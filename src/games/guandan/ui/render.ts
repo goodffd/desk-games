@@ -47,17 +47,33 @@ export function cardLabel(card: Card, level: Rank): CardLabel {
  *  大王=彩色小丑+红 JOKER；小王=灰色小丑+黑 JOKER。 */
 function jokerInner(big: boolean): string {
   const c = big
-    ? { lobeL: '#d23b35', lobeR: '#2f8f5b', lobeC: '#e0a838', bell: '#f3c623', face: '#f6d3a8', band: '#6a3fb0', ink: '#5b3a1a', nose: '#d2362f', word: '#d2362f' }
-    : { lobeL: '#9a9a9a', lobeR: '#aeaeae', lobeC: '#888888', bell: '#cfcfcf', face: '#dcdcdc', band: '#777777', ink: '#555555', nose: '#bbbbbb', word: '#1a1a1a' };
-  return `<svg class="gd-joker-fig" viewBox="0 0 40 44" aria-hidden="true">`
-    + `<path d="M20 16 Q6 16 5 30 L11 25 Q12 19 20 18 Z" fill="${c.lobeL}"/><circle cx="5" cy="31" r="2.6" fill="${c.bell}"/>`
-    + `<path d="M20 16 Q34 16 35 30 L29 25 Q28 19 20 18 Z" fill="${c.lobeR}"/><circle cx="35" cy="31" r="2.6" fill="${c.bell}"/>`
-    + `<path d="M13 14 Q20 2 27 14 L24 19 Q20 15 16 19 Z" fill="${c.lobeC}"/><circle cx="20" cy="4" r="2.6" fill="${c.bell}"/>`
-    + `<circle cx="20" cy="29" r="10" fill="${c.face}"/>`
-    + `<path d="M10 23 Q20 17 30 23 L30 27 Q20 21 10 27 Z" fill="${c.band}"/>`
-    + `<circle cx="16.5" cy="28" r="1.4" fill="${c.ink}"/><circle cx="23.5" cy="28" r="1.4" fill="${c.ink}"/>`
-    + `<circle cx="20" cy="31" r="1.3" fill="${c.nose}"/>`
-    + `<path d="M16 33 Q20 37 24 33" stroke="${c.ink}" stroke-width="1.3" fill="none" stroke-linecap="round"/>`
+    ? { hatA: '#d23b35', hatB: '#2f8f5b', hatC: '#e0a838', bell: '#f3c623', band: '#6a3fb0', skin: '#f8d9b0', cheek: '#f4a6a0', nose: '#d2362f', ink: '#5b3a1a', collar: '#f3ecd9', suitA: '#d23b35', suitB: '#e0a838', shoe: '#6a3fb0', word: '#d2362f' }
+    : { hatA: '#9a9a9a', hatB: '#aeaeae', hatC: '#888888', bell: '#cfcfcf', band: '#7a7a7a', skin: '#dcdcdc', cheek: '#c6c6c6', nose: '#bbbbbb', ink: '#555555', collar: '#ededed', suitA: '#9a9a9a', suitB: '#bcbcbc', shoe: '#777777', word: '#1a1a1a' };
+  return `<svg class="gd-joker-fig" viewBox="0 0 44 76" aria-hidden="true">`
+    // 帽子三尖 + 铃铛
+    + `<path d="M15 13 Q3 14 5 28 L11 23 Q12 16 19 14 Z" fill="${c.hatA}"/><circle cx="5" cy="29" r="2.4" fill="${c.bell}"/>`
+    + `<path d="M29 13 Q41 14 39 28 L33 23 Q32 16 25 14 Z" fill="${c.hatB}"/><circle cx="39" cy="29" r="2.4" fill="${c.bell}"/>`
+    + `<path d="M15 13 Q22 0 29 13 L26 18 Q22 14 18 18 Z" fill="${c.hatC}"/><circle cx="22" cy="2" r="2.4" fill="${c.bell}"/>`
+    // 大头 + 帽檐
+    + `<circle cx="22" cy="29" r="13" fill="${c.skin}"/>`
+    + `<path d="M10 15 Q22 9 34 15 L34 19 Q22 12 10 19 Z" fill="${c.band}"/>`
+    // 脸：眼/腮/鼻/嘴
+    + `<circle cx="17.5" cy="29" r="1.7" fill="${c.ink}"/><circle cx="26.5" cy="29" r="1.7" fill="${c.ink}"/>`
+    + `<circle cx="14.5" cy="33" r="2.1" fill="${c.cheek}"/><circle cx="29.5" cy="33" r="2.1" fill="${c.cheek}"/>`
+    + `<circle cx="22" cy="32.5" r="1.7" fill="${c.nose}"/>`
+    + `<path d="M17.5 36 Q22 40.5 26.5 36" stroke="${c.ink}" stroke-width="1.3" fill="none" stroke-linecap="round"/>`
+    // 皱领
+    + `<path d="M12 41 Q15 46 18 41 Q22 46 26 41 Q29 46 32 41 L30 45 Q22 49 14 45 Z" fill="${c.collar}" stroke="${c.ink}" stroke-width="0.4"/>`
+    // 身体（两色小丑衣）+ 扣子
+    + `<path d="M16 45 L28 45 L30 64 L14 64 Z" fill="${c.suitA}"/>`
+    + `<path d="M22 45 L28 45 L30 64 L22 64 Z" fill="${c.suitB}"/>`
+    + `<circle cx="22" cy="51" r="1.1" fill="${c.bell}"/><circle cx="22" cy="57" r="1.1" fill="${c.bell}"/>`
+    // 手臂 + 袖口铃铛
+    + `<path d="M16 46 Q9 50 11 57" stroke="${c.suitA}" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="11" cy="58" r="2" fill="${c.bell}"/>`
+    + `<path d="M28 46 Q35 50 33 57" stroke="${c.suitB}" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="33" cy="58" r="2" fill="${c.bell}"/>`
+    // 腿 + 翘头鞋
+    + `<rect x="18" y="63" width="2.6" height="7" fill="${c.suitB}"/><rect x="23.4" y="63" width="2.6" height="7" fill="${c.suitA}"/>`
+    + `<path d="M14 70 Q12 73.5 18 72.5 L20.6 70.5 Z" fill="${c.shoe}"/><path d="M30 70 Q32 73.5 26 72.5 L23.4 70.5 Z" fill="${c.shoe}"/>`
     + `</svg><span class="gd-joker-word" style="color:${c.word}">JOKER</span>`;
 }
 

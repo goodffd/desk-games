@@ -252,39 +252,43 @@
 .gd-card--red { color: var(--red); }
 .gd-card--black { color: var(--black); }
 
-/* --- 大小王牌面 --- */
+/* --- 大小王牌面（全身 Q 版小丑 + 竖排 JOKER） --- */
 .gd-card--joker {
+  position: relative;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 0;
   padding: 2px;
 }
 .gd-card--joker-big { background: linear-gradient(135deg, #fff8f0, #fdeede); }
 .gd-card--joker-small { background: linear-gradient(135deg, #f6f6f8, #eaeaee); }
 
-/* 小丑 SVG：大牌 */
+/* 全身小丑 SVG：填满牌面 */
 .gd-joker-fig {
-  width: 38px;
-  height: 42px;
+  width: 46px;
+  height: 76px;
   flex-shrink: 0;
 }
-/* 小丑 SVG：小牌 */
 .gd-card--small .gd-joker-fig {
-  width: 28px;
-  height: 31px;
+  width: 33px;
+  height: 55px;
 }
 
-/* JOKER 文字：必须完整显示 5 个字母，不裁切 */
+/* JOKER 竖排（每字母直立、上下叠），居左上角 */
 .gd-joker-word {
-  font-size: 0.5rem;
+  position: absolute;
+  top: 3px;
+  left: 2px;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-size: 0.34rem;
   font-weight: 800;
-  letter-spacing: 0;
-  line-height: 1;
-  white-space: nowrap;
-  overflow: visible;
+  letter-spacing: -0.05em;
+  line-height: 0.92;
+  text-shadow: 0 0 2px rgba(255,255,255,0.9), 0 0 2px rgba(255,255,255,0.9);
 }
 .gd-card--small .gd-joker-word {
-  font-size: 0.4rem;
+  font-size: 0.28rem;
 }
 
 /* --- 普通牌面字号 --- */

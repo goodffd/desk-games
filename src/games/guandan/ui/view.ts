@@ -84,7 +84,7 @@ export function mount(root: HTMLElement): () => void {
   topbar.appendChild(topbarTitle);
   topbar.appendChild(backBtn);
 
-  // 主桌面
+  // 主桌面（flex 列：top → center → bottom）
   const tableEl = document.createElement('div');
   tableEl.className = 'gd-table';
 
@@ -100,15 +100,33 @@ export function mount(root: HTMLElement): () => void {
   };
   for (const s of [0, 1, 2, 3] as Seat[]) {
     seatEls[s].className = `gd-seat gd-seat--${SEAT_POSITIONS[s]}`;
-    tableEl.appendChild(seatEls[s]);
   }
+
+  // 顶部对手行：上家(3) + 对家(2) + 下家(1) 横排一行
+  const opponentsRow = document.createElement('div');
+  opponentsRow.className = 'gd-opponents-row';
+  opponentsRow.appendChild(seatEls[3]); // 上家，左列
+  opponentsRow.appendChild(seatEls[2]); // 对家，中列
+  opponentsRow.appendChild(seatEls[1]); // 下家，右列
+  tableEl.appendChild(opponentsRow);
 
   // 中央出牌展示区
   const centerEl = document.createElement('div');
   centerEl.className = 'gd-center';
   tableEl.appendChild(centerEl);
 
-  // 按钮区（在 gameEl 底部，bottom seat 下方）
+  // 底部区域：玩家手牌 + 提示 + 按钮，用 gd-bottom-area 包住推到 game 底部
+  const bottomArea = document.createElement('div');
+  bottomArea.className = 'gd-bottom-area';
+
+  bottomArea.appendChild(seatEls[0]); // 玩家手牌
+
+  // 提示文字
+  const hintEl = document.createElement('div');
+  hintEl.className = 'gd-hint';
+  bottomArea.appendChild(hintEl);
+
+  // 按钮区
   const actionsEl = document.createElement('div');
   actionsEl.className = 'gd-actions';
   const playBtn = document.createElement('button');
@@ -119,15 +137,11 @@ export function mount(root: HTMLElement): () => void {
   passBtn.textContent = '不要';
   actionsEl.appendChild(playBtn);
   actionsEl.appendChild(passBtn);
-
-  // 提示文字
-  const hintEl = document.createElement('div');
-  hintEl.className = 'gd-hint';
+  bottomArea.appendChild(actionsEl);
 
   gameEl.appendChild(topbar);
   gameEl.appendChild(tableEl);
-  gameEl.appendChild(hintEl);
-  gameEl.appendChild(actionsEl);
+  gameEl.appendChild(bottomArea);
   root.appendChild(gameEl);
 
   // ── 渲染函数 ──────────────────────────────────────────────────────────────
@@ -162,11 +176,11 @@ export function mount(root: HTMLElement): () => void {
 
     el.appendChild(label);
 
-    // 背面牌堆
+    // 背面牌堆（最多 7 张横向小叠，左右角块控制宽度）
     if (finishIdx < 0 && state.hands[seat]!.length > 0) {
       const backEl = document.createElement('div');
       backEl.className = 'gd-hand-back';
-      const shown = Math.min(state.hands[seat]!.length, 8);
+      const shown = Math.min(state.hands[seat]!.length, 7);
       for (let i = 0; i < shown; i++) {
         const bc = document.createElement('div');
         bc.className = 'gd-hand-back__card';

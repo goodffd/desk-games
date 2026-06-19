@@ -15,7 +15,7 @@
   --border-card: #d4c4a0;
 }
 
-/* --- 游戏根容器 --- */
+/* --- 游戏根容器（flex 列，topbar + table(撑满) + bottomArea(固定高度贴底)） --- */
 .gd-game {
   display: flex;
   flex-direction: column;
@@ -25,7 +25,14 @@
   position: relative;
   overflow: hidden;
   font-family: var(--font-ui);
-  justify-content: flex-start;
+}
+
+/* 手牌+提示+按钮区，固定在底部 */
+.gd-bottom-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 /* --- 顶部栏 --- */
@@ -58,20 +65,28 @@
 }
 .gd-topbar__back:hover { background: rgba(201,168,76,0.1); border-color: var(--gold); }
 
-/* --- 主桌面（四座布局：固定顶底行，中行拉伸填满） --- */
+/* --- 主桌面（flex:1 撑满，position:relative 给绝对定位子元素用） --- */
 .gd-table {
   flex: 1 1 0;
-  display: grid;
-  grid-template-rows: 120px 1fr 120px;
-  grid-template-columns: 100px 1fr 100px;
-  grid-template-areas:
-    ".       top    ."
-    "left   center  right"
-    ".      bottom  .";
-  gap: 0.2rem;
-  padding: 0.3rem 0.4rem;
   min-height: 0;
-  align-items: center;
+  position: relative;
+  overflow: hidden;
+  /* 毡布椭圆渐变：中央亮绿，四周暗角 */
+  background: radial-gradient(ellipse 80% 70% at 50% 50%, #1e4420 0%, #132f13 70%, #0e230e 100%);
+  border-radius: 0 0 20px 20px;
+  box-shadow: inset 0 0 60px rgba(0,0,0,0.35);
+}
+
+/* 顶部三家对手横排：绝对贴顶 */
+.gd-opponents-row {
+  position: absolute;
+  top: 0.4rem;
+  left: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
 }
 
 /* --- 各座区域 --- */
@@ -83,10 +98,31 @@
   min-width: 0;
 }
 
-.gd-seat--top    { grid-area: top; flex-direction: column; }
-.gd-seat--bottom { grid-area: bottom; flex-direction: column-reverse; }
-.gd-seat--left   { grid-area: left; flex-direction: column; justify-content: center; align-self: stretch; }
-.gd-seat--right  { grid-area: right; flex-direction: column; justify-content: center; align-self: stretch; }
+/* 顶部对家：横排居中 */
+.gd-seat--top {
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+/* 底部玩家：在 bottom-area 中居中 */
+.gd-seat--bottom {
+  flex-direction: column-reverse;
+  align-items: center;
+  width: 100%;
+}
+
+/* 上家(3)/下家(1)：横排两端 */
+.gd-seat--left {
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1;
+}
+.gd-seat--right {
+  flex-direction: column;
+  align-items: flex-end;
+  flex: 1;
+}
 
 /* --- 座位标签 --- */
 .gd-seat__label {
@@ -125,33 +161,45 @@
 .gd-hand-back {
   display: flex;
   justify-content: center;
+  flex-direction: row;  /* 默认横向叠 */
 }
 .gd-hand-back__card {
-  width: 34px;
-  height: 50px;
+  width: 26px;
+  height: 38px;
   background: linear-gradient(135deg, #1a6b2a, #0e4a1a);
   border: 1px solid #2a8a3a;
-  border-radius: 4px;
-  margin: 0 -9px;
+  border-radius: 3px;
+  margin: 0 -7px;
   box-shadow: 1px 1px 3px rgba(0,0,0,0.4);
 }
 
-/* 左右座位：竖向叠牌，拉伸填满中间行 */
-.gd-seat--left .gd-hand-back { flex-direction: column; flex: 1; justify-content: center; }
-.gd-seat--left .gd-hand-back__card { margin: -11px 0; }
-.gd-seat--right .gd-hand-back { flex-direction: column; flex: 1; justify-content: center; }
-.gd-seat--right .gd-hand-back__card { margin: -11px 0; }
+/* 左右角块：横向小叠（最多 7 张，不再竖向拉满） */
+.gd-seat--left .gd-hand-back,
+.gd-seat--right .gd-hand-back {
+  flex-direction: row;
+}
+.gd-seat--left .gd-hand-back__card,
+.gd-seat--right .gd-hand-back__card {
+  margin: 0 -7px;
+}
 
-/* --- 中央区域 --- */
+/* --- 中央出牌区：绝对定位，固定在 gd-table 中上方（对手行下方约 130px 处） --- */
 .gd-center {
-  grid-area: center;
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  top: 230px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  min-height: 0;
-  position: relative;
+  padding: 0.8rem 0.5rem;
+  /* 桌面内圆角/内阴影，增加"桌子"感 */
+  border-radius: 12px;
+  background: rgba(0,0,0,0.10);
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+  min-height: 150px;
 }
 
 /* --- 出牌展示区（仅显示有出牌的格子） --- */

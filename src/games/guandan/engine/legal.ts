@@ -145,6 +145,8 @@ interface HandIndex {
   /** all jokers, split */
   bigJokers: Card[];
   smallJokers: Card[];
+  /** the natural rank of the current level (red-heart cards of this rank are the wilds) */
+  levelPoint: number;
 }
 
 function indexHand(hand: Card[], level: Rank): HandIndex {
@@ -179,7 +181,7 @@ function indexHand(hand: Card[], level: Rank): HandIndex {
     else sm.set(c.rank, [c]);
   }
 
-  return { byRank, bySuitRank, wilds, bigJokers, smallJokers };
+  return { byRank, bySuitRank, wilds, bigJokers, smallJokers, levelPoint: level };
 }
 
 /** Pick `count` cards of natural `rank` from the index (real cards only). */
@@ -187,6 +189,45 @@ function takeReal(idx: HandIndex, rank: number, count: number): Card[] | null {
   const arr = idx.byRank.get(rank);
   if (!arr || arr.length < count) return null;
   return arr.slice(0, count);
+}
+
+/**
+ * Candidate combo-component points for a hand: every distinct REAL natural rank, PLUS
+ * the LEVEL point itself whenever wildcards are present. Red-heart-2 wildcards may play
+ * as their own level rank (e.g. two wilds = a level pair), so the level point is a valid
+ * component point even when the hand holds no real level card. (When a real level card
+ * IS present, the level point already appears as a real rank; we de-dup with a Set.)
+ */
+function candidatePoints(idx: HandIndex): number[] {
+  const s = new Set<number>(idx.byRank.keys());
+  if (idx.wilds.length > 0) s.add(idx.levelPoint);
+  return [...s].sort((a, b) => a - b);
+}
+
+/**
+ * Take `count` cards forming a single-point group at natural `rank`, drawing REAL cards
+ * of that rank first and filling any deficit from the wildcard pool, given a per-call
+ * wild budget. Wilds fill the deficit by acting AS rank `rank` (a substitute, or — when
+ * `rank` is the level point — their own literal level card; either way the concrete group
+ * is later validated by `allReadings`). Returns the chosen cards and how many wilds it
+ * consumed, or null if it cannot be formed within `wildBudget`.
+ */
+function takeAtPoint(
+  idx: HandIndex,
+  rank: number,
+  count: number,
+  wildBudget: number,
+  wildOffset: number
+): { cards: Card[]; wildsUsed: number } | null {
+  const real = idx.byRank.get(rank);
+  const realN = real ? Math.min(real.length, count) : 0;
+  const deficit = count - realN;
+  if (deficit > wildBudget) return null;
+  if (deficit + wildOffset > idx.wilds.length) return null;
+  const out: Card[] = [];
+  if (realN > 0) out.push(...real!.slice(0, realN));
+  for (let i = 0; i < deficit; i++) out.push(idx.wilds[wildOffset + i]!);
+  return { cards: out, wildsUsed: deficit };
 }
 
 /**
@@ -234,53 +275,41 @@ export function enumerateLeads(hand: Card[], level: Rank): Combo[] {
   }
 
   // ----- pairs (2 same point) -----
-  // real pair: count>=2.  one-wild pair: count>=1 real + 1 wild.  two-wild pair: 2 wilds (level point).
-  for (const r of realRanks) {
-    if (cnt(r) >= 2) record(out, takeReal(idx, r, 2)!, 'pair', level);
-    if (W >= 1 && cnt(r) >= 1) record(out, [...takeReal(idx, r, 1)!, idx.wilds[0]!], 'pair', level);
+  // Candidate points include the level point: two red-heart-2 wilds form a level pair
+  // (key 15) even with no real level card. `takeAtPoint` draws reals first then wilds.
+  for (const r of candidatePoints(idx)) {
+    const got = takeAtPoint(idx, r, 2, W, 0);
+    if (got) record(out, got.cards, 'pair', level);
   }
-  if (W >= 2) record(out, [idx.wilds[0]!, idx.wilds[1]!], 'pair', level);
 
   // ----- triples (3 same point) -----
-  for (const r of realRanks) {
-    if (cnt(r) >= 3) record(out, takeReal(idx, r, 3)!, 'triple', level);
-    if (W >= 1 && cnt(r) >= 2)
-      record(out, [...takeReal(idx, r, 2)!, idx.wilds[0]!], 'triple', level);
-    if (W >= 2 && cnt(r) >= 1)
-      record(out, [...takeReal(idx, r, 1)!, idx.wilds[0]!, idx.wilds[1]!], 'triple', level);
-  }
-  if (W >= 2) {
-    // 2 wilds alone make a pair, not a triple (need 3 cards). nothing here.
+  // Same candidate-point treatment; a level triple needs ≥1 real level card since only
+  // two wilds exist, which `takeAtPoint`'s wild-budget check enforces naturally.
+  for (const r of candidatePoints(idx)) {
+    const got = takeAtPoint(idx, r, 3, W, 0);
+    if (got) record(out, got.cards, 'triple', level);
   }
 
   // ----- tripleWithPair (3 of point A + 2 of point B, A != B) -----
-  // We need a triple structure and a pair structure that consume distinct REAL points and
-  // share the wildcard budget. Build by choosing the triple point t and pair point p, then
-  // distributing wildcards across the deficits. Keep it simple & correct by enumerating
-  // wildcard split (wt for triple, wp for pair) with wt+wp <= W.
+  // We need a triple structure and a pair structure on DISTINCT points that share the
+  // wildcard budget. Candidate points include every real rank PLUS the LEVEL point (which
+  // red-heart-2 wilds can fill as their own level rank) — that is the root-cause fix: e.g.
+  // {S5,H5,D5,红2,红2} = triple-5 + a level pair built from the two wilds. `takeAtPoint`
+  // draws real cards first then wilds; we allocate the triple's wilds at offset 0 and the
+  // pair's at the offset following them so no wild is double-spent.
   {
-    const pts = realRanks;
+    const pts = candidatePoints(idx);
     for (const t of pts) {
+      const tri = takeAtPoint(idx, t, 3, W, 0);
+      if (!tri) continue;
+      const remW = W - tri.wildsUsed;
       for (const p of pts) {
         if (t === p) continue;
-        for (let wt = 0; wt <= W; wt++) {
-          const needTripleReal = 3 - wt;
-          if (needTripleReal < 0) continue;
-          if (cnt(t) < needTripleReal) continue;
-          const remW = W - wt;
-          for (let wpair = 0; wpair <= remW; wpair++) {
-            const needPairReal = 2 - wpair;
-            if (needPairReal < 0) continue;
-            if (cnt(p) < needPairReal) continue;
-            const group: Card[] = [];
-            if (needTripleReal > 0) group.push(...takeReal(idx, t, needTripleReal)!);
-            if (needPairReal > 0) group.push(...takeReal(idx, p, needPairReal)!);
-            const usedW = wt + wpair;
-            for (let i = 0; i < usedW; i++) group.push(idx.wilds[i]!);
-            if (group.length !== 5) continue;
-            record(out, group, 'tripleWithPair', level);
-          }
-        }
+        const pair = takeAtPoint(idx, p, 2, remW, tri.wildsUsed);
+        if (!pair) continue;
+        const group = [...tri.cards, ...pair.cards];
+        if (group.length !== 5) continue;
+        record(out, group, 'tripleWithPair', level);
       }
     }
   }

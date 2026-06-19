@@ -269,6 +269,58 @@ describe('enumerateFollows: wild-assisted follows', () => {
 });
 
 // ---------------------------------------------------------------------------
+describe('enumerateLeads / enumerateFollows: level point composed by red-heart-2 wilds', () => {
+  // ROOT-CAUSE regression: structured enumeration must offer the LEVEL point (rank 2,
+  // key 15) as a combo component even when ALL of its cards are red-heart-2 wildcards
+  // acting as their own level rank — not only as substitutes for other ranks. These
+  // readings are accepted by identify/allReadings but were previously not generated.
+
+  it('{S5,H5,D5,红2,红2} leads include tripleWithPair key5 (pair part = two wilds as level)', () => {
+    const hand = [n('S', 5), n('H', 5), n('D', 5), wild(), wild()];
+    const leads = enumerateLeads(hand, L);
+    expect(has(leads, 'tripleWithPair', 5, 5)).toBe(true);
+    // sanity: identify agrees this exact group is a tripleWithPair key 5
+    const built = find(leads, 'tripleWithPair', 5, 5)!;
+    const re = identify(built.cards, L);
+    // identify reads {S5,H5,D5,H2,H2} as triple-5 + pair-2(level) → tripleWithPair key5
+    expect(re).not.toBeNull();
+    expect(re!.type).toBe('tripleWithPair');
+    expect(re!.key).toBe(5);
+  });
+
+  it('{红2,红2} leads include pair key15 (the level pair)', () => {
+    const hand = [wild(), wild()];
+    const leads = enumerateLeads(hand, L);
+    expect(has(leads, 'pair', 15, 2)).toBe(true);
+  });
+
+  it('follows: current=tripleWithPair(triple-4), hand {5,5,5,红2,红2} → tripleWithPair(triple-5)', () => {
+    const cur = identify(
+      cards(['S', 4], ['H', 4], ['D', 4], ['C', 5], ['D', 5]),
+      L
+    )!;
+    expect(cur.type).toBe('tripleWithPair');
+    expect(cur.key).toBe(4); // triple is the 4s
+    const hand = [n('S', 5), n('H', 5), n('D', 5), wild(), wild()];
+    const f = enumerateFollows(hand, cur, L);
+    expect(has(f, 'tripleWithPair', 5, 5)).toBe(true);
+  });
+
+  it('completeness: enumerateLeads ⊇ every tripleWithPair allReadings finds for {S5,H5,D5,红2,红2}', () => {
+    // For the title hand, build the set of tripleWithPair keys allReadings yields for the
+    // whole 5-card group, and assert enumerateLeads covers each (root-cause completeness).
+    const hand = [n('S', 5), n('H', 5), n('D', 5), wild(), wild()];
+    const leads = enumerateLeads(hand, L);
+    const fromReadings = allReadings(hand, L).filter(c => c.type === 'tripleWithPair');
+    for (const r of fromReadings) {
+      expect(has(leads, 'tripleWithPair', r.key, 5)).toBe(true);
+    }
+    // and the specific brief case is among them
+    expect(fromReadings.some(c => c.key === 5)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 describe('isLegalPlay', () => {
   const hand = () => [
     n('S', 3),

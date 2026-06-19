@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { parseHash } from '../src/shell/router';
 import { route } from '../src/shell/router';
 import type { GameModule, GameEntry } from '../src/shell/types';
@@ -102,8 +102,8 @@ describe('route', () => {
 
   it('unknown game id routes home as fallback', () => {
     const cleanup = route(registry, '#/nonexistent', root);
-    // should not crash; render home or show error
-    expect(root.innerHTML.length).toBeGreaterThan(0);
+    // should fall back to home page, which renders the registered game cards
+    expect(root.innerHTML).toContain('testgame');
     cleanup();
   });
 });

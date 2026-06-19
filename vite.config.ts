@@ -6,4 +6,7 @@ export default defineConfig({
   build: {
     assetsInlineLimit: 4 * 1024 * 1024, // 4MB — inline fonts/images
   },
+  test: {
+    exclude: ['**/.claude/**', '**/node_modules/**', '**/dist/**'],
+  },
 });

@@ -26,7 +26,7 @@ desk-games/
 │   │       ├── engine/        # 纯逻辑，无 DOM，唯一真相
 │   │       │   ├── cards.ts   # 牌/牌堆/发牌/单张大小
 │   │       │   ├── combos.ts  # 牌型识别 + 比大小 + 逢人配指派
-│   │       │   ├── rules.ts   # 合法跟牌枚举
+│   │       │   ├── legal.ts   # 合法跟牌枚举
 │   │       │   └── game.ts    # 单局状态机：出牌/不要/接风/名次
 │   │       ├── ai/            # choosePlay 纯函数策略
 │   │       └── ui/           # DOM+CSS 渲染 + 交互 + 动画

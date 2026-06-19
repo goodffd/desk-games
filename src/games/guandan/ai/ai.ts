@@ -14,7 +14,6 @@
 
 import type { Card, Combo, Seat } from '../engine/types';
 import type { DealState } from '../engine/game';
-import { rankValue } from '../engine/cards';
 import { enumerateLeads, enumerateFollows, isLegalPlay } from '../engine/legal';
 
 // Bomb-class types (power > 0)
@@ -97,17 +96,17 @@ export function choosePlay(s: DealState, seat: Seat): Card[] | null {
   const partner = ((seat + 2) % 4) as Seat;
   const partnerLeads = s.current.by === partner;
 
-  const follows = enumerateFollows(hand, s.current.combo, level);
-
-  if (follows.length === 0) {
-    // Nothing can beat current — must pass.
-    return null;
-  }
-
   if (partnerLeads) {
     // Partner is winning this trick. Strongly prefer to pass and let partner take it.
     // Only override if we have nothing else meaningful to do — in the basic AI, always pass
     // when partner leads (we never "help" by pressing). This satisfies the TDD weak assertion.
+    return null;
+  }
+
+  const follows = enumerateFollows(hand, s.current.combo, level);
+
+  if (follows.length === 0) {
+    // Nothing can beat current — must pass.
     return null;
   }
 

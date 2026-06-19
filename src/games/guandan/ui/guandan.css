@@ -1,0 +1,380 @@
+/* ===== 掼蛋游戏样式 ===== */
+
+/* --- 变量 --- */
+:root {
+  --font-ui: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", system-ui, sans-serif;
+  /* 注意：内嵌字体子集待补（pyftsubset 暂不在本机，留作后续字体专项） */
+  --gold: #c9a84c;
+  --gold-dim: #8a6e2a;
+  --bg-table: #1a3a1a;
+  --bg-card: #f5f0e8;
+  --bg-card-selected: #fff9e8;
+  --red: #c0392b;
+  --black: #1a1208;
+  --text-light: #e8d9b0;
+  --text-dim: #a89070;
+  --border-card: #d4c4a0;
+}
+
+/* --- 游戏根容器 --- */
+.gd-game {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 500px;
+  background: var(--bg-table);
+  position: relative;
+  overflow: hidden;
+  font-family: var(--font-ui);
+}
+
+/* --- 顶部栏 --- */
+.gd-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  background: rgba(0, 0, 0, 0.4);
+  border-bottom: 1px solid #2a4a2a;
+  flex-shrink: 0;
+}
+
+.gd-topbar__title {
+  color: var(--gold);
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+}
+
+.gd-topbar__back {
+  background: transparent;
+  border: 1px solid var(--gold-dim);
+  color: var(--gold);
+  padding: 0.3rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: var(--font-ui);
+  transition: border-color 0.2s, background 0.2s;
+}
+.gd-topbar__back:hover { background: rgba(201,168,76,0.1); border-color: var(--gold); }
+
+/* --- 主桌面（四座布局） --- */
+.gd-table {
+  flex: 1;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas:
+    ".       top    ."
+    "left   center  right"
+    ".      bottom  .";
+  gap: 0.5rem;
+  padding: 0.5rem;
+  min-height: 0;
+}
+
+/* --- 各座区域 --- */
+.gd-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.gd-seat--top    { grid-area: top; flex-direction: column; }
+.gd-seat--bottom { grid-area: bottom; flex-direction: column-reverse; }
+.gd-seat--left   { grid-area: left; flex-direction: column; justify-content: center; }
+.gd-seat--right  { grid-area: right; flex-direction: column; justify-content: center; }
+
+/* --- 座位标签 --- */
+.gd-seat__label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.gd-seat__label.is-active {
+  color: var(--gold);
+}
+
+.gd-seat__label-name { font-weight: 600; }
+.gd-seat__card-count {
+  background: rgba(0,0,0,0.4);
+  border-radius: 3px;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* --- 名次徽章 --- */
+.gd-seat__rank {
+  background: var(--gold);
+  color: #1a1208;
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* --- AI 座位手牌（背面堆叠显示） --- */
+.gd-hand-back {
+  display: flex;
+  justify-content: center;
+}
+.gd-hand-back__card {
+  width: 28px;
+  height: 40px;
+  background: linear-gradient(135deg, #1a6b2a, #0e4a1a);
+  border: 1px solid #2a8a3a;
+  border-radius: 4px;
+  margin: 0 -8px;
+  box-shadow: 1px 1px 3px rgba(0,0,0,0.4);
+}
+
+/* 左右座位旋转 */
+.gd-seat--left .gd-hand-back { flex-direction: column; }
+.gd-seat--left .gd-hand-back__card { margin: -10px 0; }
+.gd-seat--right .gd-hand-back { flex-direction: column; }
+.gd-seat--right .gd-hand-back__card { margin: -10px 0; }
+
+/* --- 中央区域 --- */
+.gd-center {
+  grid-area: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 0;
+  position: relative;
+}
+
+/* --- 出牌展示区 --- */
+.gd-played-area {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 0.4rem;
+  width: 100%;
+  max-width: 360px;
+}
+
+.gd-played-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 60px;
+  justify-content: center;
+}
+
+.gd-played-slot__label {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.gd-played-slot__cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1px;
+}
+
+.gd-played-slot--pass .gd-played-slot__status {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.gd-played-slot--current {
+  background: rgba(201, 168, 76, 0.08);
+  border-radius: 4px;
+  padding: 0.2rem;
+}
+
+/* --- 牌卡组件 --- */
+.gd-card {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: 36px;
+  height: 52px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 5px;
+  padding: 2px 3px;
+  cursor: default;
+  user-select: none;
+  box-shadow: 1px 2px 4px rgba(0,0,0,0.3);
+  transition: transform 0.15s, box-shadow 0.15s;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.gd-card--small {
+  width: 28px;
+  height: 40px;
+  font-size: 0.7rem;
+}
+
+.gd-card--red { color: var(--red); }
+.gd-card--black { color: var(--black); }
+.gd-card--joker-big { color: var(--red); background: linear-gradient(135deg, #fff0f0, #f5e0e0); }
+.gd-card--joker-small { color: #333; background: linear-gradient(135deg, #f0f0f5, #e0e0e5); }
+
+.gd-card__rank {
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.gd-card--small .gd-card__rank { font-size: 0.7rem; }
+
+.gd-card__suit {
+  font-size: 0.75rem;
+  line-height: 1;
+}
+.gd-card--small .gd-card__suit { font-size: 0.6rem; }
+
+/* --- 玩家手牌（扇形展开） --- */
+.gd-player-hand {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 0.5rem 1rem;
+  min-height: 80px;
+  position: relative;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.gd-player-hand .gd-card {
+  cursor: pointer;
+  margin: 0 -6px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.gd-player-hand .gd-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 2px 4px 8px rgba(0,0,0,0.5);
+  z-index: 10;
+}
+
+.gd-player-hand .gd-card.is-selected {
+  transform: translateY(-16px);
+  box-shadow: 2px 6px 12px rgba(201, 168, 76, 0.5);
+  border-color: var(--gold);
+  background: var(--bg-card-selected);
+  z-index: 11;
+}
+
+.gd-player-hand .gd-card.is-selected:hover {
+  transform: translateY(-20px);
+}
+
+/* --- 操作按钮 --- */
+.gd-actions {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: center;
+  padding: 0.4rem 0;
+  flex-shrink: 0;
+}
+
+.gd-btn {
+  padding: 0.5rem 1.5rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  transition: opacity 0.2s, transform 0.1s;
+  min-width: 80px;
+}
+
+.gd-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.gd-btn--play {
+  background: var(--gold);
+  color: #1a1208;
+}
+.gd-btn--play:not(:disabled):hover { opacity: 0.85; transform: scale(1.02); }
+
+.gd-btn--pass {
+  background: transparent;
+  border: 1px solid var(--gold-dim);
+  color: var(--gold);
+}
+.gd-btn--pass:not(:disabled):hover { background: rgba(201,168,76,0.1); }
+
+/* --- 提示信息 --- */
+.gd-hint {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  min-height: 1.2em;
+  padding: 0.2rem;
+}
+
+.gd-hint--error { color: #e07050; }
+.gd-hint--info  { color: var(--gold); }
+
+/* --- 局结弹层 --- */
+.gd-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.gd-result {
+  background: linear-gradient(145deg, #2a1f0e, #1e1608);
+  border: 1px solid var(--gold);
+  border-radius: 12px;
+  padding: 2rem 3rem;
+  text-align: center;
+  max-width: 340px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+
+.gd-result__title {
+  font-size: 1.5rem;
+  color: var(--gold);
+  margin-bottom: 1rem;
+  letter-spacing: 0.1em;
+}
+
+.gd-result__ranking {
+  list-style: none;
+  margin-bottom: 1.2rem;
+}
+
+.gd-result__ranking li {
+  font-size: 1rem;
+  color: var(--text-light);
+  padding: 0.2rem 0;
+}
+
+.gd-result__gain {
+  font-size: 0.9rem;
+  color: var(--gold);
+  margin-bottom: 1.2rem;
+}
+
+.gd-btn--restart {
+  background: var(--gold);
+  color: #1a1208;
+  padding: 0.6rem 2rem;
+  font-size: 1rem;
+}
+.gd-btn--restart:hover { opacity: 0.85; }

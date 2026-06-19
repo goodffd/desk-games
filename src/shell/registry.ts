@@ -1,17 +1,5 @@
-import type { GameEntry, GameModule } from './types';
-
-// 掼蛋 stub（Task 8 占位，Task 9 替换为真实 UI）
-const guandanStub: GameModule = {
-  id: 'guandan',
-  name: '掼蛋',
-  desc: '升级类扑克，2v2 四人局，支持对 AI 单局',
-  mount(root: HTMLElement): () => void {
-    root.innerHTML = '<div style="padding:2rem;text-align:center;font-size:1.2rem">掼蛋（开发中）</div>';
-    return () => {
-      root.innerHTML = '';
-    };
-  },
-};
+import type { GameEntry } from './types';
+import { guandanModule } from '../games/guandan/index';
 
 /**
  * 构建游戏注册表
@@ -19,7 +7,7 @@ const guandanStub: GameModule = {
  */
 export function buildRegistry(xiangqiUrl: string = '#'): GameEntry[] {
   return [
-    { kind: 'internal', module: guandanStub },
+    { kind: 'internal', module: guandanModule },
     {
       kind: 'external',
       id: 'xiangqi',

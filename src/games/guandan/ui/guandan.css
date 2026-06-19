@@ -2,8 +2,7 @@
 
 /* --- 变量 --- */
 :root {
-  --font-ui: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", system-ui, sans-serif;
-  /* 注意：内嵌字体子集待补（pyftsubset 暂不在本机，留作后续字体专项） */
+  --font-ui: 'DGFont', system-ui, sans-serif;
   --gold: #c9a84c;
   --gold-dim: #8a6e2a;
   --bg-table: #1a3a1a;
@@ -26,6 +25,7 @@
   position: relative;
   overflow: hidden;
   font-family: var(--font-ui);
+  justify-content: flex-start;
 }
 
 /* --- 顶部栏 --- */
@@ -60,17 +60,18 @@
 
 /* --- 主桌面（四座布局） --- */
 .gd-table {
-  flex: 1;
+  flex: 0 0 auto;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto auto auto;
   grid-template-columns: auto 1fr auto;
   grid-template-areas:
     ".       top    ."
     "left   center  right"
     ".      bottom  .";
-  gap: 0.5rem;
-  padding: 0.5rem;
+  gap: 0.4rem;
+  padding: 0.4rem 0.5rem;
   min-height: 0;
+  align-content: flex-start;
 }
 
 /* --- 各座区域 --- */
@@ -126,20 +127,20 @@
   justify-content: center;
 }
 .gd-hand-back__card {
-  width: 28px;
-  height: 40px;
+  width: 36px;
+  height: 54px;
   background: linear-gradient(135deg, #1a6b2a, #0e4a1a);
   border: 1px solid #2a8a3a;
   border-radius: 4px;
-  margin: 0 -8px;
+  margin: 0 -10px;
   box-shadow: 1px 1px 3px rgba(0,0,0,0.4);
 }
 
 /* 左右座位旋转 */
 .gd-seat--left .gd-hand-back { flex-direction: column; }
-.gd-seat--left .gd-hand-back__card { margin: -10px 0; }
+.gd-seat--left .gd-hand-back__card { margin: -12px 0; }
 .gd-seat--right .gd-hand-back { flex-direction: column; }
-.gd-seat--right .gd-hand-back__card { margin: -10px 0; }
+.gd-seat--right .gd-hand-back__card { margin: -12px 0; }
 
 /* --- 中央区域 --- */
 .gd-center {
@@ -148,7 +149,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.6rem;
+  gap: 0.4rem;
   min-height: 0;
   position: relative;
 }
@@ -160,7 +161,7 @@
   grid-template-rows: 1fr 1fr;
   gap: 0.4rem;
   width: 100%;
-  max-width: 360px;
+  max-width: 420px;
 }
 
 .gd-played-slot {
@@ -168,7 +169,7 @@
   flex-direction: column;
   align-items: center;
   gap: 0.2rem;
-  min-height: 60px;
+  min-height: 80px;
   justify-content: center;
 }
 
@@ -201,8 +202,8 @@
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
-  width: 36px;
-  height: 52px;
+  width: 44px;
+  height: 64px;
   background: var(--bg-card);
   border: 1px solid var(--border-card);
   border-radius: 5px;
@@ -216,9 +217,9 @@
 }
 
 .gd-card--small {
-  width: 28px;
-  height: 40px;
-  font-size: 0.7rem;
+  width: 38px;
+  height: 54px;
+  font-size: 0.8rem;
 }
 
 .gd-card--red { color: var(--red); }
@@ -227,17 +228,17 @@
 .gd-card--joker-small { color: #333; background: linear-gradient(135deg, #f0f0f5, #e0e0e5); }
 
 .gd-card__rank {
-  font-size: 0.85rem;
+  font-size: 1rem;
   font-weight: 700;
   line-height: 1;
 }
-.gd-card--small .gd-card__rank { font-size: 0.7rem; }
+.gd-card--small .gd-card__rank { font-size: 0.8rem; }
 
 .gd-card__suit {
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   line-height: 1;
 }
-.gd-card--small .gd-card__suit { font-size: 0.6rem; }
+.gd-card--small .gd-card__suit { font-size: 0.7rem; }
 
 /* --- 玩家手牌（扇形展开） --- */
 .gd-player-hand {
@@ -253,7 +254,7 @@
 
 .gd-player-hand .gd-card {
   cursor: pointer;
-  margin: 0 -6px;
+  margin: 0 -8px;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 

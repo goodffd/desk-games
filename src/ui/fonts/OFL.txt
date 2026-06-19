@@ -1,0 +1,41 @@
+Font: Noto Sans SC (思源黑体简体中文) Regular
+Source: https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5/
+Origin: https://github.com/notofonts/noto-cjk
+
+SIL OPEN FONT LICENSE Version 1.1
+
+Copyright 2014-2021 Adobe Systems Incorporated (http://www.adobe.com/)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is available with a FAQ at: http://scripts.sil.org/OFL
+
+OFL PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of academic and linguistic communities, and to provide a free and
+open framework in which fonts may be shared and improved in partnership
+with others.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+The Font Software may be embedded in documents, distributed as part
+of applications, and sold as part of a product, as long as the
+OFL Reserved Font Name(s) are not used as the primary name of the
+resulting work.
+
+Neither the Font Software nor any of its individual components may
+be sold by itself.
+
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+
+Subset created with pyftsubset (fonttools) for desk-games project.
+Source files:
+  - noto-sans-sc-chinese-simplified-400-normal.woff2 (Chinese Simplified block)
+  - noto-sans-sc-latin-400-normal.woff2 (Latin block)
+Merged and subsetted to cover 358 CJK unified ideographs used as fixed UI
+text in the app, plus U+0020-007E (basic Latin: card ranks 3-10/J/Q/K/A,
+digits, common punctuation).

@@ -10,6 +10,7 @@
  * 6. unmount：清 setTimeout、清 DOM
  */
 
+import '../../../ui/fonts/embedded.css';
 import './guandan.css';
 
 import type { Card, Seat } from '../engine/types';
@@ -25,11 +26,13 @@ import { cardEl, comboTypeLabel, rankName } from './render';
 const HUMAN_SEAT: Seat = 0;
 
 // 座位名称
+// 出牌序：0→1→2→3→0（逆时针）
+// 座1 在屏幕右侧（本玩家的下家）；座3 在屏幕左侧（本玩家的上家）
 const SEAT_LABELS: Record<Seat, string> = {
   0: '你',
-  1: '右家',
+  1: '下家',
   2: '对家',
-  3: '左家',
+  3: '上家',
 };
 
 // 生成 0..n-1 的随机置换（Fisher-Yates，UI 层允许使用 Math.random）

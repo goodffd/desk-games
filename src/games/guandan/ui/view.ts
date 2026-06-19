@@ -176,73 +176,101 @@ export function mount(root: HTMLElement): () => void {
     }
   }
 
-  /** 渲染中央出牌展示区（四格：各家最近一手 / 状态） */
+  /** 渲染中央出牌展示区（只显示有出牌的座位，无出牌不显示占位） */
   function renderCenter(): void {
     centerEl.innerHTML = '';
 
     const area = document.createElement('div');
     area.className = 'gd-played-area';
 
-    // 4 个位置对应 4 个座位
-    for (const seat of [0, 1, 2, 3] as Seat[]) {
+    /**
+     * 布局：对家(2)在上行；上家(3)/下家(1)在中行左右；玩家(0)的出牌在底部
+     * bottom seat(0) 的已打出牌显示在中行（玩家手牌区已在下方，不占中心行）
+     * 排列顺序：上行=对家，中行=上家+下家，状态行
+     * 只有 state.current.by===seat 时才生成 slot（有出牌才显示）
+     */
+
+    // 创建一个 slot 的工厂
+    function makeSlot(seat: Seat): HTMLElement | null {
+      const isCurrent = state.current !== null && state.current.by === seat;
+      const isFinished = state.finished.includes(seat);
+
+      // 有出牌 or 已完成 才显示
+      if (!isCurrent && !isFinished) return null;
+
       const slot = document.createElement('div');
       slot.className = 'gd-played-slot';
-
-      // 是否是当前出牌者（current.by）
-      const isCurrent = state.current !== null && state.current.by === seat;
       if (isCurrent) slot.classList.add('gd-played-slot--current');
 
+      // 小标签（谁出的）
       const slotLabel = document.createElement('div');
       slotLabel.className = 'gd-played-slot__label';
       slotLabel.textContent = SEAT_LABELS[seat];
       slot.appendChild(slotLabel);
 
-      // 显示该座位当前桌面状态
-      if (state.current !== null && state.current.by === seat) {
-        // 这家是当前出牌者
+      if (isCurrent) {
+        const combo = state.current!.combo;
         const cardsDiv = document.createElement('div');
         cardsDiv.className = 'gd-played-slot__cards';
-        const combo = state.current.combo;
-        for (const c of combo.cards.slice(0, 8)) {
+        for (const c of combo.cards.slice(0, 10)) {
           cardsDiv.appendChild(cardEl(c, LEVEL, true));
         }
-        if (combo.cards.length > 8) {
+        if (combo.cards.length > 10) {
           const more = document.createElement('span');
-          more.style.fontSize = '0.7rem';
+          more.style.fontSize = '0.65rem';
           more.style.color = 'var(--text-dim)';
-          more.textContent = `+${combo.cards.length - 8}`;
+          more.textContent = `+${combo.cards.length - 10}`;
           cardsDiv.appendChild(more);
         }
-        const typeLabel = document.createElement('div');
-        typeLabel.style.fontSize = '0.7rem';
-        typeLabel.style.color = 'var(--gold)';
-        typeLabel.textContent = comboTypeLabel(combo.type);
+        const typeDiv = document.createElement('div');
+        typeDiv.className = 'gd-played-slot__type';
+        typeDiv.textContent = comboTypeLabel(combo.type);
         slot.appendChild(cardsDiv);
-        slot.appendChild(typeLabel);
-      } else if (state.finished.includes(seat)) {
+        slot.appendChild(typeDiv);
+      } else if (isFinished) {
         const finishIdx = state.finished.indexOf(seat);
         const badge = document.createElement('span');
         badge.className = 'gd-seat__rank';
         badge.textContent = rankName(finishIdx);
         slot.appendChild(badge);
-      } else {
-        // 空位
       }
 
-      area.appendChild(slot);
+      return slot;
     }
+
+    // 上行：对家(2)
+    const topRow = document.createElement('div');
+    topRow.className = 'gd-played-row';
+    const slot2 = makeSlot(2);
+    if (slot2) topRow.appendChild(slot2);
+    if (topRow.children.length > 0) area.appendChild(topRow);
+
+    // 中行：上家(3) + 下家(1)
+    const midRow = document.createElement('div');
+    midRow.className = 'gd-played-row';
+    const slot3 = makeSlot(3);
+    const slot1 = makeSlot(1);
+    if (slot3) midRow.appendChild(slot3);
+    if (slot1) midRow.appendChild(slot1);
+    if (midRow.children.length > 0) area.appendChild(midRow);
+
+    // 底行：玩家(0)出牌
+    const botRow = document.createElement('div');
+    botRow.className = 'gd-played-row';
+    const slot0 = makeSlot(0);
+    if (slot0) botRow.appendChild(slot0);
+    if (botRow.children.length > 0) area.appendChild(botRow);
 
     centerEl.appendChild(area);
 
     // 当前状态提示
     if (!isDealOver(state)) {
       const turnInfo = document.createElement('div');
-      turnInfo.style.fontSize = '0.75rem';
-      turnInfo.style.color = 'var(--text-dim)';
+      turnInfo.className = 'gd-center-status';
       const isFreeLead = state.current === null;
       if (state.turn === HUMAN_SEAT) {
         turnInfo.textContent = isFreeLead ? '自由出牌' : '请出牌或不要';
-        turnInfo.style.color = 'var(--gold)';
+        turnInfo.classList.add('gd-center-status--yours');
       } else {
         turnInfo.textContent = `${SEAT_LABELS[state.turn]} 思考中…`;
       }

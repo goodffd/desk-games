@@ -1,4 +1,4 @@
-/* ===== 掼蛋游戏样式 ===== */
+/* ===== 掼蛋游戏样式 — 途游风格 v2 ===== */
 
 /* --- 变量 --- */
 :root {
@@ -33,7 +33,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 1rem;
   background: rgba(0, 0, 0, 0.4);
   border-bottom: 1px solid #2a4a2a;
   flex-shrink: 0;
@@ -58,20 +58,20 @@
 }
 .gd-topbar__back:hover { background: rgba(201,168,76,0.1); border-color: var(--gold); }
 
-/* --- 主桌面（四座布局） --- */
+/* --- 主桌面（四座布局：固定顶底行，中行拉伸填满） --- */
 .gd-table {
-  flex: 0 0 auto;
+  flex: 1 1 0;
   display: grid;
-  grid-template-rows: auto auto auto;
-  grid-template-columns: auto 1fr auto;
+  grid-template-rows: 120px 1fr 120px;
+  grid-template-columns: 100px 1fr 100px;
   grid-template-areas:
     ".       top    ."
     "left   center  right"
     ".      bottom  .";
-  gap: 0.4rem;
-  padding: 0.4rem 0.5rem;
+  gap: 0.2rem;
+  padding: 0.3rem 0.4rem;
   min-height: 0;
-  align-content: flex-start;
+  align-items: center;
 }
 
 /* --- 各座区域 --- */
@@ -79,21 +79,21 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.2rem;
   min-width: 0;
 }
 
 .gd-seat--top    { grid-area: top; flex-direction: column; }
 .gd-seat--bottom { grid-area: bottom; flex-direction: column-reverse; }
-.gd-seat--left   { grid-area: left; flex-direction: column; justify-content: center; }
-.gd-seat--right  { grid-area: right; flex-direction: column; justify-content: center; }
+.gd-seat--left   { grid-area: left; flex-direction: column; justify-content: center; align-self: stretch; }
+.gd-seat--right  { grid-area: right; flex-direction: column; justify-content: center; align-self: stretch; }
 
 /* --- 座位标签 --- */
 .gd-seat__label {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.8rem;
+  gap: 0.35rem;
+  font-size: 0.78rem;
   color: var(--text-dim);
   white-space: nowrap;
 }
@@ -106,8 +106,8 @@
 .gd-seat__card-count {
   background: rgba(0,0,0,0.4);
   border-radius: 3px;
-  padding: 0.1rem 0.35rem;
-  font-size: 0.75rem;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.72rem;
   color: var(--text-dim);
 }
 
@@ -127,20 +127,20 @@
   justify-content: center;
 }
 .gd-hand-back__card {
-  width: 36px;
-  height: 54px;
+  width: 34px;
+  height: 50px;
   background: linear-gradient(135deg, #1a6b2a, #0e4a1a);
   border: 1px solid #2a8a3a;
   border-radius: 4px;
-  margin: 0 -10px;
+  margin: 0 -9px;
   box-shadow: 1px 1px 3px rgba(0,0,0,0.4);
 }
 
-/* 左右座位旋转 */
-.gd-seat--left .gd-hand-back { flex-direction: column; }
-.gd-seat--left .gd-hand-back__card { margin: -12px 0; }
-.gd-seat--right .gd-hand-back { flex-direction: column; }
-.gd-seat--right .gd-hand-back__card { margin: -12px 0; }
+/* 左右座位：竖向叠牌，拉伸填满中间行 */
+.gd-seat--left .gd-hand-back { flex-direction: column; flex: 1; justify-content: center; }
+.gd-seat--left .gd-hand-back__card { margin: -11px 0; }
+.gd-seat--right .gd-hand-back { flex-direction: column; flex: 1; justify-content: center; }
+.gd-seat--right .gd-hand-back__card { margin: -11px 0; }
 
 /* --- 中央区域 --- */
 .gd-center {
@@ -149,131 +149,195 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
   min-height: 0;
   position: relative;
 }
 
-/* --- 出牌展示区 --- */
+/* --- 出牌展示区（仅显示有出牌的格子） --- */
 .gd-played-area {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
   width: 100%;
-  max-width: 420px;
+}
+
+/* 顶行（对家）、中行（上家 + 下家左右分布）、无底行（底部用 bottom seat 显示） */
+.gd-played-row {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 0.6rem;
+  width: 100%;
 }
 
 .gd-played-slot {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.2rem;
-  min-height: 80px;
-  justify-content: center;
+  gap: 0.15rem;
+}
+
+/* 当前出牌者高亮背景 */
+.gd-played-slot--current {
+  background: rgba(201, 168, 76, 0.1);
+  border-radius: 5px;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid rgba(201,168,76,0.25);
 }
 
 .gd-played-slot__label {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: var(--text-dim);
+  letter-spacing: 0.05em;
+}
+.gd-played-slot--current .gd-played-slot__label {
+  color: var(--gold);
 }
 
 .gd-played-slot__cards {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
-  gap: 1px;
+}
+/* 出牌区的牌也重叠 */
+.gd-played-slot__cards .gd-card {
+  margin: 0 -6px;
 }
 
-.gd-played-slot--pass .gd-played-slot__status {
+.gd-played-slot__type {
+  font-size: 0.65rem;
+  color: var(--gold);
+  margin-top: 0.1rem;
+}
+
+/* 状态提示行 */
+.gd-center-status {
+  font-size: 0.72rem;
   color: var(--text-dim);
-  font-size: 0.8rem;
+  text-align: center;
+}
+.gd-center-status--yours {
+  color: var(--gold);
 }
 
-.gd-played-slot--current {
-  background: rgba(201, 168, 76, 0.08);
-  border-radius: 4px;
-  padding: 0.2rem;
-}
-
-/* --- 牌卡组件 --- */
+/* --- 牌卡组件（放大版：60×84px） --- */
 .gd-card {
   display: inline-flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
-  width: 44px;
-  height: 64px;
+  width: 60px;
+  height: 84px;
   background: var(--bg-card);
   border: 1px solid var(--border-card);
-  border-radius: 5px;
-  padding: 2px 3px;
+  border-radius: 6px;
+  padding: 3px 4px;
   cursor: default;
   user-select: none;
-  box-shadow: 1px 2px 4px rgba(0,0,0,0.3);
+  box-shadow: 1px 2px 5px rgba(0,0,0,0.3);
   transition: transform 0.15s, box-shadow 0.15s;
   position: relative;
   flex-shrink: 0;
 }
 
+/* 出牌区及 AI 座位展示用小牌（比放大版稍小，保持可读） */
 .gd-card--small {
-  width: 38px;
-  height: 54px;
-  font-size: 0.8rem;
+  width: 44px;
+  height: 62px;
+  font-size: 0.85rem;
 }
 
 .gd-card--red { color: var(--red); }
 .gd-card--black { color: var(--black); }
-.gd-card--joker-big { color: var(--red); background: linear-gradient(135deg, #fff0f0, #f5e0e0); }
-.gd-card--joker-small { color: #333; background: linear-gradient(135deg, #f0f0f5, #e0e0e5); }
 
+/* --- 大小王牌面 --- */
+.gd-card--joker {
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 2px;
+}
+.gd-card--joker-big { background: linear-gradient(135deg, #fff8f0, #fdeede); }
+.gd-card--joker-small { background: linear-gradient(135deg, #f6f6f8, #eaeaee); }
+
+/* 小丑 SVG：大牌 */
+.gd-joker-fig {
+  width: 38px;
+  height: 42px;
+  flex-shrink: 0;
+}
+/* 小丑 SVG：小牌 */
+.gd-card--small .gd-joker-fig {
+  width: 28px;
+  height: 31px;
+}
+
+/* JOKER 文字：必须完整显示 5 个字母，不裁切 */
+.gd-joker-word {
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: visible;
+}
+.gd-card--small .gd-joker-word {
+  font-size: 0.4rem;
+}
+
+/* --- 普通牌面字号 --- */
 .gd-card__rank {
-  font-size: 1rem;
+  font-size: 1.15rem;
   font-weight: 700;
   line-height: 1;
 }
-.gd-card--small .gd-card__rank { font-size: 0.8rem; }
+.gd-card--small .gd-card__rank { font-size: 0.9rem; }
 
 .gd-card__suit {
-  font-size: 0.85rem;
+  font-size: 1rem;
   line-height: 1;
 }
-.gd-card--small .gd-card__suit { font-size: 0.7rem; }
+.gd-card--small .gd-card__suit { font-size: 0.8rem; }
 
-/* --- 玩家手牌（扇形展开） --- */
+/* --- 玩家手牌（大牌、重叠扇形） --- */
 .gd-player-hand {
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  padding: 0.5rem 1rem;
-  min-height: 80px;
+  padding: 0.4rem 0.5rem;
+  min-height: 96px;
   position: relative;
   flex-wrap: nowrap;
   overflow-x: auto;
 }
 
+/* 手牌重叠：负 margin 让 27 张能排下 */
 .gd-player-hand .gd-card {
   cursor: pointer;
-  margin: 0 -8px;
+  margin: 0 -14px;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
+/* 悬停：向上突出 */
 .gd-player-hand .gd-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 2px 4px 8px rgba(0,0,0,0.5);
+  transform: translateY(-10px);
+  box-shadow: 2px 5px 10px rgba(0,0,0,0.5);
   z-index: 10;
 }
 
+/* 选中：更大上移 + 金边 */
 .gd-player-hand .gd-card.is-selected {
-  transform: translateY(-16px);
-  box-shadow: 2px 6px 12px rgba(201, 168, 76, 0.5);
+  transform: translateY(-22px);
+  box-shadow: 2px 8px 16px rgba(201, 168, 76, 0.55);
   border-color: var(--gold);
   background: var(--bg-card-selected);
   z-index: 11;
 }
 
 .gd-player-hand .gd-card.is-selected:hover {
-  transform: translateY(-20px);
+  transform: translateY(-26px);
 }
 
 /* --- 操作按钮 --- */
@@ -281,7 +345,7 @@
   display: flex;
   gap: 0.8rem;
   justify-content: center;
-  padding: 0.4rem 0;
+  padding: 0.35rem 0;
   flex-shrink: 0;
 }
 
@@ -321,7 +385,8 @@
   font-size: 0.8rem;
   color: var(--text-dim);
   min-height: 1.2em;
-  padding: 0.2rem;
+  padding: 0.15rem;
+  flex-shrink: 0;
 }
 
 .gd-hint--error { color: #e07050; }

@@ -96,22 +96,32 @@ function speakTTS(text: string): void {
 }
 
 /** 语音播报：优先播预生成的豆包2.0真人级 clip（自然有感情），无 clip / 被拦截则退回系统语音。
- *  打断上一句保持跟手。iOS 需先有用户手势解锁音频（点出牌/进入即解锁），之后 AI 出牌也能响。 */
+ *  iOS 需先有用户手势解锁音频（点出牌/进入即解锁），之后 AI 出牌也能响。
+ *  gdSpeakEndAt = 本句预计结束时间戳，AI 出牌据此等本句报牌播完再出，避免被打断截断。 */
 let gdAudio: HTMLAudioElement | null = null;
+let gdSpeakEndAt = 0;
 function speak(text: string): void {
   try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
+  const now = performance.now();
   const clip = VOICE_CLIPS[text];
   if (clip) {
     try {
       if (!gdAudio) gdAudio = new Audio();
       gdAudio.pause();
+      gdSpeakEndAt = now + 1300; // 保守估计，metadata 就绪后按真实时长校准
+      gdAudio.onloadedmetadata = (): void => {
+        const d = gdAudio?.duration ?? 0;
+        if (isFinite(d) && d > 0) gdSpeakEndAt = performance.now() + d * 1000 + 200; // +200ms 小停顿
+      };
+      gdAudio.onended = (): void => { gdSpeakEndAt = 0; };
       gdAudio.src = clip;
       gdAudio.currentTime = 0;
       const p = gdAudio.play();
-      if (p && typeof p.catch === 'function') p.catch(() => speakTTS(text)); // 被拦截 → 系统语音
+      if (p && typeof p.catch === 'function') p.catch(() => { gdSpeakEndAt = 0; speakTTS(text); }); // 被拦截 → 系统语音
       return;
-    } catch { /* 落到系统语音 */ }
+    } catch { gdSpeakEndAt = 0; /* 落到系统语音 */ }
   }
+  gdSpeakEndAt = now + 900; // 系统语音时长难测，给个估计，AI 也稍等
   speakTTS(text);
 }
 
@@ -421,8 +431,11 @@ export function mount(root: HTMLElement): () => void {
   // ── AI 自动推进 ────────────────────────────────────────────
   function scheduleAi(): void {
     if (isDealOver(state) || state.turn === HUMAN_SEAT) return;
-    const t = window.setTimeout(() => {
+    const act = (): void => {
       if (isDealOver(state) || state.turn === HUMAN_SEAT) return;
+      // 上一手报牌还在播就再等，等播完再出，语音不被下一手打断截断
+      const left = gdSpeakEndAt - performance.now();
+      if (left > 0) { timers.push(window.setTimeout(act, Math.min(left + 50, 1600))); return; }
       const seat = state.turn;
       const decision = choosePlay(state, seat);
       try {
@@ -435,8 +448,8 @@ export function mount(root: HTMLElement): () => void {
       renderAll();
       if (isDealOver(state)) showResult();
       else if (state.turn !== HUMAN_SEAT) scheduleAi();
-    }, 650);
-    timers.push(t);
+    };
+    timers.push(window.setTimeout(act, 450)); // 基础思考时间；再叠加等上句报牌播完
   }
 
   // ── 局终 ───────────────────────────────────────────────────

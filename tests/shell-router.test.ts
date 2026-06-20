@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
-import { parseHash } from '../src/shell/router';
+import { parsePath } from '../src/shell/router';
 import { route } from '../src/shell/router';
 import type { GameModule, GameEntry } from '../src/shell/types';
 
@@ -26,29 +26,29 @@ function makeFakeModule(id: string): GameModule & { mountCalls: HTMLElement[]; u
   };
 }
 
-describe('parseHash', () => {
-  it('empty string → home', () => {
-    expect(parseHash('')).toEqual({ view: 'home' });
-  });
-
-  it('"#/" → home', () => {
-    expect(parseHash('#/')).toEqual({ view: 'home' });
-  });
-
-  it('"#" → home', () => {
-    expect(parseHash('#')).toEqual({ view: 'home' });
-  });
-
+describe('parsePath', () => {
   it('"/" → home', () => {
-    expect(parseHash('/')).toEqual({ view: 'home' });
+    expect(parsePath('/')).toEqual({ view: 'home' });
   });
 
-  it('"#/guandan" → game guandan', () => {
-    expect(parseHash('#/guandan')).toEqual({ view: 'game', id: 'guandan' });
+  it('empty string → home', () => {
+    expect(parsePath('')).toEqual({ view: 'home' });
   });
 
-  it('"#/xiangqi" → game xiangqi', () => {
-    expect(parseHash('#/xiangqi')).toEqual({ view: 'game', id: 'xiangqi' });
+  it('"/guandan" → game guandan', () => {
+    expect(parsePath('/guandan')).toEqual({ view: 'game', id: 'guandan' });
+  });
+
+  it('"/guandan/" (尾斜杠) → game guandan', () => {
+    expect(parsePath('/guandan/')).toEqual({ view: 'game', id: 'guandan' });
+  });
+
+  it('"/guandan/extra" → 取首段 game guandan', () => {
+    expect(parsePath('/guandan/extra')).toEqual({ view: 'game', id: 'guandan' });
+  });
+
+  it('"/xiangqi" → game xiangqi', () => {
+    expect(parsePath('/xiangqi')).toEqual({ view: 'game', id: 'xiangqi' });
   });
 });
 
@@ -67,14 +67,14 @@ describe('route', () => {
   });
 
   it('routing to a game calls mount', () => {
-    const cleanup = route(registry, '#/testgame', root);
+    const cleanup = route(registry, '/testgame', root);
     expect(fakeModule.mountCalls.length).toBe(1);
     expect(fakeModule.mountCalls[0]).toBe(root);
     cleanup();
   });
 
   it('cleanup unmounts the game', () => {
-    const cleanup = route(registry, '#/testgame', root);
+    const cleanup = route(registry, '/testgame', root);
     expect(root.innerHTML).not.toBe('');
     cleanup();
     expect(root.innerHTML).toBe('');
@@ -82,13 +82,13 @@ describe('route', () => {
   });
 
   it('routing home renders internal card', () => {
-    const cleanup = route(registry, '', root);
+    const cleanup = route(registry, '/', root);
     expect(root.innerHTML).toContain('testgame');
     cleanup();
   });
 
   it('routing home renders external card with anchor', () => {
-    const cleanup = route(registry, '', root);
+    const cleanup = route(registry, '/', root);
     const anchor = root.querySelector('a[target="_blank"]');
     expect(anchor).not.toBeNull();
     expect((anchor as HTMLAnchorElement).rel).toContain('noopener');
@@ -96,12 +96,12 @@ describe('route', () => {
   });
 
   it('routing home returns noop cleanup without throwing', () => {
-    const cleanup = route(registry, '', root);
+    const cleanup = route(registry, '/', root);
     expect(() => cleanup()).not.toThrow();
   });
 
   it('unknown game id routes home as fallback', () => {
-    const cleanup = route(registry, '#/nonexistent', root);
+    const cleanup = route(registry, '/nonexistent', root);
     // should fall back to home page, which renders the registered game cards
     expect(root.innerHTML).toContain('testgame');
     cleanup();

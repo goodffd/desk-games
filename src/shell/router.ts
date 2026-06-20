@@ -1,54 +1,47 @@
 import type { GameEntry } from './types';
 import { renderHome } from './home';
 
-export type ParsedHash =
+export type ParsedRoute =
   | { view: 'home' }
   | { view: 'game'; id: string };
 
 /**
- * 解析 location.hash 字符串
- * '' | '#' | '#/' | '/' → home
- * '#/guandan' → { view:'game', id:'guandan' }
+ * 解析 location.pathname（真路径，不用 hash；与象棋 /xiangqi 一致）
+ * '/' | '' → home
+ * '/guandan' | '/guandan/' | '/guandan/xxx' → { view:'game', id:'guandan' }
  */
-export function parseHash(hash: string): ParsedHash {
-  // 去掉前导 # 和 /
-  const stripped = hash.replace(/^#?\/?/, '').trim();
+export function parsePath(pathname: string): ParsedRoute {
+  const stripped = pathname.replace(/^\/+/, '').replace(/\/+$/, '').trim();
   if (!stripped) return { view: 'home' };
-  return { view: 'game', id: stripped };
+  const id = stripped.split('/')[0] || stripped; // 只取第一段
+  return { view: 'game', id };
 }
 
 /**
- * 根据 hash 渲染到 root，返回 cleanup 函数
+ * 根据 pathname 渲染到 root，返回 cleanup 函数
  * - home：渲染首页列表
  * - game id（internal）：mount 游戏模块
- * - game id（external）：不在 SPA 内路由，回退首页
+ * - game id（external / 未知）：不在本 SPA 内路由，回退首页
  */
 export function route(
   registry: GameEntry[],
-  hash: string,
+  pathname: string,
   root: HTMLElement,
 ): () => void {
-  const parsed = parseHash(hash);
+  const parsed = parsePath(pathname);
 
   if (parsed.view === 'home') {
     return renderHome(registry, root);
   }
 
-  // 查找对应 entry
   const entry = registry.find(e =>
     e.kind === 'internal' ? e.module.id === parsed.id : e.id === parsed.id,
   );
 
-  if (!entry) {
-    // 找不到对应游戏，渲染首页作为兜底
+  if (!entry || entry.kind === 'external') {
+    // 未知游戏 / 外链游戏（象棋由服务端 /xiangqi 直接服务）不在本 SPA 内路由，回退首页
     return renderHome(registry, root);
   }
 
-  if (entry.kind === 'external') {
-    // 外链游戏不在 SPA 内路由，渲染首页
-    return renderHome(registry, root);
-  }
-
-  // internal：mount 游戏
   return entry.module.mount(root);
 }

@@ -1,4 +1,5 @@
 import type { GameEntry } from './types';
+import { navigate } from './nav';
 
 /**
  * 渲染首页游戏列表到 root，返回 cleanup 函数
@@ -38,7 +39,7 @@ export function renderHome(registry: GameEntry[], root: HTMLElement): () => void
       card.dataset['gameId'] = entry.module.id;
       const id = entry.module.id;
       const onClick = () => {
-        location.hash = `#/${id}`;
+        navigate(`/${id}`);
       };
       const onKeydown = (e: KeyboardEvent) => {
         if (e.key === 'Enter' || e.key === ' ') onClick();

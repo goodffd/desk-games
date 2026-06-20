@@ -28,10 +28,10 @@ async function init() {
 
   function render() {
     if (cleanup) cleanup();
-    cleanup = route(registry, location.hash, app!);
+    cleanup = route(registry, location.pathname, app!);
   }
 
-  window.addEventListener('hashchange', render);
+  window.addEventListener('popstate', render); // 真路径导航（navigate 用 pushState + 派发 popstate）
   render();
 }
 

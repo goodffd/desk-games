@@ -13,6 +13,7 @@
 import '../../../ui/fonts/embedded.css';
 import './guandan.css';
 import './joker-img.css';
+import { navigate } from '../../../shell/nav';
 
 import type { Card, Seat } from '../engine/types';
 import { LEVEL } from '../engine/types';
@@ -81,7 +82,7 @@ export function mount(root: HTMLElement): () => void {
   const backBtn = document.createElement('button');
   backBtn.className = 'gd-topbar__back';
   backBtn.textContent = '← 返回大厅';
-  backBtn.addEventListener('click', () => { location.hash = '#/'; });
+  backBtn.addEventListener('click', () => { navigate('/'); });
   topbar.appendChild(topbarTitle);
   topbar.appendChild(backBtn);
 

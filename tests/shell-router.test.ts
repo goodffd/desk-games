@@ -87,11 +87,12 @@ describe('route', () => {
     cleanup();
   });
 
-  it('routing home renders external card with anchor', () => {
+  it('routing home renders external card as whole-card link', () => {
     const cleanup = route(registry, '/', root);
-    const anchor = root.querySelector('a[target="_blank"]');
-    expect(anchor).not.toBeNull();
-    expect((anchor as HTMLAnchorElement).rel).toContain('noopener');
+    // 外链卡整张是 <a>（整卡可点），不再是卡内单独「前往」链接
+    const card = root.querySelector('a.game-card[data-game-id="xiangqi"]');
+    expect(card).not.toBeNull();
+    expect((card as HTMLAnchorElement).getAttribute('href')).toBe('#');
     cleanup();
   });
 

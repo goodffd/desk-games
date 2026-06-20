@@ -38,6 +38,9 @@ body {
 
 /* ===== 游戏卡片 ===== */
 .game-card {
+  display: block;            /* 外链卡是 <a>，块级铺满 */
+  text-decoration: none;     /* 去链接下划线 */
+  color: inherit;            /* 去链接蓝色，文字用卡内自定义色 */
   background: linear-gradient(145deg, #2a1f0e, #1e1608);
   border: 1px solid #4a3820;
   border-radius: 8px;

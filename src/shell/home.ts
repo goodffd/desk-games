@@ -2,7 +2,10 @@ import type { GameEntry } from './types';
 import { navigate } from './nav';
 
 /**
- * 渲染首页游戏列表到 root，返回 cleanup 函数
+ * 渲染首页游戏列表到 root，返回 cleanup 函数。
+ * 两类卡片交互一致：**整张卡片可点**进入。
+ * - 内置游戏：div + click → SPA navigate(/id)
+ * - 外链游戏：整卡就是 <a href>（如象棋 /xiangqi/），同标签页进入
  */
 export function renderHome(registry: GameEntry[], root: HTMLElement): () => void {
   root.innerHTML = '';
@@ -19,41 +22,35 @@ export function renderHome(registry: GameEntry[], root: HTMLElement): () => void
   grid.className = 'home__grid';
 
   for (const entry of registry) {
-    const card = document.createElement('div');
+    const isInternal = entry.kind === 'internal';
+    const card: HTMLElement = document.createElement(isInternal ? 'div' : 'a');
     card.className = 'game-card';
 
     const name = document.createElement('h2');
     name.className = 'game-card__name';
-    name.textContent = entry.kind === 'internal' ? entry.module.name : entry.name;
+    name.textContent = isInternal ? entry.module.name : entry.name;
 
     const desc = document.createElement('p');
     desc.className = 'game-card__desc';
-    desc.textContent = entry.kind === 'internal' ? entry.module.desc : entry.desc;
+    desc.textContent = isInternal ? entry.module.desc : entry.desc;
 
     card.appendChild(name);
     card.appendChild(desc);
 
-    if (entry.kind === 'internal') {
+    if (isInternal) {
       card.setAttribute('role', 'button');
       card.setAttribute('tabindex', '0');
       card.dataset['gameId'] = entry.module.id;
       const id = entry.module.id;
-      const onClick = () => {
-        navigate(`/${id}`);
-      };
+      const onClick = () => navigate(`/${id}`);
       const onKeydown = (e: KeyboardEvent) => {
-        if (e.key === 'Enter' || e.key === ' ') onClick();
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
       };
       card.addEventListener('click', onClick);
       card.addEventListener('keydown', onKeydown);
     } else {
-      const anchor = document.createElement('a');
-      anchor.href = entry.url;
-      anchor.target = '_blank';
-      anchor.rel = 'noopener noreferrer';
-      anchor.className = 'game-card__link';
-      anchor.textContent = '前往 →';
-      card.appendChild(anchor);
+      // 整张卡片即链接：同标签页进入外链游戏（同源子路径，如 /xiangqi/）
+      (card as HTMLAnchorElement).href = entry.url;
       card.dataset['gameId'] = entry.id;
     }
 

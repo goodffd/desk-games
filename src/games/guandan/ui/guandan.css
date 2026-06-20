@@ -235,9 +235,10 @@
   z-index: 1;
 }
 .gd-card__rank {
-  font-size: 1.5rem;
-  font-weight: 800;
-  letter-spacing: -0.04em;
+  font-family: 'GDRank', var(--font-ui);  /* Oswald 子集：经典扑克粗体数字 */
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 .gd-card__suit {            /* 角标小花色 SVG */
   width: 15px;
@@ -258,22 +259,19 @@
 .gd-card--small .gd-card__suit { width: 11px; height: 11px; }
 .gd-card--small .gd-card__pip { width: 28px; height: 28px; }
 
-/* 逢人配：右上金徽章 */
+/* 逢人配：右上金「配」字，大小跟角标花色一致 */
 .gd-card__wild-tag {
   position: absolute;
   top: 3px;
-  right: 3px;
+  right: 4px;
   z-index: 2;
-  font-size: 0.58rem;
-  font-weight: 700;
-  color: #fff;
-  background: var(--gold);
-  border-radius: 3px;
-  padding: 0 3px;
-  line-height: 1.3;
+  font-size: 15px;        /* = .gd-card__suit 高度 */
+  line-height: 1;
+  font-weight: 800;
+  color: var(--gold);
   font-family: var(--font-ui);
 }
-.gd-card--small .gd-card__wild-tag { font-size: 0.46rem; padding: 0 2px; }
+.gd-card--small .gd-card__wild-tag { font-size: 11px; }   /* = 小牌花色高度 */
 
 /* --- 玩家手牌（大牌、重叠扇形） --- */
 .gd-player-hand {

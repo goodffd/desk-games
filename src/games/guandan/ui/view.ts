@@ -8,6 +8,7 @@
 
 import './guandan.css';
 import './joker-img.css';
+import './rank-font.css';
 import { navigate } from '../../../shell/nav';
 
 import type { Card, Seat, Combo } from '../engine/types';

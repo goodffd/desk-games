@@ -138,7 +138,7 @@
 .gd-play--right  { right: 150px; top: 36%; }
 .gd-play--bottom { bottom: 4px; left: 50%; transform: translateX(-50%); }
 .gd-play__cards { display: flex; flex-wrap: nowrap; }
-.gd-play__cards .gd-card { margin: 0 -16px; }
+.gd-play__cards .gd-card { margin: 0 -22px; }
 .gd-play__type { font-size: 0.6rem; color: var(--gold); margin-top: 1px; }
 .gd-play__pass {
   font-size: 0.8rem; font-weight: 600; color: var(--text-dim);
@@ -158,12 +158,12 @@
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
-  width: 60px;
-  height: 84px;
+  width: 80px;
+  height: 112px;
   background: var(--bg-card);
   border: 1px solid var(--border-card);
-  border-radius: 6px;
-  padding: 3px 4px;
+  border-radius: 8px;
+  padding: 4px 6px;
   cursor: default;
   user-select: none;
   box-shadow: 1px 2px 5px rgba(0,0,0,0.3);
@@ -174,8 +174,8 @@
 
 /* 出牌区及 AI 座位展示用小牌（比放大版稍小，保持可读） */
 .gd-card--small {
-  width: 44px;
-  height: 62px;
+  width: 58px;
+  height: 81px;
   font-size: 0.85rem;
 }
 
@@ -195,13 +195,13 @@
 
 /* 小丑图（背景图见 joker-img.css）：居中，尽量大但给左侧 JOKER 留位 */
 .gd-joker-fig {
-  width: 46px;
-  height: 70px;
+  width: 62px;
+  height: 94px;
   flex-shrink: 0;
 }
 .gd-card--small .gd-joker-fig {
-  width: 33px;
-  height: 50px;
+  width: 44px;
+  height: 66px;
 }
 /* 小王：整张小丑图 CSS 转灰 */
 .gd-card--joker-small .gd-joker-fig {
@@ -215,67 +215,57 @@
   left: 1px;
   writing-mode: vertical-rl;
   text-orientation: upright;
-  font-size: 0.34rem;
+  font-size: 0.44rem;
   font-weight: 800;
   letter-spacing: -0.05em;
   line-height: 0.92;
   text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 1px #fff;
 }
 .gd-card--small .gd-joker-word {
-  font-size: 0.28rem;
+  font-size: 0.34rem;
 }
 
 /* --- 普通牌面字号 --- */
 .gd-card__rank {
-  font-size: 1.15rem;
+  font-size: 1.55rem;
   font-weight: 700;
   line-height: 1;
 }
-.gd-card--small .gd-card__rank { font-size: 0.9rem; }
+.gd-card--small .gd-card__rank { font-size: 1.15rem; }
 
 .gd-card__suit {
-  font-size: 1rem;
+  font-size: 1.35rem;
   line-height: 1;
 }
-.gd-card--small .gd-card__suit { font-size: 0.8rem; }
+.gd-card--small .gd-card__suit { font-size: 1.05rem; }
 
 /* --- 玩家手牌（大牌、重叠扇形） --- */
 .gd-player-hand {
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  padding: 34px 0.5rem 0.4rem;   /* 顶部留空间给选中牌上移，不被裁 */
-  min-height: 96px;
+  padding: 8px 0.5rem 6px;
+  min-height: 124px;
   position: relative;
   flex-wrap: nowrap;
-  overflow: visible;             /* 关键：不要横向拉条、不裁切上移的选中牌 */
+  overflow: visible;             /* 不出横向拉条 */
 }
 
-/* 手牌重叠：负 margin 让 27 张紧凑排下，宽度内放得下、不出滚动条 */
+/* 手牌重叠：大牌更多重叠，27 张排得下不溢出。不做 hover 跳动 */
 .gd-player-hand .gd-card {
   cursor: pointer;
-  margin: 0 -19px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  margin: 0 -28px;
 }
 
-/* 悬停：向上突出 */
-.gd-player-hand .gd-card:hover {
-  transform: translateY(-10px);
-  box-shadow: 2px 5px 10px rgba(0,0,0,0.5);
-  z-index: 10;
-}
-
-/* 选中：更大上移 + 金边 */
-.gd-player-hand .gd-card.is-selected {
-  transform: translateY(-22px);
-  box-shadow: 2px 8px 16px rgba(201, 168, 76, 0.55);
-  border-color: var(--gold);
-  background: var(--bg-card-selected);
-  z-index: 11;
-}
-
-.gd-player-hand .gd-card.is-selected:hover {
-  transform: translateY(-26px);
+/* 选中：途游式——不上移/不跳动，整张盖一层蒙阴影 + 金边圈标记，点「出牌」才打出 */
+.gd-player-hand .gd-card.is-selected::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 0 0 2.5px var(--gold);
+  pointer-events: none;
 }
 
 /* --- 操作按钮 --- */
@@ -382,3 +372,17 @@
   font-size: 1rem;
 }
 .gd-btn--restart:hover { opacity: 0.85; }
+
+/* --- 手机竖屏自动转横屏：掼蛋牌桌需要横向空间，竖握时整页旋转 90° 显示为横屏 --- */
+@media (orientation: portrait) and (max-width: 920px) {
+  html, body { overflow: hidden; }
+  .gd-game {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 100vh;
+    height: 100vw;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center center;
+  }
+}

@@ -12,7 +12,7 @@ import { navigate } from '../../../shell/nav';
 
 import type { Card, Seat, Combo } from '../engine/types';
 import { LEVEL } from '../engine/types';
-import { makeDeck, deal, sortHand } from '../engine/cards';
+import { makeDeck, deal, sortHand, rankValue } from '../engine/cards';
 import { createDeal, play, pass, isDealOver, ranking, levelGain } from '../engine/game';
 import type { DealState } from '../engine/game';
 import { isLegalPlay } from '../engine/legal';
@@ -35,6 +35,18 @@ function randomShuffle(n: number): number[] {
     [arr[i], arr[j]] = [arr[j]!, arr[i]!];
   }
   return arr;
+}
+
+/** 出牌展示排序：同点数聚一起，组越大越靠前（三带二=三同在前/对子在后；连对/钢板/顺子自然成组） */
+function sortComboCards(cards: Card[]): Card[] {
+  const cnt = new Map<number, number>();
+  for (const c of cards) { const v = rankValue(c, LEVEL); cnt.set(v, (cnt.get(v) ?? 0) + 1); }
+  return [...cards].sort((a, b) => {
+    const va = rankValue(a, LEVEL), vb = rankValue(b, LEVEL);
+    const ca = cnt.get(va)!, cb = cnt.get(vb)!;
+    if (ca !== cb) return cb - ca; // 大组在前
+    return va - vb;                // 同组按点数升序
+  });
 }
 
 function startNewDeal(): DealState {
@@ -179,7 +191,7 @@ export function mount(root: HTMLElement): () => void {
     } else {
       const cardsDiv = document.createElement('div');
       cardsDiv.className = 'gd-play__cards';
-      for (const c of lp.cards.slice(0, 14)) cardsDiv.appendChild(cardEl(c, LEVEL, true));
+      for (const c of sortComboCards(lp.cards).slice(0, 14)) cardsDiv.appendChild(cardEl(c, LEVEL, true));
       elx.appendChild(cardsDiv);
       const type = document.createElement('div');
       type.className = 'gd-play__type';

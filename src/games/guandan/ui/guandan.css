@@ -83,9 +83,10 @@
   gap: 3px;
 }
 .gd-seat--top, .gd-seat--left, .gd-seat--right { position: absolute; z-index: 5; }
-.gd-seat--top   { top: 8px;   left: 50%; transform: translateX(-50%); }
-.gd-seat--left  { left: 12px; top: 50%; transform: translateY(-50%); }
-.gd-seat--right { right: 12px; top: 50%; transform: translateY(-50%); }
+/* 三家对手相对 gameEl 全高定位，从边缘往牌桌中心收一些（owner：别都贴边） */
+.gd-seat--top   { top: 8%;   left: 50%; transform: translateX(-50%); }
+.gd-seat--left  { left: 6%;  top: 50%; transform: translateY(-50%); }
+.gd-seat--right { right: 6%; top: 50%; transform: translateY(-50%); }
 /* 你（手牌左侧）：头像在上、名/张数在下，竖排紧凑 */
 .gd-seat--bottom { flex-direction: column; align-items: center; gap: 4px; padding: 4px 0 2px; }
 /* 左右家：只锚定头像竖向居中；名/张数绝对排到头像下方，残局张数角标变大也不顶动头像 */
@@ -93,6 +94,22 @@
 .gd-seat--right .gd-seat__info {
   position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
   margin-top: 3px;
+}
+/* 对手轮到时：头像上方「思考中」浮标（替代中央状态文字） */
+.gd-seat__thinking {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  background: rgba(0,0,0,0.6);
+  color: var(--gold);
+  font-size: 0.64rem;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 9px;
+  pointer-events: none;
 }
 
 /* 头像（圆形简笔人像，按队伍配色：你&对家=金，上家&下家=蓝） */
@@ -526,6 +543,7 @@
   .gd-play--left   { left: 68px; top: 50%; }
   .gd-play--right  { right: 68px; top: 50%; }
   /* 你座位从游戏底边抬起，避免旋转后名字胶囊跑到屏幕左缘被裁 */
+  /* margin-bottom 管左右(旋转后不贴左缘)；上下(与手牌竖向居中)由 renderHand 动态 translateX */
   .gd-hand-row > .gd-seat--bottom { margin-bottom: 62px; }
 }
 

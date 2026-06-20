@@ -185,10 +185,8 @@ export function mount(root: HTMLElement): () => void {
     seatEls[s].className = `gd-seat gd-seat--${SEAT_POS[s]}`;
     playEls[s].className = `gd-play gd-play--${SEAT_POS[s]}`;
   }
-  // 对家(2)座位留在牌桌顶部；上家(3,左)/下家(1,右)座位改挂 gameEl，按整局全高竖向居中
-  //（手机牌桌被手牌区压扁成窄条，若挂 tableEl 则 top:50% 只是窄条中点→旋转后跑偏到屏幕一侧）
-  tableEl.appendChild(seatEls[2]);
-  // 四家出牌区都挂 gameEl，按整局全高摆成围绕中心的菱形（手机牌桌被手牌压扁，挂 tableEl 会全挤到上部串叠）
+  // 三家对手座位都挂 gameEl，按整局全高定位（手机牌桌被手牌压扁成窄条，挂 tableEl 会跑偏/串叠）
+  // 四家出牌区也都挂 gameEl，按整局全高摆成围绕中心的菱形
 
   const statusEl = document.createElement('div');
   statusEl.className = 'gd-turn-status';
@@ -226,8 +224,9 @@ export function mount(root: HTMLElement): () => void {
   gameEl.appendChild(topbar);
   gameEl.appendChild(tableEl);
   gameEl.appendChild(bottomArea);
-  gameEl.appendChild(seatEls[1]); // 下家(右)：相对 gameEl 全高竖向居中
-  gameEl.appendChild(seatEls[3]); // 上家(左)：相对 gameEl 全高竖向居中
+  gameEl.appendChild(seatEls[1]); // 下家(右)
+  gameEl.appendChild(seatEls[2]); // 对家(上)
+  gameEl.appendChild(seatEls[3]); // 上家(左)
   // 四家出牌区菱形（围绕中心，朝各自方向偏，不压头像/手牌）
   gameEl.appendChild(playEls[0]); // 你(下)
   gameEl.appendChild(playEls[1]); // 下家(右)
@@ -241,10 +240,18 @@ export function mount(root: HTMLElement): () => void {
   function renderSeatInfo(seat: Seat): void {
     const elx = seatEls[seat]!;
     elx.innerHTML = '';
-    const active = state.turn === seat && !isDealOver(state);
+    const active = started && state.turn === seat && !isDealOver(state);
     elx.classList.toggle('is-active', active);
 
     elx.appendChild(avatarEl(seat));
+
+    // 对手轮到时在其头像上方显示「思考中」（替代中央状态文字）
+    if (active && seat !== HUMAN_SEAT) {
+      const think = document.createElement('div');
+      think.className = 'gd-seat__thinking';
+      think.textContent = '思考中';
+      elx.appendChild(think);
+    }
 
     const info = document.createElement('div');
     info.className = 'gd-seat__info';
@@ -361,18 +368,28 @@ export function mount(root: HTMLElement): () => void {
       const ml = step - colW;                // 负=列间重叠
       colEls.forEach((c, i) => { if (i > 0) (c as HTMLElement).style.marginLeft = `${ml}px`; });
     }
+    // 竖握手机(游戏旋转)：把「你」头像沿 game-local-x 移到手牌中心 → 旋转后与手牌竖向居中。
+    // 固定值跟不了不同副牌的手牌宽度(=旋转后高度)，按实测手牌宽度动态算。桌面/横屏不旋转则不动。
+    const meEl = seatEls[0] as HTMLElement;
+    const rotated = window.matchMedia('(orientation: portrait) and (max-width: 920px)').matches;
+    if (rotated) {
+      const handW = handEl.offsetWidth;
+      const meW2 = meEl.offsetWidth || 40;
+      // 有牌：移到手牌中心；牌出光(无牌)：移到牌桌偏中心，别孤零零留在底边
+      const tx = handW > 4 ? (meW2 / 2 + 20 + handW / 2) : (gameEl.offsetWidth || 800) * 0.34;
+      meEl.style.transform = `translateX(${Math.round(tx)}px)`;
+    } else {
+      meEl.style.transform = '';
+    }
   }
 
   function renderStatus(): void {
-    if (!started || isDealOver(state)) { statusEl.textContent = ''; statusEl.className = 'gd-turn-status'; return; }
-    const isFreeLead = state.current === null;
-    if (state.turn === HUMAN_SEAT) {
-      statusEl.textContent = isFreeLead ? '该你出牌' : '请出牌或不要';
-      statusEl.className = 'gd-turn-status gd-turn-status--yours';
-    } else {
-      statusEl.textContent = `${SEAT_LABELS[state.turn]} 思考中…`;
-      statusEl.className = 'gd-turn-status';
+    // 仅我方回合显中央状态；对手「思考中」移到各自头像上方(见 renderSeatInfo)
+    if (!started || isDealOver(state) || state.turn !== HUMAN_SEAT) {
+      statusEl.textContent = ''; statusEl.className = 'gd-turn-status'; return;
     }
+    statusEl.textContent = state.current === null ? '该你出牌' : '请出牌或不要';
+    statusEl.className = 'gd-turn-status gd-turn-status--yours';
   }
 
   function renderButtons(): void {
@@ -555,7 +572,7 @@ export function mount(root: HTMLElement): () => void {
     primeAudio();
     startOverlay.remove();
     started = true;
-    renderStatus(); // 开始后才显示「该你出牌」/「X 思考中」
+    renderAll(); // 开始后才显示状态/思考中浮标
     if (state.turn !== HUMAN_SEAT) scheduleAi();
   });
   gameEl.appendChild(startOverlay);

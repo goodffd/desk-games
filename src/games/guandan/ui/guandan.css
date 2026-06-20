@@ -543,7 +543,7 @@
   .gd-seat--left  { left: 12px; }
   .gd-seat--right { right: 12px; }
   /* 矮牌桌：4 家出牌区收成紧凑菱形，互不相叠，我方出牌区上移不贴头像 */
-  .gd-play--top    { top: 33%; }
+  .gd-play--top    { top: 21%; }  /* 对家出牌区移近头像，与上家/下家「牌↔头像」间距一致 */
   .gd-play--bottom { top: 60%; bottom: auto; }
   .gd-play--left   { left: 68px; top: 50%; }
   .gd-play--right  { right: 68px; top: 50%; }

@@ -371,15 +371,27 @@ export function mount(root: HTMLElement): () => void {
     // 竖握手机(游戏旋转)：把「你」头像沿 game-local-x 移到手牌中心 → 旋转后与手牌竖向居中。
     // 固定值跟不了不同副牌的手牌宽度(=旋转后高度)，按实测手牌宽度动态算。桌面/横屏不旋转则不动。
     const meEl = seatEls[0] as HTMLElement;
+    const avEl = meEl.querySelector('.gd-avatar') as HTMLElement | null; // 对齐头像本身(非含名字的整座位)
     const rotated = window.matchMedia('(orientation: portrait) and (max-width: 920px)').matches;
-    if (rotated) {
-      const colW0 = (colEls[0] as HTMLElement)?.offsetWidth || 0;
-      const meW2 = meEl.offsetWidth || 40;
-      // 有牌：移到与"第一张牌"齐平(顶部，非整排中间)；牌出光(无牌)：移到牌桌偏中心，别孤留底边
-      const tx = colW0 > 0 ? (meW2 / 2 + 20 + colW0 / 2) : (gameEl.offsetWidth || 800) * 0.34;
-      meEl.style.transform = `translateX(${Math.round(tx)}px)`;
+    const firstFront = (colEls[0] as HTMLElement)?.lastElementChild as HTMLElement | null; // 最左列最下(前)那张牌
+    if (rotated && firstFront && avEl) {
+      meEl.style.transform = '';                      // 先清空，量头像自然位置
+      const a0 = avEl.getBoundingClientRect();
+      const fr = firstFront.getBoundingClientRect();
+      // 头像竖向中心与该牌竖向中心同一水平线(横屏)=同一 cx(竖屏)；紧挨其左侧(横屏)=上方(竖屏)
+      const targetCx = fr.left + fr.width / 2;
+      const targetCy = fr.top - 6 - a0.height / 2;
+      const acx = a0.left + a0.width / 2, acy = a0.top + a0.height / 2;
+      // 旋转矩阵 matrix(0,1,-1,0)：game-local 的 translate(dx,dy) → 屏幕位移 (-dy, dx)
+      meEl.style.transform = `translate(${Math.round(targetCy - acy)}px, ${Math.round(acx - targetCx)}px)`;
+    } else if (rotated) {
+      meEl.style.transform = `translateX(${Math.round((gameEl.offsetWidth || 800) * 0.34)}px)`; // 牌出光：偏中心
     } else {
-      meEl.style.transform = '';
+      // 桌面：手牌越少头像越往中心(上)移，别一直钉死在底边
+      const remain = (state.hands[HUMAN_SEAT] ?? []).length;
+      const frac = Math.max(0, Math.min(1, 1 - remain / 27));
+      const up = Math.round(frac * 240);
+      meEl.style.transform = up > 0 ? `translateY(${-up}px)` : '';
     }
   }
 

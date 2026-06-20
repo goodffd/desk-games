@@ -7,7 +7,7 @@
  * - comboTypeLabel(type) → string（中文牌型名）
  */
 
-import type { Card, Rank, ComboType } from '../engine/types';
+import type { Card, Rank, ComboType, Combo } from '../engine/types';
 import { SUIT_IMG } from './suits';
 
 const RANK_DISPLAY: Record<number, string> = {
@@ -19,10 +19,11 @@ const SUIT_SYMBOL: Record<string, string> = {
   S: '♠', H: '♥', D: '♦', C: '♣',
 };
 
-/** 花色图（Seedream 生成，已去白底+正色）；按高度缩放，自然宽度，四花色一致 */
+/** 花色图（Seedream 生成，已去白底+正色）；按高度缩放，自然宽度。
+ *  加 gd-suit-<花色> 类用于单花色微调（方块菱形面积小，CSS 放大补偿） */
 function suitImg(suit: string, cls: string): HTMLImageElement {
   const img = document.createElement('img');
-  img.className = cls;
+  img.className = `${cls} gd-suit-${suit}`;
   img.src = SUIT_IMG[suit] ?? '';
   img.alt = '';
   return img;
@@ -127,6 +128,42 @@ export function comboTypeLabel(type: ComboType): string {
     kingBomb: '四大天王',
   };
   return MAP[type] ?? type;
+}
+
+/** 牌点读音（途游黑话）：A=尖 Q=圈 J=钩，大小王中文，K/数字照读。
+ *  key = combo.key（单张/对子/三同张点数 rankValue）：级牌=15、小王=16、大王=17 */
+function rankSpeech(key: number, level: Rank): string {
+  if (key === 17) return '大王';
+  if (key === 16) return '小王';
+  const r = key === 15 ? level : key; // 级牌按其自然点数（固定打 2 → “2”）
+  switch (r) {
+    case 14: return '尖'; // A
+    case 13: return 'K';
+    case 12: return '圈'; // Q
+    case 11: return '钩'; // J
+    default: return String(r); // 2-10
+  }
+}
+
+const CN_NUM = ['', '一', '二', '三', '四', '五', '六', '七', '八'];
+
+/** 出牌语音：
+ *  - 报牌型：顺子/同花顺/三带二/N连对/钢板/炸弹/天王炸
+ *  - 报点数：单张=点数、对子="对"+点数、三同张="3条"+点数 */
+export function comboSpeech(combo: Combo, level: Rank): string {
+  switch (combo.type) {
+    case 'single': return rankSpeech(combo.key, level);
+    case 'pair': return '对' + rankSpeech(combo.key, level);
+    case 'triple': return '3条' + rankSpeech(combo.key, level);
+    case 'tripleWithPair': return '三带二';
+    case 'straight': return '顺子';
+    case 'straightFlush': return '同花顺';
+    case 'consecPairs': return (CN_NUM[Math.round(combo.length / 2)] ?? '') + '连对';
+    case 'consecTriples': return '钢板';
+    case 'bomb': return '炸弹';
+    case 'kingBomb': return '天王炸';
+    default: return comboTypeLabel(combo.type);
+  }
 }
 
 /** 名次文字 */

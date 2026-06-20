@@ -18,7 +18,8 @@ import { createDeal, play, pass, isDealOver, ranking, levelGain } from '../engin
 import type { DealState } from '../engine/game';
 import { isLegalPlay } from '../engine/legal';
 import { choosePlay } from '../ai/ai';
-import { cardEl, comboTypeLabel, rankName } from './render';
+import { cardEl, comboSpeech, rankName } from './render';
+import { VOICE_CLIPS } from './voice-clips';
 
 const HUMAN_SEAT: Seat = 0;
 
@@ -50,17 +51,68 @@ function sortComboCards(cards: Card[]): Card[] {
   });
 }
 
-/** 语音播报牌型（zh-CN），打断上一句保持跟手；不支持则静默 */
-function speak(text: string): void {
+/** 选系统里最自然的中文语音：增强/高级/Siri/网络语音优先，其次知名本地语音 */
+let gdVoice: SpeechSynthesisVoice | null = null;
+function pickVoice(): SpeechSynthesisVoice | null {
+  try {
+    const synth = window.speechSynthesis;
+    if (!synth) return null;
+    const cn = synth.getVoices().filter(
+      (v) => /zh([-_](cn|hans|sg))?/i.test(v.lang) || /chinese|中文|普通话|mandarin/i.test(v.name),
+    );
+    if (!cn.length) return null;
+    const score = (v: SpeechSynthesisVoice): number => {
+      const n = v.name.toLowerCase();
+      let s = 0;
+      if (/premium|enhanced|超清|高级|增强|神经|neural/.test(n)) s += 100;
+      if (/siri/.test(n)) s += 60;
+      if (/tingting|婷婷|meijia|美佳|sinji|li-?mu|yu-?shu/.test(n)) s += 30;
+      if (!v.localService) s += 25; // 网络语音通常更自然
+      if (/cn|hans/i.test(v.lang)) s += 10;
+      return s;
+    };
+    return [...cn].sort((a, b) => score(b) - score(a))[0] ?? cn[0]!;
+  } catch { return null; }
+}
+if (typeof window !== 'undefined' && window.speechSynthesis) {
+  gdVoice = pickVoice();
+  window.speechSynthesis.onvoiceschanged = (): void => { gdVoice = pickVoice(); };
+}
+
+/** 系统语音兜底（zh-CN），用挑好的高质量语音；不支持则静默 */
+function speakTTS(text: string): void {
   try {
     const synth = window.speechSynthesis;
     if (!synth) return;
+    if (!gdVoice) gdVoice = pickVoice();
     synth.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'zh-CN';
-    u.rate = 1.05;
+    if (gdVoice) u.voice = gdVoice;
+    u.rate = 0.97;
+    u.pitch = 1.08;
     synth.speak(u);
   } catch { /* 不支持语音则静默 */ }
+}
+
+/** 语音播报：优先播预生成的豆包2.0真人级 clip（自然有感情），无 clip / 被拦截则退回系统语音。
+ *  打断上一句保持跟手。iOS 需先有用户手势解锁音频（点出牌/进入即解锁），之后 AI 出牌也能响。 */
+let gdAudio: HTMLAudioElement | null = null;
+function speak(text: string): void {
+  try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
+  const clip = VOICE_CLIPS[text];
+  if (clip) {
+    try {
+      if (!gdAudio) gdAudio = new Audio();
+      gdAudio.pause();
+      gdAudio.src = clip;
+      gdAudio.currentTime = 0;
+      const p = gdAudio.play();
+      if (p && typeof p.catch === 'function') p.catch(() => speakTTS(text)); // 被拦截 → 系统语音
+      return;
+    } catch { /* 落到系统语音 */ }
+  }
+  speakTTS(text);
 }
 
 function startNewDeal(): DealState {
@@ -122,9 +174,11 @@ export function mount(root: HTMLElement): () => void {
     seatEls[s].className = `gd-seat gd-seat--${SEAT_POS[s]}`;
     playEls[s].className = `gd-play gd-play--${SEAT_POS[s]}`;
   }
-  // 三家对手 + 三个出牌区放进牌桌；玩家(0)出牌区也在牌桌底部（手牌在下方 bottomArea）
-  for (const s of [1, 2, 3] as Seat[]) tableEl.appendChild(seatEls[s]);
-  for (const s of [0, 1, 2, 3] as Seat[]) tableEl.appendChild(playEls[s]);
+  // 对家(2)座位留在牌桌顶部；上家(3,左)/下家(1,右)座位改挂 gameEl，按整局全高竖向居中
+  //（手机牌桌被手牌区压扁成窄条，若挂 tableEl 则 top:50% 只是窄条中点→旋转后跑偏到屏幕一侧）
+  tableEl.appendChild(seatEls[2]);
+  // 对家(2)/你(0)出牌区留牌桌；上家(3)/下家(1)出牌区跟随其座位挂 gameEl，与头像同高(top:50%)对齐
+  for (const s of [0, 2] as Seat[]) tableEl.appendChild(playEls[s]);
 
   const statusEl = document.createElement('div');
   statusEl.className = 'gd-turn-status';
@@ -148,16 +202,24 @@ export function mount(root: HTMLElement): () => void {
   passBtn.textContent = '不要';
   actionsEl.appendChild(playBtn);
   actionsEl.appendChild(passBtn);
-  bottomArea.appendChild(actionsEl);    // 按钮(在头像上方)
-  bottomArea.appendChild(seatEls[0]);   // 你信息行(头像+名+张数)，在按钮下方
+  bottomArea.appendChild(actionsEl);    // 按钮(在手牌上方)
 
+  // 你的头像+名放手牌左侧（途游式：自己头像在手牌左侧，与牌留间隔）
+  const handRow = document.createElement('div');
+  handRow.className = 'gd-hand-row';
+  handRow.appendChild(seatEls[0]);      // 你：手牌左侧
   const handEl = document.createElement('div');
   handEl.className = 'gd-player-hand';
-  bottomArea.appendChild(handEl);
+  handRow.appendChild(handEl);
+  bottomArea.appendChild(handRow);
 
   gameEl.appendChild(topbar);
   gameEl.appendChild(tableEl);
   gameEl.appendChild(bottomArea);
+  gameEl.appendChild(seatEls[1]); // 下家(右)：相对 gameEl 全高竖向居中
+  gameEl.appendChild(seatEls[3]); // 上家(左)：相对 gameEl 全高竖向居中
+  gameEl.appendChild(playEls[1]); // 下家出牌区：跟随座位挂 gameEl，同高对齐
+  gameEl.appendChild(playEls[3]); // 上家出牌区：同上
   root.appendChild(gameEl);
 
   // ── 渲染 ───────────────────────────────────────────────────
@@ -272,7 +334,8 @@ export function mount(root: HTMLElement): () => void {
     const nc = colEls.length;
     if (nc > 1) {
       const colW = (colEls[0] as HTMLElement).offsetWidth || 54;
-      const availW = (gameEl.clientWidth || 800) - 10;
+      const meW = (seatEls[0] as HTMLElement)?.offsetWidth || 0; // 你头像占手牌左侧，可用宽要减掉，否则溢出
+      const availW = (gameEl.clientWidth || 800) - meW - 20 - 10;
       // 列推进至少容下最宽角标(点数+花色)+缝，角标花色不被下一列盖。
       // 量点数宽(文字可靠)+按高估花色宽+间距——花色是图片宽度异步，直接量角标会漏掉它
       let maxRank = 0; // 视觉宽度(getBoundingClientRect 含 scaleX 压缩)，压缩后的「10」让列更紧凑
@@ -319,7 +382,7 @@ export function mount(root: HTMLElement): () => void {
     state = play(state, seat, cards);
     if (wasLead) lastPlays = { 0: null, 1: null, 2: null, 3: null }; // 新一圈：清掉上圈
     lastPlays[seat] = state.current ? state.current.combo : null;
-    if (state.current) speak(comboTypeLabel(state.current.combo.type)); // 语音播报牌型(替代文字说明)
+    if (state.current) speak(comboSpeech(state.current.combo, LEVEL)); // 语音：牌型/具体点数(见 comboSpeech)
   }
   function applyPass(seat: Seat): void {
     state = pass(state, seat);
@@ -437,6 +500,21 @@ export function mount(root: HTMLElement): () => void {
   const onPointerUp = (): void => { dragging = false; };
   handEl.addEventListener('pointermove', onHandPointerMove);
   window.addEventListener('pointerup', onPointerUp);
+
+  // iOS：音频要用户手势解锁。首次在游戏内按下时静音预热一下，之后 AI 出牌的语音也能响
+  const primeAudio = (): void => {
+    try {
+      if (!gdAudio) gdAudio = new Audio();
+      gdAudio.muted = true;
+      gdAudio.src = VOICE_CLIPS['不要'] ?? '';
+      const pr = gdAudio.play();
+      if (pr && typeof pr.then === 'function') {
+        pr.then(() => { if (gdAudio) { gdAudio.pause(); gdAudio.currentTime = 0; gdAudio.muted = false; } })
+          .catch(() => { if (gdAudio) gdAudio.muted = false; });
+      }
+    } catch { /* ignore */ }
+  };
+  gameEl.addEventListener('pointerdown', primeAudio, { once: true });
 
   // 转屏/缩放后重算手牌重叠（可用宽度变了），避免溢出
   const onResize = (): void => { renderHand(); };

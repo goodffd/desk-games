@@ -86,8 +86,14 @@
 .gd-seat--top   { top: 8px;   left: 50%; transform: translateX(-50%); }
 .gd-seat--left  { left: 12px; top: 50%; transform: translateY(-50%); }
 .gd-seat--right { right: 12px; top: 50%; transform: translateY(-50%); }
-/* 你的信息行（底部区：头像 + 名 + 张数 横排） */
-.gd-seat--bottom { flex-direction: row; align-items: center; gap: 8px; padding: 4px 0 2px; }
+/* 你（手牌左侧）：头像在上、名/张数在下，竖排紧凑 */
+.gd-seat--bottom { flex-direction: column; align-items: center; gap: 4px; padding: 4px 0 2px; }
+/* 左右家：只锚定头像竖向居中；名/张数绝对排到头像下方，残局张数角标变大也不顶动头像 */
+.gd-seat--left .gd-seat__info,
+.gd-seat--right .gd-seat__info {
+  position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  margin-top: 3px;
+}
 
 /* 头像（圆形简笔人像，按队伍配色：你&对家=金，上家&下家=蓝） */
 .gd-avatar {
@@ -241,7 +247,7 @@
 }
 .gd-card--small .gd-card__corner {  /* 出牌：点数+花色竖排，间距更大 */
   flex-direction: column;
-  gap: 3px;
+  gap: 5px;
   align-items: center;
   left: 4px;
 }
@@ -266,6 +272,8 @@
   width: auto;
   display: block;
 }
+/* 方块是菱形，等高下填充面积/宽度都比♠♥♣小，单独放大补偿（角标+大花色通用） */
+.gd-suit-D { transform: scale(1.18); }
 /* 逢人配：花色位放金「配」字（真粗体） */
 .gd-card__suit--wild {
   font-family: 'GDWild', var(--font-ui);
@@ -285,6 +293,17 @@
 .gd-card--small .gd-card__suit { height: 13px; }
 .gd-card--small .gd-card__suit--wild { font-size: 0.78rem; }
 .gd-card--small .gd-card__pip { height: 26px; right: 2px; bottom: 2px; }
+
+/* 你的头像+名 放手牌左侧（途游式：自己头像在手牌左下，与牌留间隔） */
+.gd-hand-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 20px;                 /* 你↔手牌 间隔 */
+  width: 100%;
+}
+.gd-hand-row > .gd-seat--bottom { flex: 0 0 auto; padding-bottom: 8px; }
 
 /* --- 玩家手牌（大牌、重叠扇形） --- */
 .gd-player-hand {
@@ -472,8 +491,8 @@
   /* 矮牌桌：4 家出牌区收成紧凑菱形，互不相叠，我方出牌区上移不贴头像 */
   .gd-play--top    { top: 16%; }
   .gd-play--bottom { top: 56%; bottom: auto; }
-  .gd-play--left   { left: 68px; top: 44%; }
-  .gd-play--right  { right: 68px; top: 44%; }
+  .gd-play--left   { left: 68px; top: 50%; }
+  .gd-play--right  { right: 68px; top: 50%; }
 }
 
 /* --- 手机竖屏自动转横屏：掼蛋牌桌需要横向空间，竖握时整页旋转 90° 显示为横屏 ---

@@ -283,7 +283,7 @@ export function mount(root: HTMLElement): () => void {
         const suitW = suitH * 1.15; // 花色按高度估宽(最宽红心≈1.08)，不依赖异步图片宽度
         const maxCorner = maxRank + 4 + suitW; // 点数 + 间距 + 花色
         const fitStep = (availW - colW) / (nc - 1);
-        const step = Math.min(fitStep, maxCorner + 10); // +10 留缝，花色不贴下一列
+        const step = Math.min(fitStep, maxCorner + 6); // 收紧：角标右边只留 ~2px 缝(角标花色不跨列)，右下大花色可被盖一部分
         const ml = step - colW;                // 负=列间重叠
         colEls.forEach((c, i) => { if (i > 0) (c as HTMLElement).style.marginLeft = `${ml}px`; });
       }

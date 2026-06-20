@@ -261,6 +261,8 @@
   transform: scaleY(1.32);       /* 纵向拉长，复刻途游高窄感 */
   transform-origin: top center;
 }
+/* 字母(J/Q/K/A)天生比数字宽，横向收窄跟数字看齐 */
+.gd-card__rank--alpha { transform: scaleY(1.32) scaleX(0.85); }
 .gd-card__suit {            /* 角标花色图：按高缩放、自然宽度、四花色一致 */
   height: 19px;
   width: auto;

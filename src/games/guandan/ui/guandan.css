@@ -452,6 +452,11 @@
   .gd-card--small .gd-card__rank { font-size: 0.76rem; }
   .gd-card--small .gd-card__suit { height: 9px; }
   .gd-card--small .gd-card__pip { height: 18px; }
+  /* 小丑图跟着牌缩小，别超出牌边界 */
+  .gd-joker-fig { width: 41px; height: 62px; }
+  .gd-card--small .gd-joker-fig { width: 26px; height: 39px; }
+  .gd-joker-word { font-size: 0.36rem; }
+  .gd-card--small .gd-joker-word { font-size: 0.27rem; }
   .gd-player-hand { min-height: 76px; padding: 4px 0.3rem 4px; }
   .gd-avatar { width: 34px; height: 34px; }
   .gd-avatar svg { width: 21px; height: 21px; }

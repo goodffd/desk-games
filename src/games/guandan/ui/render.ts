@@ -57,7 +57,9 @@ export function cardLabel(card: Card, level: Rank): CardLabel {
  *  大王=彩色原图+红 JOKER；小王=整体 CSS 转灰+黑 JOKER（见 guandan.css）。 */
 function jokerInner(big: boolean): string {
   const word = big ? '#d2362f' : '#1a1a1a';
-  return `<div class="gd-joker-fig"></div><span class="gd-joker-word" style="color:${word}">JOKER</span>`;
+  // 逐字母竖列：用 flex column + line-height 精确压缩字母竖向间距，不靠 writing-mode 的不可控 advance
+  const letters = [...'JOKER'].map((ch) => `<span>${ch}</span>`).join('');
+  return `<div class="gd-joker-fig"></div><span class="gd-joker-word" style="color:${word}">${letters}</span>`;
 }
 
 /**

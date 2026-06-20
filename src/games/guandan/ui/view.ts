@@ -251,56 +251,39 @@ export function mount(root: HTMLElement): () => void {
     handEl.innerHTML = '';
     // 展示顺序：左→右 大→小。级牌仅次于大小王由 rankValue/sortHand 保证
     const cards = [...sortedHand(HUMAN_SEAT)].reverse();
-    const cols = window.matchMedia('(max-width: 520px), (max-height: 520px)').matches;
-    handEl.classList.toggle('gd-hand--cols', cols);
+    // 桌面与手机统一：同点数堆成一列向上叠、列间重叠（途游式，省横向空间且角标花色不跨叠）
+    handEl.classList.add('gd-hand--cols');
 
-    if (cols) {
-      // 手机端：同点数堆成一列向上叠
-      const groups: Card[][] = [];
-      const at = new Map<number, number>();
-      for (const card of cards) {
-        const v = rankValue(card, LEVEL);
-        if (!at.has(v)) { at.set(v, groups.length); groups.push([]); }
-        groups[at.get(v)!]!.push(card);
-      }
-      for (const g of groups) {
-        const col = document.createElement('div');
-        col.className = 'gd-hand-col';
-        for (const card of g) col.appendChild(makeHandCard(card));
-        handEl.appendChild(col);
-      }
-      // 按可用宽度横向收紧：列多时列间重叠，整排不溢出屏幕
-      const colEls = handEl.querySelectorAll('.gd-hand-col');
-      const nc = colEls.length;
-      if (nc > 1) {
-        const colW = (colEls[0] as HTMLElement).offsetWidth || 54;
-        const availW = (gameEl.clientWidth || 800) - 10;
-        // 列推进至少容下最宽角标(点数+花色)+缝，角标花色不被下一列盖。
-        // 量点数宽(文字可靠)+固定预留花色+间距——花色是图片宽度异步，直接量角标会漏掉它
-        let maxRank = 0; // 用视觉宽度(getBoundingClientRect 含 scaleX 压缩)，让压缩后的「10」也让列更紧凑
-        handEl.querySelectorAll('.gd-card__rank').forEach(c => { maxRank = Math.max(maxRank, c.getBoundingClientRect().width); });
-        const suitH = ((handEl.querySelector('.gd-card__suit') as HTMLElement)?.offsetHeight) || 14;
-        const suitW = suitH * 1.15; // 花色按高度估宽(最宽红心≈1.08)，不依赖异步图片宽度
-        const maxCorner = maxRank + 4 + suitW; // 点数 + 间距 + 花色
-        const fitStep = (availW - colW) / (nc - 1);
-        const step = Math.min(fitStep, maxCorner + 6); // 收紧：角标右边只留 ~2px 缝(角标花色不跨列)，右下大花色可被盖一部分
-        const ml = step - colW;                // 负=列间重叠
-        colEls.forEach((c, i) => { if (i > 0) (c as HTMLElement).style.marginLeft = `${ml}px`; });
-      }
-      return;
+    const groups: Card[][] = [];
+    const at = new Map<number, number>();
+    for (const card of cards) {
+      const v = rankValue(card, LEVEL);
+      if (!at.has(v)) { at.set(v, groups.length); groups.push([]); }
+      groups[at.get(v)!]!.push(card);
     }
-
-    // 桌面：重叠扇形。cw 实测当前牌宽，按可用宽度算露出量，27 张放得下不溢出
-    for (const card of cards) handEl.appendChild(makeHandCard(card));
-    const first = handEl.querySelector('.gd-card') as HTMLElement | null;
-    const cw = first?.offsetWidth || 80;
-    const n = cards.length;
-    if (n > 1) {
-      const availW = (gameEl.clientWidth || 900) - 16;
-      let step = (availW - cw) / (n - 1);
-      step = Math.max(14, Math.min(step, cw * 0.5)); // 上限=半张牌；下限 14px 保证窄屏挤得下
-      const m = (step - cw) / 2;
-      handEl.querySelectorAll('.gd-card').forEach(c => { (c as HTMLElement).style.margin = `0 ${m}px`; });
+    for (const g of groups) {
+      const col = document.createElement('div');
+      col.className = 'gd-hand-col';
+      for (const card of g) col.appendChild(makeHandCard(card));
+      handEl.appendChild(col);
+    }
+    // 按可用宽度横向收紧：列多则列间重叠，整排不溢出屏幕
+    const colEls = handEl.querySelectorAll('.gd-hand-col');
+    const nc = colEls.length;
+    if (nc > 1) {
+      const colW = (colEls[0] as HTMLElement).offsetWidth || 54;
+      const availW = (gameEl.clientWidth || 800) - 10;
+      // 列推进至少容下最宽角标(点数+花色)+缝，角标花色不被下一列盖。
+      // 量点数宽(文字可靠)+按高估花色宽+间距——花色是图片宽度异步，直接量角标会漏掉它
+      let maxRank = 0; // 视觉宽度(getBoundingClientRect 含 scaleX 压缩)，压缩后的「10」让列更紧凑
+      handEl.querySelectorAll('.gd-card__rank').forEach((c) => { maxRank = Math.max(maxRank, c.getBoundingClientRect().width); });
+      const suitH = ((handEl.querySelector('.gd-card__suit') as HTMLElement)?.offsetHeight) || 14;
+      const suitW = suitH * 1.15; // 花色按高度估宽(最宽红心≈1.08)，不依赖异步图片宽度
+      const maxCorner = maxRank + 4 + suitW; // 点数 + 间距 + 花色
+      const fitStep = (availW - colW) / (nc - 1);
+      const step = Math.min(fitStep, maxCorner + 9); // 角标右边留 ~5px 清楚的缝，花色不贴下一列；右下大花色可被盖一部分
+      const ml = step - colW;                // 负=列间重叠
+      colEls.forEach((c, i) => { if (i > 0) (c as HTMLElement).style.marginLeft = `${ml}px`; });
     }
   }
 
@@ -461,6 +444,9 @@ export function mount(root: HTMLElement): () => void {
   window.addEventListener('orientationchange', onResize);
 
   renderAll();
+  // 内嵌字体(GDRank)异步加载：首次布局可能用 fallback 字体量角标宽度→步进算错→角标花色跨叠。
+  // 字体就绪后重算手牌，确保步进按真实点数宽度计算。
+  if (document.fonts?.ready) void document.fonts.ready.then(() => { renderHand(); });
   if (state.turn !== HUMAN_SEAT) scheduleAi();
 
   return () => {

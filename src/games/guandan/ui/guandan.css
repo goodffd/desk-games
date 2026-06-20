@@ -210,31 +210,32 @@
 .gd-card--small .gd-joker-fig { width: 33px; height: 53px; }
 .gd-card--joker-small .gd-joker-fig { filter: grayscale(1) brightness(1.06); } /* 小王转灰 */
 
-/* JOKER 竖排：用牌面同款 Besley(GDRank)，靠左上放大、不超牌边 */
+/* JOKER 竖排：逐字母 flex 竖列，用牌面同款 Besley(GDRank)；line-height<1 压缩字母竖向间距、不超牌边 */
 .gd-joker-word {
   position: absolute;
-  top: 5px;
+  top: 4px;
   left: 4px;
-  writing-mode: vertical-rl;
-  text-orientation: upright;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   font-family: 'GDRank', serif;
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 0.88;
+  line-height: 1;              /* 字母竖向留清楚空隙（牌高够，不挤） */
   text-shadow: 0 0 2px #fff, 0 0 1px #fff;
 }
-.gd-card--small .gd-joker-word { font-size: 0.6rem; top: 3px; left: 2px; }
+.gd-joker-word span { display: block; }
+.gd-card--small .gd-joker-word { font-size: 0.5rem; top: 3px; left: 2px; }
 
 /* --- 途游式牌面：左上角标(点数+花色) + 右下角大花色，靠这两处填满整张牌 --- */
 .gd-card__corner {
   position: absolute;
   top: 2px;
-  left: 5px;
+  left: 4px;
   display: flex;
   flex-direction: row;       /* 手牌：点数+花色横排紧挨（如「A♠」横着） */
   align-items: center;
-  gap: 4px;                  /* 数字↔花色间距 */
+  gap: 3px;                  /* 数字↔花色间距 */
   line-height: 0.9;
   z-index: 1;
 }
@@ -246,7 +247,7 @@
 }
 .gd-card__rank {
   font-family: 'GDRank', serif;  /* Besley 板衬线(途游同款，Q 圈内出尾) */
-  font-size: 1.5rem;
+  font-size: 1.3rem;             /* 27 张挤一屏：角标需窄到露出量内，否则花色被下一张盖 */
   font-weight: 700;
   line-height: 1;
   display: inline-block;
@@ -256,12 +257,12 @@
 /* 字母(J/Q/K/A)天生比数字宽，横向收窄跟数字看齐 */
 .gd-card__rank--alpha { transform: scaleY(1.32) scaleX(0.85); }
 /* 「10」两位数太宽：横向压缩 + 缩小 1/0 间距 */
-.gd-card__rank--ten { transform: scaleY(1.32) scaleX(0.74); letter-spacing: -0.09em; }
+.gd-card__rank--ten { transform: scaleY(1.32) scaleX(0.82); letter-spacing: -0.03em; }
 /* 手牌默认只显角标；每列最前那张(含单张牌)完整可见，恢复右下大花色 */
 .gd-player-hand .gd-card__pip { display: none; }
 .gd-player-hand .gd-hand-col .gd-card:last-child .gd-card__pip { display: block; }
 .gd-card__suit {            /* 角标花色图：按高缩放、自然宽度、四花色一致 */
-  height: 19px;
+  height: 13px;
   width: auto;
   display: block;
 }
@@ -269,7 +270,7 @@
 .gd-card__suit--wild {
   font-family: 'GDWild', var(--font-ui);
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.78rem;
   color: var(--gold);
 }
 .gd-card__pip {            /* 右下角大花色图（填满牌面） */
@@ -321,7 +322,7 @@
   flex-shrink: 0;
 }
 .gd-hand-col .gd-card + .gd-card {
-  margin-top: -50px;   /* 向上叠，露出每张顶部角标（牌高 76 → 露 ~26px，上下角标不相叠） */
+  margin-top: -80px;   /* 桌面：向上叠，牌高 112 → 露 ~32px 顶部角标（上下角标不相叠）；手机另调 */
 }
 
 /* 选中：途游式——不上移/不跳动，整张盖一层蒙阴影 + 金边圈标记，点「出牌」才打出 */
@@ -447,6 +448,7 @@
   .gd-card__suit { height: 14px; }
   .gd-card__suit--wild { font-size: 0.7rem; }
   .gd-card__pip { height: 28px; }
+  .gd-hand-col .gd-card + .gd-card { margin-top: -50px; } /* 手机牌高 76 → 露 ~26px */
   .gd-card--small { width: 36px; height: 50px; }
   .gd-card--small .gd-card__rank { font-size: 0.76rem; }
   .gd-card--small .gd-card__suit { height: 9px; }
@@ -454,8 +456,8 @@
   /* 小丑图跟着牌缩小，别超出牌边界 */
   .gd-joker-fig { width: 32px; height: 52px; }
   .gd-card--small .gd-joker-fig { width: 21px; height: 33px; }
-  .gd-joker-word { font-size: 0.62rem; top: 3px; left: 2px; }
-  .gd-card--small .gd-joker-word { font-size: 0.4rem; }
+  .gd-joker-word { font-size: 0.52rem; top: 3px; left: 2px; }
+  .gd-card--small .gd-joker-word { font-size: 0.36rem; }
   .gd-player-hand { min-height: 76px; padding: 4px 0.3rem 4px; }
   .gd-avatar { width: 34px; height: 34px; }
   .gd-avatar svg { width: 21px; height: 21px; }

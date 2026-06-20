@@ -50,6 +50,19 @@ function sortComboCards(cards: Card[]): Card[] {
   });
 }
 
+/** 语音播报牌型（zh-CN），打断上一句保持跟手；不支持则静默 */
+function speak(text: string): void {
+  try {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'zh-CN';
+    u.rate = 1.05;
+    synth.speak(u);
+  } catch { /* 不支持语音则静默 */ }
+}
+
 function startNewDeal(): DealState {
   const deck = makeDeck();
   const hands = deal(deck, randomShuffle);
@@ -117,13 +130,10 @@ export function mount(root: HTMLElement): () => void {
   statusEl.className = 'gd-turn-status';
   tableEl.appendChild(statusEl);
 
-  // 底部：玩家信息 + 手牌 + 按钮
+  // 底部：玩家信息 + 提示 + 按钮(在手牌上方，仅轮到我时显示) + 手牌
   const bottomArea = document.createElement('div');
   bottomArea.className = 'gd-bottom-area';
   bottomArea.appendChild(seatEls[0]);   // 玩家信息行（头像+名+张数）
-  const handEl = document.createElement('div');
-  handEl.className = 'gd-player-hand';
-  bottomArea.appendChild(handEl);
 
   const hintEl = document.createElement('div');
   hintEl.className = 'gd-hint';
@@ -139,7 +149,11 @@ export function mount(root: HTMLElement): () => void {
   passBtn.textContent = '不要';
   actionsEl.appendChild(playBtn);
   actionsEl.appendChild(passBtn);
-  bottomArea.appendChild(actionsEl);
+  bottomArea.appendChild(actionsEl);    // 按钮在手牌上方
+
+  const handEl = document.createElement('div');
+  handEl.className = 'gd-player-hand';
+  bottomArea.appendChild(handEl);
 
   gameEl.appendChild(topbar);
   gameEl.appendChild(tableEl);
@@ -199,10 +213,7 @@ export function mount(root: HTMLElement): () => void {
       cardsDiv.className = 'gd-play__cards';
       for (const c of sortComboCards(lp.cards).slice(0, 14)) cardsDiv.appendChild(cardEl(c, LEVEL, true));
       elx.appendChild(cardsDiv);
-      const type = document.createElement('div');
-      type.className = 'gd-play__type';
-      type.textContent = comboTypeLabel(lp.type);
-      elx.appendChild(type);
+      // 牌型不再用文字说明，改用语音播报（见 applyPlay → speak）
     }
   }
 
@@ -303,8 +314,9 @@ export function mount(root: HTMLElement): () => void {
 
   function renderButtons(): void {
     const isHumanTurn = state.turn === HUMAN_SEAT && !isDealOver(state);
+    actionsEl.style.display = isHumanTurn ? 'flex' : 'none'; // 途游式：仅轮到我时显示按钮
     playBtn.disabled = !isHumanTurn;
-    passBtn.disabled = !isHumanTurn || state.current === null;
+    passBtn.disabled = !isHumanTurn || state.current === null; // 自己领出时不能"不要"
   }
 
   function renderAll(): void {
@@ -320,10 +332,12 @@ export function mount(root: HTMLElement): () => void {
     state = play(state, seat, cards);
     if (wasLead) lastPlays = { 0: null, 1: null, 2: null, 3: null }; // 新一圈：清掉上圈
     lastPlays[seat] = state.current ? state.current.combo : null;
+    if (state.current) speak(comboTypeLabel(state.current.combo.type)); // 语音播报牌型(替代文字说明)
   }
   function applyPass(seat: Seat): void {
     state = pass(state, seat);
     lastPlays[seat] = 'pass';
+    speak('不要');
   }
 
   function getSelectedCards(): Card[] {

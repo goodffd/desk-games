@@ -275,11 +275,15 @@ export function mount(root: HTMLElement): () => void {
       if (nc > 1) {
         const colW = (colEls[0] as HTMLElement).offsetWidth || 54;
         const availW = (gameEl.clientWidth || 800) - 10;
-        // 列推进至少容下最宽角标(如两位数「10♠」)+缝，花色不被下一列盖；列太多则按可用宽度重叠
-        let maxCorner = 0;
-        handEl.querySelectorAll('.gd-card__corner').forEach(c => { maxCorner = Math.max(maxCorner, (c as HTMLElement).offsetWidth); });
+        // 列推进至少容下最宽角标(点数+花色)+缝，角标花色不被下一列盖。
+        // 量点数宽(文字可靠)+固定预留花色+间距——花色是图片宽度异步，直接量角标会漏掉它
+        let maxRank = 0;
+        handEl.querySelectorAll('.gd-card__rank').forEach(c => { maxRank = Math.max(maxRank, (c as HTMLElement).offsetWidth); });
+        const suitH = ((handEl.querySelector('.gd-card__suit') as HTMLElement)?.offsetHeight) || 14;
+        const suitW = suitH * 1.15; // 花色按高度估宽(最宽红心≈1.08)，不依赖异步图片宽度
+        const maxCorner = maxRank + 4 + suitW; // 点数 + 间距 + 花色
         const fitStep = (availW - colW) / (nc - 1);
-        const step = Math.min(fitStep, maxCorner + 8);
+        const step = Math.min(fitStep, maxCorner + 10); // +10 留缝，花色不贴下一列
         const ml = step - colW;                // 负=列间重叠
         colEls.forEach((c, i) => { if (i > 0) (c as HTMLElement).style.marginLeft = `${ml}px`; });
       }

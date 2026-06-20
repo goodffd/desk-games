@@ -72,6 +72,8 @@ function avatarEl(seat: Seat): HTMLElement {
 export function mount(root: HTMLElement): () => void {
   let state = startNewDeal();
   let selectedIds = new Set<number>();
+  let dragging = false;   // 滑动选牌进行中
+  let dragMode = true;    // 本次划动目标态：true=选中 / false=取消
   let lastPlays: Record<Seat, LastPlay> = { 0: null, 1: null, 2: null, 3: null };
   const timers: number[] = [];
 
@@ -200,6 +202,21 @@ export function mount(root: HTMLElement): () => void {
     }
   }
 
+  /** 选/弃一张牌：更新集合 + 直接切类，不整屏重渲（保证滑动顺滑；选牌不影响按钮态） */
+  function applyCardSelect(id: number, sel: boolean): void {
+    const ce = handEl.querySelector(`.gd-card[data-card-id="${id}"]`) as HTMLElement | null;
+    if (sel) { selectedIds.add(id); ce?.classList.add('is-selected'); }
+    else { selectedIds.delete(id); ce?.classList.remove('is-selected'); }
+  }
+  /** 屏幕坐标下的手牌 id（滑动经过判定，鼠标/触摸通用） */
+  function cardIdAtPoint(x: number, y: number): number | null {
+    const t = document.elementFromPoint(x, y);
+    const card = t && (t as HTMLElement).closest('.gd-card');
+    if (!card || !handEl.contains(card)) return null;
+    const id = (card as HTMLElement).dataset['cardId'];
+    return id ? Number(id) : null;
+  }
+
   /** 玩家手牌（扇形，可选） */
   function renderHand(): void {
     handEl.innerHTML = '';
@@ -208,11 +225,13 @@ export function mount(root: HTMLElement): () => void {
     for (const card of cards) {
       const ce = cardEl(card, LEVEL);
       if (selectedIds.has(card.id)) ce.classList.add('is-selected');
-      ce.addEventListener('click', () => {
+      // 滑动选牌：按下即定本次目标态(选/弃)并应用到起手牌；滑过的牌由全局 pointermove 接力
+      ce.addEventListener('pointerdown', (e) => {
         if (state.turn !== HUMAN_SEAT || isDealOver(state)) return;
-        if (selectedIds.has(card.id)) selectedIds.delete(card.id);
-        else selectedIds.add(card.id);
-        renderAll();
+        e.preventDefault();                    // 防文本选择/触摸滚动
+        dragging = true;
+        dragMode = !selectedIds.has(card.id);  // 起手牌决定本次划动是"选"还是"取消"
+        applyCardSelect(card.id, dragMode);
       });
       handEl.appendChild(ce);
     }
@@ -221,7 +240,7 @@ export function mount(root: HTMLElement): () => void {
     if (n > 1) {
       const availW = (gameEl.clientWidth || 900) - 16;
       let step = (availW - cw) / (n - 1);
-      step = Math.max(26, Math.min(step, 54));
+      step = Math.max(26, Math.min(step, 30));
       const m = (step - cw) / 2;
       handEl.querySelectorAll('.gd-card').forEach(c => { (c as HTMLElement).style.margin = `0 ${m}px`; });
     }
@@ -364,12 +383,24 @@ export function mount(root: HTMLElement): () => void {
   // ── 绑定 + 初次渲染 ────────────────────────────────────────
   playBtn.addEventListener('click', handlePlay);
   passBtn.addEventListener('click', handlePass);
+
+  // 滑动选牌：手牌区内 pointermove 经过的牌切到同一目标态；任意处松手结束
+  const onHandPointerMove = (e: PointerEvent): void => {
+    if (!dragging) return;
+    const id = cardIdAtPoint(e.clientX, e.clientY);
+    if (id !== null && selectedIds.has(id) !== dragMode) applyCardSelect(id, dragMode);
+  };
+  const onPointerUp = (): void => { dragging = false; };
+  handEl.addEventListener('pointermove', onHandPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+
   renderAll();
   if (state.turn !== HUMAN_SEAT) scheduleAi();
 
   return () => {
     for (const t of timers) clearTimeout(t);
     timers.length = 0;
+    window.removeEventListener('pointerup', onPointerUp);
     root.innerHTML = '';
   };
 }

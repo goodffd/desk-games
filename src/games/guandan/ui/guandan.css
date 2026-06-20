@@ -21,7 +21,8 @@
   flex-direction: column;
   height: 100vh;
   min-height: 500px;
-  background: var(--bg-table);
+  /* 整局一块连续毡布：中央亮、四周暗角，桌面与手牌/出牌区不分区不裁切 */
+  background: radial-gradient(ellipse 94% 84% at 50% 42%, #2c6230 0%, #1b431d 56%, #112d12 100%);
   position: relative;
   overflow: hidden;
   font-family: var(--font-ui);
@@ -70,11 +71,8 @@
   flex: 1 1 0;
   min-height: 0;
   position: relative;
-  overflow: hidden;
-  /* 毡布椭圆渐变：中央亮绿，四周暗角 */
-  background: radial-gradient(ellipse 80% 70% at 50% 50%, #1e4420 0%, #132f13 70%, #0e230e 100%);
-  border-radius: 0 0 20px 20px;
-  box-shadow: inset 0 0 60px rgba(0,0,0,0.35);
+  overflow: visible;   /* 不裁切：桌面与出牌/手牌区连成一片毡布，图像不被边界截掉 */
+  background: transparent;
 }
 
 /* --- 四家座位（绝对围坐：对家上 / 上家左 / 下家右 / 你=底部信息行） --- */
@@ -136,7 +134,7 @@
 .gd-play--top    { top: 112px; left: 50%; transform: translateX(-50%); }
 .gd-play--left   { left: 150px; top: 36%; }
 .gd-play--right  { right: 150px; top: 36%; }
-.gd-play--bottom { bottom: 4px; left: 50%; transform: translateX(-50%); }
+.gd-play--bottom { bottom: 54px; left: 50%; transform: translateX(-50%); }
 .gd-play__cards { display: flex; flex-wrap: nowrap; }
 .gd-play__cards .gd-card { margin: 0 -12px; }
 .gd-play__type { font-size: 0.6rem; color: var(--gold); margin-top: 1px; }
@@ -225,32 +223,57 @@
   font-size: 0.34rem;
 }
 
-/* --- 普通牌面字号 --- */
+/* --- 途游式牌面：左上角标(点数+小花色) + 中心大花色 --- */
+.gd-card__corner {
+  position: absolute;
+  top: 3px;
+  left: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0.82;
+  z-index: 1;
+}
 .gd-card__rank {
-  font-size: 1.55rem;
-  font-weight: 700;
-  line-height: 1;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
 }
-.gd-card--small .gd-card__rank { font-size: 1.15rem; }
-
-.gd-card__suit {
-  font-size: 1.35rem;
-  line-height: 1;
+.gd-card__suit {            /* 角标小花色 SVG */
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
 }
-.gd-card--small .gd-card__suit { font-size: 1.05rem; }
+.gd-card__pip {             /* 中心大花色 SVG */
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  top: 53%;
+  left: 53%;
+  transform: translate(-50%, -50%);
+  opacity: 0.95;
+}
+/* 出牌区小牌同款缩小 */
+.gd-card--small .gd-card__rank { font-size: 1.12rem; }
+.gd-card--small .gd-card__suit { width: 11px; height: 11px; }
+.gd-card--small .gd-card__pip { width: 28px; height: 28px; }
 
-/* 逢人配「配」：小号、金底白字徽章，内嵌思源黑体 */
-.gd-card__suit--wild {
-  font-size: 0.6rem;
+/* 逢人配：右上金徽章 */
+.gd-card__wild-tag {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  z-index: 2;
+  font-size: 0.58rem;
   font-weight: 700;
   color: #fff;
   background: var(--gold);
   border-radius: 3px;
   padding: 0 3px;
-  line-height: 1.35;
+  line-height: 1.3;
   font-family: var(--font-ui);
 }
-.gd-card--small .gd-card__suit--wild { font-size: 0.48rem; }
+.gd-card--small .gd-card__wild-tag { font-size: 0.46rem; padding: 0 2px; }
 
 /* --- 玩家手牌（大牌、重叠扇形） --- */
 .gd-player-hand {
@@ -268,6 +291,7 @@
 .gd-player-hand .gd-card {
   cursor: pointer;
   margin: 0 -28px;
+  touch-action: none;   /* 手指划动连续选牌，不触发页面滚动/缩放 */
 }
 
 /* 选中：途游式——不上移/不跳动，整张盖一层蒙阴影 + 金边圈标记，点「出牌」才打出 */

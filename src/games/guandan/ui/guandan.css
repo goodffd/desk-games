@@ -34,7 +34,7 @@
   flex-direction: column;
   align-items: center;
   flex-shrink: 0;
-  padding-bottom: 140px;   /* 手牌上抬，完整露出底部正中的「你」头像(头像+名占 ~70px + 8%边距) */
+  padding-bottom: 100px;   /* 手牌上抬，完整露出底部正中的「你」头像 */
 }
 
 /* --- 顶部栏 --- */
@@ -67,6 +67,16 @@
 }
 .gd-topbar__back:hover { background: rgba(201,168,76,0.1); border-color: var(--gold); }
 
+/* 可玩区：菜单栏下方的整块区域。四家座位/出牌区相对它绝对定位，
+   故 top:50%=可玩区竖向居中、对家(top)与你(bottom)关于可玩区上下对称 */
+.gd-playfield {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 /* --- 主桌面（flex:1 撑满，position:relative 给绝对定位子元素用） --- */
 .gd-table {
   flex: 1 1 0;
@@ -84,14 +94,14 @@
   gap: 3px;
 }
 .gd-seat--top, .gd-seat--left, .gd-seat--right { position: absolute; z-index: 5; }
-/* 三家对手相对 gameEl 全高定位，从边缘往牌桌中心收一些（owner：别都贴边） */
-.gd-seat--top   { top: 8%;   left: 50%; transform: translateX(-50%); }
+/* 相对可玩区(playfield)定位：对家贴可玩区顶、上家/下家竖向居中、你贴可玩区底(与对家对称) */
+.gd-seat--top   { top: 2.5%;  left: 50%; transform: translateX(-50%); }
 .gd-seat--left  { left: 6%;  top: 50%; transform: translateY(-50%); }
 .gd-seat--right { right: 6%; top: 50%; transform: translateY(-50%); }
 /* 你：绝对定位到底部正中，与对家(top:8%)上下对称、横向居中。
    column-reverse：头像贴底边、名字朝中心——正好镜像对家(头像贴顶边、名字朝中心)，头像距边=对家头像距顶 */
 .gd-seat--bottom {
-  position: absolute; bottom: 8%; left: 50%; transform: translateX(-50%);
+  position: absolute; bottom: 2.5%; left: 50%; transform: translateX(-50%);
   z-index: 9;            /* 头像始终可见：在手牌(6)/出牌区(3~7)之上 */
   flex-direction: column-reverse; align-items: center; gap: 4px;
 }
@@ -173,10 +183,10 @@
 .gd-play:not(.has-play) { display: none; }
 /* 四家出牌区围绕牌桌中心摆菱形（相对 gameEl 全高），各朝自家方向偏，不压头像/手牌 */
 /* 出牌区与头像都用 %（头像 left/right:6%），出牌区在其内侧 14%，屏幕再宽也不会被头像追上重叠 */
-.gd-play--top    { top: 20%; left: 50%; transform: translateX(-50%); }
+.gd-play--top    { top: 14%; left: 50%; transform: translateX(-50%); }
 .gd-play--left   { left: 14%; top: 50%; transform: translateY(-50%); }
 .gd-play--right  { right: 14%; top: 50%; transform: translateY(-50%); }
-.gd-play--bottom { top: 66%; left: 50%; transform: translateX(-50%); }
+.gd-play--bottom { top: 50%; left: 50%; transform: translateX(-50%); }  /* 在手牌上方，我打出的牌可见 */
 .gd-play__cards { display: flex; flex-wrap: nowrap; }
 .gd-play__cards .gd-card { margin: 0 -10px; }
 .gd-play__type { font-size: 0.95rem; font-weight: 600; color: var(--gold); margin-top: 3px; }
@@ -518,7 +528,7 @@
 @media (max-width: 520px), (max-height: 520px) {
   .gd-card { width: 42px; height: 60px; border-radius: 6px; padding: 3px 4px; }  /* 手机手牌再缩一圈 48→42 */
   .gd-card__corner { top: 2px; left: 3px; }
-  .gd-card__rank { font-size: 0.82rem; }
+  .gd-card__rank { font-size: 0.92rem; }   /* 牌缩小后点数/字母放大一号，保证清晰 */
   .gd-card__suit { height: 10px; }
   .gd-card__suit--wild { font-size: 0.56rem; }
   .gd-card__pip { height: 22px; }
@@ -543,15 +553,13 @@
   .gd-turn-status { display: none; }
   .gd-play__type { font-size: 0.66rem; margin-top: 1px; }
   .gd-play__cards .gd-card { margin: 0 -9px; }
-  /* 手机端三家对手回到原边缘位（往中心收只在桌面端做，手机不动） */
-  .gd-seat--top   { top: 11%; }
+  /* 手机端左右两家只调横向贴边量；上下(对家/你)与竖向居中由可玩区基础值统一管 */
   .gd-seat--left  { left: 12px; }
   .gd-seat--right { right: 12px; }
-  .gd-seat--bottom { bottom: 11%; }      /* 你：与对家 top:11% 上下对称 */
-  .gd-bottom-area { padding-bottom: 106px; } /* 手机让位量(头像+名 ~52px + 11%边距) */
-  /* 矮牌桌：4 家出牌区收成紧凑菱形，互不相叠，我方出牌区上移不贴头像 */
-  .gd-play--top    { top: 21%; }  /* 对家出牌区移近头像，与上家/下家「牌↔头像」间距一致 */
-  .gd-play--bottom { top: 60%; bottom: auto; }
+  .gd-bottom-area { padding-bottom: 70px; } /* 手机让位量(头像+名 ~52px + 小边距) */
+  /* 矮牌桌：4 家出牌区收成紧凑菱形，互不相叠 */
+  .gd-play--top    { top: 12%; }
+  .gd-play--bottom { top: 56%; bottom: auto; }  /* 在手牌上方可见 */
   .gd-play--left   { left: 68px; top: 50%; }
   .gd-play--right  { right: 68px; top: 50%; }
 }

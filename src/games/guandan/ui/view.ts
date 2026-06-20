@@ -221,18 +221,23 @@ export function mount(root: HTMLElement): () => void {
   handRow.appendChild(handEl);
   bottomArea.appendChild(handRow);
 
-  gameEl.appendChild(topbar);
-  gameEl.appendChild(tableEl);
-  gameEl.appendChild(bottomArea);
-  gameEl.appendChild(seatEls[0]); // 你(底部正中，绝对定位，与对家对称)
-  gameEl.appendChild(seatEls[1]); // 下家(右)
-  gameEl.appendChild(seatEls[2]); // 对家(上)
-  gameEl.appendChild(seatEls[3]); // 上家(左)
+  // playfield = 菜单栏下方的「可玩区」：四家座位/出牌区都相对它定位，
+  // 故 top:50%=可玩区竖向居中、对家(top:D)与你(bottom:D)关于可玩区上下对称、上家/下家居中。
+  const playfield = document.createElement('div');
+  playfield.className = 'gd-playfield';
+  playfield.appendChild(tableEl);
+  playfield.appendChild(bottomArea);
+  playfield.appendChild(seatEls[0]); // 你(底部正中，与对家对称)
+  playfield.appendChild(seatEls[1]); // 下家(右)
+  playfield.appendChild(seatEls[2]); // 对家(上)
+  playfield.appendChild(seatEls[3]); // 上家(左)
   // 四家出牌区菱形（围绕中心，朝各自方向偏，不压头像/手牌）
-  gameEl.appendChild(playEls[0]); // 你(下)
-  gameEl.appendChild(playEls[1]); // 下家(右)
-  gameEl.appendChild(playEls[2]); // 对家(上)
-  gameEl.appendChild(playEls[3]); // 上家(左)
+  playfield.appendChild(playEls[0]); // 你(下)
+  playfield.appendChild(playEls[1]); // 下家(右)
+  playfield.appendChild(playEls[2]); // 对家(上)
+  playfield.appendChild(playEls[3]); // 上家(左)
+  gameEl.appendChild(topbar);
+  gameEl.appendChild(playfield);
   root.appendChild(gameEl);
 
   // ── 渲染 ───────────────────────────────────────────────────
@@ -346,6 +351,11 @@ export function mount(root: HTMLElement): () => void {
       if (!at.has(v)) { at.set(v, groups.length); groups.push([]); }
       groups[at.get(v)!]!.push(card);
     }
+    // 每列(同点数)内按花色排序：DOM 上→下 = 方块→梅花→红心→黑桃，即视觉上 黑桃在底、方块在顶。
+    // 升序排，同花色自然相邻不被其他花色错开。大小王无花色，留在本列原位(各自单独成列)。
+    const SUIT_ORDER: Record<string, number> = { D: 0, C: 1, H: 2, S: 3 };
+    const suitKey = (c: Card): number => (c.kind === 'joker' ? -1 : (SUIT_ORDER[c.suit] ?? 0));
+    for (const g of groups) g.sort((a, b) => suitKey(a) - suitKey(b));
     for (const g of groups) {
       const col = document.createElement('div');
       col.className = 'gd-hand-col';

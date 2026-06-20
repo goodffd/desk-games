@@ -166,9 +166,10 @@
 }
 .gd-play:not(.has-play) { display: none; }
 /* 四家出牌区围绕牌桌中心摆菱形（相对 gameEl 全高），各朝自家方向偏，不压头像/手牌 */
+/* 出牌区与头像都用 %（头像 left/right:6%），出牌区在其内侧 14%，屏幕再宽也不会被头像追上重叠 */
 .gd-play--top    { top: 20%; left: 50%; transform: translateX(-50%); }
-.gd-play--left   { left: 170px; top: 50%; transform: translateY(-50%); }
-.gd-play--right  { right: 170px; top: 50%; transform: translateY(-50%); }
+.gd-play--left   { left: 14%; top: 50%; transform: translateY(-50%); }
+.gd-play--right  { right: 14%; top: 50%; transform: translateY(-50%); }
 .gd-play--bottom { top: 66%; left: 50%; transform: translateX(-50%); }
 .gd-play__cards { display: flex; flex-wrap: nowrap; }
 .gd-play__cards .gd-card { margin: 0 -10px; }
@@ -537,6 +538,10 @@
   .gd-turn-status { display: none; }
   .gd-play__type { font-size: 0.66rem; margin-top: 1px; }
   .gd-play__cards .gd-card { margin: 0 -9px; }
+  /* 手机端三家对手回到原边缘位（往中心收只在桌面端做，手机不动） */
+  .gd-seat--top   { top: 11%; }
+  .gd-seat--left  { left: 12px; }
+  .gd-seat--right { right: 12px; }
   /* 矮牌桌：4 家出牌区收成紧凑菱形，互不相叠，我方出牌区上移不贴头像 */
   .gd-play--top    { top: 33%; }
   .gd-play--bottom { top: 60%; bottom: auto; }

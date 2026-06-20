@@ -373,10 +373,10 @@ export function mount(root: HTMLElement): () => void {
     const meEl = seatEls[0] as HTMLElement;
     const rotated = window.matchMedia('(orientation: portrait) and (max-width: 920px)').matches;
     if (rotated) {
-      const handW = handEl.offsetWidth;
+      const colW0 = (colEls[0] as HTMLElement)?.offsetWidth || 0;
       const meW2 = meEl.offsetWidth || 40;
-      // 有牌：移到手牌中心；牌出光(无牌)：移到牌桌偏中心，别孤零零留在底边
-      const tx = handW > 4 ? (meW2 / 2 + 20 + handW / 2) : (gameEl.offsetWidth || 800) * 0.34;
+      // 有牌：移到与"第一张牌"齐平(顶部，非整排中间)；牌出光(无牌)：移到牌桌偏中心，别孤留底边
+      const tx = colW0 > 0 ? (meW2 / 2 + 20 + colW0 / 2) : (gameEl.offsetWidth || 800) * 0.34;
       meEl.style.transform = `translateX(${Math.round(tx)}px)`;
     } else {
       meEl.style.transform = '';

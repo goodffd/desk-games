@@ -28,12 +28,13 @@
   font-family: var(--font-ui);
 }
 
-/* 手牌+提示+按钮区，固定在底部 */
+/* 手牌+提示+按钮区，固定在底部。padding-bottom 把手牌上抬，给底部正中的「你」头像让位 */
 .gd-bottom-area {
   display: flex;
   flex-direction: column;
   align-items: center;
   flex-shrink: 0;
+  padding-bottom: 140px;   /* 手牌上抬，完整露出底部正中的「你」头像(头像+名占 ~70px + 8%边距) */
 }
 
 /* --- 顶部栏 --- */
@@ -87,8 +88,13 @@
 .gd-seat--top   { top: 8%;   left: 50%; transform: translateX(-50%); }
 .gd-seat--left  { left: 6%;  top: 50%; transform: translateY(-50%); }
 .gd-seat--right { right: 6%; top: 50%; transform: translateY(-50%); }
-/* 你（手牌左侧）：头像在上、名/张数在下，竖排紧凑 */
-.gd-seat--bottom { flex-direction: column; align-items: center; gap: 4px; padding: 4px 0 2px; }
+/* 你：绝对定位到底部正中，与对家(top:8%)上下对称、横向居中。
+   column-reverse：头像贴底边、名字朝中心——正好镜像对家(头像贴顶边、名字朝中心)，头像距边=对家头像距顶 */
+.gd-seat--bottom {
+  position: absolute; bottom: 8%; left: 50%; transform: translateX(-50%);
+  z-index: 9;            /* 头像始终可见：在手牌(6)/出牌区(3~7)之上 */
+  flex-direction: column-reverse; align-items: center; gap: 4px;
+}
 /* 左右家：只锚定头像竖向居中；名/张数绝对排到头像下方，残局张数角标变大也不顶动头像 */
 .gd-seat--left .gd-seat__info,
 .gd-seat--right .gd-seat__info {
@@ -313,16 +319,14 @@
 .gd-card--small .gd-card__suit--wild { font-size: 0.78rem; }
 .gd-card--small .gd-card__pip { height: 26px; right: 2px; bottom: 2px; }
 
-/* 你的头像+名 放手牌左侧（途游式：自己头像在手牌左下，与牌留间隔） */
+/* 手牌行（你的头像已绝对定位到底部正中，不在此行内） */
 .gd-hand-row {
   display: flex;
   flex-direction: row;
   align-items: flex-end;
   justify-content: center;
-  gap: 20px;                 /* 你↔手牌 间隔 */
   width: 100%;
 }
-.gd-hand-row > .gd-seat--bottom { flex: 0 0 auto; padding-bottom: 8px; }
 
 /* --- 玩家手牌（大牌、重叠扇形） --- */
 .gd-player-hand {
@@ -332,6 +336,7 @@
   padding: 8px 0.5rem 6px;
   min-height: 124px;
   position: relative;
+  z-index: 6;                    /* 手牌夹在「最新出牌(7)」之下、「其余各家出牌(3)」之上 */
   flex-wrap: nowrap;
   overflow: visible;             /* 不出横向拉条 */
 }
@@ -511,23 +516,23 @@
 
 /* --- 矮/窄视口(手机任一朝向)：缩小牌与控件，给牌桌留空间、底部不被挤出屏外 --- */
 @media (max-width: 520px), (max-height: 520px) {
-  .gd-card { width: 48px; height: 68px; border-radius: 6px; padding: 3px 4px; }
+  .gd-card { width: 42px; height: 60px; border-radius: 6px; padding: 3px 4px; }  /* 手机手牌再缩一圈 48→42 */
   .gd-card__corner { top: 2px; left: 3px; }
-  .gd-card__rank { font-size: 0.94rem; }
-  .gd-card__suit { height: 12px; }
-  .gd-card__suit--wild { font-size: 0.64rem; }
-  .gd-card__pip { height: 25px; }
-  .gd-hand-col .gd-card + .gd-card { margin-top: -45px; } /* 手机牌高 68 → 露 ~23px */
+  .gd-card__rank { font-size: 0.82rem; }
+  .gd-card__suit { height: 10px; }
+  .gd-card__suit--wild { font-size: 0.56rem; }
+  .gd-card__pip { height: 22px; }
+  .gd-hand-col .gd-card + .gd-card { margin-top: -40px; } /* 手机牌高 60 → 露 ~20px */
   .gd-card--small { width: 36px; height: 50px; }
   .gd-card--small .gd-card__rank { font-size: 0.76rem; }
   .gd-card--small .gd-card__suit { height: 9px; }
   .gd-card--small .gd-card__pip { height: 18px; }
   /* 小丑图跟着牌缩小，别超出牌边界 */
-  .gd-joker-fig { width: 31px; height: 52px; }
+  .gd-joker-fig { width: 27px; height: 46px; }
   .gd-card--small .gd-joker-fig { width: 21px; height: 33px; }
-  .gd-joker-word { font-size: 0.46rem; top: 3px; left: 2px; }
+  .gd-joker-word { font-size: 0.40rem; top: 3px; left: 2px; }
   .gd-card--small .gd-joker-word { font-size: 0.36rem; }
-  .gd-player-hand { min-height: 68px; padding: 4px 0.3rem 4px; }
+  .gd-player-hand { min-height: 60px; padding: 4px 0.3rem 4px; }
   .gd-avatar { width: 34px; height: 34px; }
   .gd-avatar svg { width: 21px; height: 21px; }
   .gd-seat__info { font-size: 0.6rem; padding: 1px 6px; }
@@ -542,14 +547,13 @@
   .gd-seat--top   { top: 11%; }
   .gd-seat--left  { left: 12px; }
   .gd-seat--right { right: 12px; }
+  .gd-seat--bottom { bottom: 11%; }      /* 你：与对家 top:11% 上下对称 */
+  .gd-bottom-area { padding-bottom: 106px; } /* 手机让位量(头像+名 ~52px + 11%边距) */
   /* 矮牌桌：4 家出牌区收成紧凑菱形，互不相叠，我方出牌区上移不贴头像 */
   .gd-play--top    { top: 21%; }  /* 对家出牌区移近头像，与上家/下家「牌↔头像」间距一致 */
   .gd-play--bottom { top: 60%; bottom: auto; }
   .gd-play--left   { left: 68px; top: 50%; }
   .gd-play--right  { right: 68px; top: 50%; }
-  /* 你座位从游戏底边抬起，避免旋转后名字胶囊跑到屏幕左缘被裁 */
-  /* margin-bottom 管左右(旋转后不贴左缘)；上下(与手牌竖向居中)由 renderHand 动态 translateX */
-  .gd-hand-row > .gd-seat--bottom { margin-bottom: 62px; }
 }
 
 /* --- 手机竖屏自动转横屏：掼蛋牌桌需要横向空间，竖握时整页旋转 90° 显示为横屏 ---

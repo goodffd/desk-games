@@ -152,6 +152,7 @@ export function mount(root: HTMLElement): () => void {
   let dragging = false;   // 滑动选牌进行中
   let dragMode = true;    // 本次划动目标态：true=选中 / false=取消
   let lastPlays: Record<Seat, LastPlay> = { 0: null, 1: null, 2: null, 3: null };
+  let lastActor: Seat | null = null; // 最近出牌/不要的人：其出牌区浮到手牌区之上，其余沉到手牌区之下
   const timers: number[] = [];
 
   const sortedHand = (seat: Seat): Card[] => sortHand(state.hands[seat]!, LEVEL);
@@ -212,10 +213,9 @@ export function mount(root: HTMLElement): () => void {
   actionsEl.appendChild(passBtn);
   bottomArea.appendChild(actionsEl);    // 按钮(在手牌上方)
 
-  // 你的头像+名放手牌左侧（途游式：自己头像在手牌左侧，与牌留间隔）
+  // 手牌行（你的头像不再在此：改为绝对定位到底部正中，与对家上下对称）
   const handRow = document.createElement('div');
   handRow.className = 'gd-hand-row';
-  handRow.appendChild(seatEls[0]);      // 你：手牌左侧
   const handEl = document.createElement('div');
   handEl.className = 'gd-player-hand';
   handRow.appendChild(handEl);
@@ -224,6 +224,7 @@ export function mount(root: HTMLElement): () => void {
   gameEl.appendChild(topbar);
   gameEl.appendChild(tableEl);
   gameEl.appendChild(bottomArea);
+  gameEl.appendChild(seatEls[0]); // 你(底部正中，绝对定位，与对家对称)
   gameEl.appendChild(seatEls[1]); // 下家(右)
   gameEl.appendChild(seatEls[2]); // 对家(上)
   gameEl.appendChild(seatEls[3]); // 上家(左)
@@ -282,6 +283,8 @@ export function mount(root: HTMLElement): () => void {
   function renderPlay(seat: Seat): void {
     const elx = playEls[seat]!;
     elx.innerHTML = '';
+    // 最近出牌的人浮到手牌区之上(z 7>手牌6)，其余各家沉到手牌区之下(z 3<手牌6) → 只挡当前这手，不挡选牌
+    elx.style.zIndex = seat === lastActor ? '7' : '3';
     const lp = lastPlays[seat];
     if (lp === null) { elx.classList.remove('has-play'); return; }
     elx.classList.add('has-play');
@@ -354,8 +357,7 @@ export function mount(root: HTMLElement): () => void {
     const nc = colEls.length;
     if (nc > 1) {
       const colW = (colEls[0] as HTMLElement).offsetWidth || 54;
-      const meW = (seatEls[0] as HTMLElement)?.offsetWidth || 0; // 你头像占手牌左侧，可用宽要减掉，否则溢出
-      const availW = (gameEl.clientWidth || 800) - meW - 20 - 10;
+      const availW = (gameEl.clientWidth || 800) - 30; // 你头像已移出手牌行，手牌占满整宽(留点边)
       // 列推进至少容下最宽角标(点数+花色)+缝，角标花色不被下一列盖。
       // 量点数宽(文字可靠)+按高估花色宽+间距——花色是图片宽度异步，直接量角标会漏掉它
       let maxRank = 0; // 视觉宽度(getBoundingClientRect 含 scaleX 压缩)，压缩后的「10」让列更紧凑
@@ -368,31 +370,7 @@ export function mount(root: HTMLElement): () => void {
       const ml = step - colW;                // 负=列间重叠
       colEls.forEach((c, i) => { if (i > 0) (c as HTMLElement).style.marginLeft = `${ml}px`; });
     }
-    // 竖握手机(游戏旋转)：把「你」头像沿 game-local-x 移到手牌中心 → 旋转后与手牌竖向居中。
-    // 固定值跟不了不同副牌的手牌宽度(=旋转后高度)，按实测手牌宽度动态算。桌面/横屏不旋转则不动。
-    const meEl = seatEls[0] as HTMLElement;
-    const avEl = meEl.querySelector('.gd-avatar') as HTMLElement | null; // 对齐头像本身(非含名字的整座位)
-    const rotated = window.matchMedia('(orientation: portrait) and (max-width: 920px)').matches;
-    const firstFront = (colEls[0] as HTMLElement)?.lastElementChild as HTMLElement | null; // 最左列最下(前)那张牌
-    if (rotated && firstFront && avEl) {
-      meEl.style.transform = '';                      // 先清空，量头像自然位置
-      const a0 = avEl.getBoundingClientRect();
-      const fr = firstFront.getBoundingClientRect();
-      // 头像竖向中心与该牌竖向中心同一水平线(横屏)=同一 cx(竖屏)；紧挨其左侧(横屏)=上方(竖屏)
-      const targetCx = fr.left + fr.width / 2;
-      const targetCy = fr.top - 6 - a0.height / 2;
-      const acx = a0.left + a0.width / 2, acy = a0.top + a0.height / 2;
-      // 旋转矩阵 matrix(0,1,-1,0)：game-local 的 translate(dx,dy) → 屏幕位移 (-dy, dx)
-      meEl.style.transform = `translate(${Math.round(targetCy - acy)}px, ${Math.round(acx - targetCx)}px)`;
-    } else if (rotated) {
-      meEl.style.transform = `translateX(${Math.round((gameEl.offsetWidth || 800) * 0.34)}px)`; // 牌出光：偏中心
-    } else {
-      // 桌面：手牌越少头像越往中心(上)移，别一直钉死在底边
-      const remain = (state.hands[HUMAN_SEAT] ?? []).length;
-      const frac = Math.max(0, Math.min(1, 1 - remain / 27));
-      const up = Math.round(frac * 240);
-      meEl.style.transform = up > 0 ? `translateY(${-up}px)` : '';
-    }
+    // 「你」头像已绝对定位在底部正中(CSS)，不再随手牌动态摆位。
   }
 
   function renderStatus(): void {
@@ -424,15 +402,18 @@ export function mount(root: HTMLElement): () => void {
     state = play(state, seat, cards);
     if (wasLead) lastPlays = { 0: null, 1: null, 2: null, 3: null }; // 新一圈：清掉上圈
     lastPlays[seat] = state.current ? state.current.combo : null;
+    lastActor = seat; // 这家刚出牌：其出牌区浮到手牌之上，下一家出牌时再沉下去
     if (state.current) speak(comboSpeech(state.current.combo, LEVEL)); // 语音：牌型/具体点数(见 comboSpeech)
   }
   function applyPass(seat: Seat): void {
     state = pass(state, seat);
     lastPlays[seat] = 'pass';
+    lastActor = seat;
     speak('不要');
     // 一圈结束（其余全过）→ 赢家领新圈：清掉桌面所有出牌/不要，免得盖住赢家(尤其我)选牌
     if (state.current === null && !isDealOver(state)) {
       lastPlays = { 0: null, 1: null, 2: null, 3: null };
+      lastActor = null;
     }
   }
 

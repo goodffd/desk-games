@@ -357,7 +357,7 @@ export function mount(root: HTMLElement): () => void {
       const suitW = suitH * 1.15; // 花色按高度估宽(最宽红心≈1.08)，不依赖异步图片宽度
       const maxCorner = maxRank + 4 + suitW; // 点数 + 间距 + 花色
       const fitStep = (availW - colW) / (nc - 1);
-      const step = Math.min(fitStep, maxCorner + 9); // 角标右边留 ~5px 清楚的缝，花色不贴下一列；右下大花色可被盖一部分
+      const step = Math.min(fitStep, maxCorner + 6); // 列叠紧些：角标右留 ~2-3px 缝(牌缩小后角标也小，够用)
       const ml = step - colW;                // 负=列间重叠
       colEls.forEach((c, i) => { if (i > 0) (c as HTMLElement).style.marginLeft = `${ml}px`; });
     }

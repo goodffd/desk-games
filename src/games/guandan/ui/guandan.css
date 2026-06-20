@@ -208,11 +208,11 @@
 /* 小丑图(背景 contain 见 joker-img.css)：缩小、靠右竖向居中，不压到左侧 JOKER 字 */
 .gd-joker-fig {
   position: absolute;
-  right: 2px;
+  right: 3px;
   top: 50%;
   transform: translateY(-50%);
-  width: 50px;
-  height: 80px;
+  width: 56px;
+  height: 90px;
 }
 .gd-card--small .gd-joker-fig { width: 33px; height: 53px; }
 .gd-card--joker-small .gd-joker-fig { filter: grayscale(1) brightness(1.06); } /* 小王转灰 */
@@ -392,10 +392,10 @@
 }
 .gd-btn--play:not(:disabled):hover { filter: brightness(0.92); transform: scale(1.02); }
 
-/* 不要：实底（原 transparent 会透出底下的牌），保留金边金字的次按钮观感 */
+/* 不要：实底（原 transparent 会透出底下的牌），无边框、金字 */
 .gd-btn--pass {
   background: #1f3320;
-  border: 1px solid var(--gold-dim);
+  border: none;
   color: var(--gold);
 }
 .gd-btn--pass:not(:disabled):hover { background: #2a4329; }
@@ -493,23 +493,23 @@
 
 /* --- 矮/窄视口(手机任一朝向)：缩小牌与控件，给牌桌留空间、底部不被挤出屏外 --- */
 @media (max-width: 520px), (max-height: 520px) {
-  .gd-card { width: 54px; height: 76px; border-radius: 6px; padding: 3px 4px; }
-  .gd-card__corner { top: 2px; left: 4px; }
-  .gd-card__rank { font-size: 1.05rem; }
-  .gd-card__suit { height: 14px; }
-  .gd-card__suit--wild { font-size: 0.7rem; }
-  .gd-card__pip { height: 28px; }
-  .gd-hand-col .gd-card + .gd-card { margin-top: -50px; } /* 手机牌高 76 → 露 ~26px */
+  .gd-card { width: 48px; height: 68px; border-radius: 6px; padding: 3px 4px; }
+  .gd-card__corner { top: 2px; left: 3px; }
+  .gd-card__rank { font-size: 0.94rem; }
+  .gd-card__suit { height: 12px; }
+  .gd-card__suit--wild { font-size: 0.64rem; }
+  .gd-card__pip { height: 25px; }
+  .gd-hand-col .gd-card + .gd-card { margin-top: -45px; } /* 手机牌高 68 → 露 ~23px */
   .gd-card--small { width: 36px; height: 50px; }
   .gd-card--small .gd-card__rank { font-size: 0.76rem; }
   .gd-card--small .gd-card__suit { height: 9px; }
   .gd-card--small .gd-card__pip { height: 18px; }
   /* 小丑图跟着牌缩小，别超出牌边界 */
-  .gd-joker-fig { width: 32px; height: 52px; }
+  .gd-joker-fig { width: 31px; height: 52px; }
   .gd-card--small .gd-joker-fig { width: 21px; height: 33px; }
-  .gd-joker-word { font-size: 0.52rem; top: 3px; left: 2px; }
+  .gd-joker-word { font-size: 0.46rem; top: 3px; left: 2px; }
   .gd-card--small .gd-joker-word { font-size: 0.36rem; }
-  .gd-player-hand { min-height: 76px; padding: 4px 0.3rem 4px; }
+  .gd-player-hand { min-height: 68px; padding: 4px 0.3rem 4px; }
   .gd-avatar { width: 34px; height: 34px; }
   .gd-avatar svg { width: 21px; height: 21px; }
   .gd-seat__info { font-size: 0.6rem; padding: 1px 6px; }
@@ -526,7 +526,7 @@
   .gd-play--left   { left: 68px; top: 50%; }
   .gd-play--right  { right: 68px; top: 50%; }
   /* 你座位从游戏底边抬起，避免旋转后名字胶囊跑到屏幕左缘被裁 */
-  .gd-hand-row > .gd-seat--bottom { margin-bottom: 52px; }
+  .gd-hand-row > .gd-seat--bottom { margin-bottom: 62px; }
 }
 
 /* --- 手机竖屏自动转横屏：掼蛋牌桌需要横向空间，竖握时整页旋转 90° 显示为横屏 ---

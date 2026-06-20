@@ -223,15 +223,15 @@
   font-size: 0.34rem;
 }
 
-/* --- 途游式牌面：左上角标(点数+小花色) + 中心大花色 --- */
+/* --- 牌面：左上角标(点数 + 花色)，简洁；花色用 GDSuit 字体四花色同度量 --- */
 .gd-card__corner {
   position: absolute;
   top: 3px;
-  left: 5px;
+  left: 6px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  line-height: 0.82;
+  line-height: 0.88;
   z-index: 1;
 }
 .gd-card__rank {
@@ -240,38 +240,21 @@
   font-weight: 600;
   letter-spacing: 0;
 }
-.gd-card__suit {            /* 角标小花色 SVG */
-  width: 15px;
-  height: 15px;
+.gd-card__suit {            /* 角标花色（字体字形，四花色一致） */
+  font-family: 'GDSuit', var(--font-ui);
+  font-size: 1.2rem;
+  line-height: 1;
   margin-top: 1px;
 }
-.gd-card__pip {             /* 中心大花色 SVG */
-  position: absolute;
-  width: 40px;
-  height: 40px;
-  top: 53%;
-  left: 53%;
-  transform: translate(-50%, -50%);
-  opacity: 0.95;
-}
-/* 出牌区小牌同款缩小 */
-.gd-card--small .gd-card__rank { font-size: 1.12rem; }
-.gd-card--small .gd-card__suit { width: 11px; height: 11px; }
-.gd-card--small .gd-card__pip { width: 28px; height: 28px; }
-
-/* 逢人配：右上金「配」字，大小跟角标花色一致 */
-.gd-card__wild-tag {
-  position: absolute;
-  top: 3px;
-  right: 4px;
-  z-index: 2;
-  font-size: 15px;        /* = .gd-card__suit 高度 */
-  line-height: 1;
+/* 逢人配：花色位置改放金「配」字，与花色同大小 */
+.gd-card__suit--wild {
+  font-family: var(--font-ui);
   font-weight: 800;
   color: var(--gold);
-  font-family: var(--font-ui);
 }
-.gd-card--small .gd-card__wild-tag { font-size: 11px; }   /* = 小牌花色高度 */
+/* 出牌区小牌同款缩小 */
+.gd-card--small .gd-card__rank { font-size: 1.18rem; }
+.gd-card--small .gd-card__suit { font-size: 0.92rem; }
 
 /* --- 玩家手牌（大牌、重叠扇形） --- */
 .gd-player-hand {

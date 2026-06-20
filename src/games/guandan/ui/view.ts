@@ -241,7 +241,7 @@ export function mount(root: HTMLElement): () => void {
     if (n > 1) {
       const availW = (gameEl.clientWidth || 900) - 16;
       let step = (availW - cw) / (n - 1);
-      step = Math.max(26, Math.min(step, 30));
+      step = Math.max(30, Math.min(step, 36));
       const m = (step - cw) / 2;
       handEl.querySelectorAll('.gd-card').forEach(c => { (c as HTMLElement).style.margin = `0 ${m}px`; });
     }

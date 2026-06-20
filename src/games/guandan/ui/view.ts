@@ -265,7 +265,7 @@ export function mount(root: HTMLElement): () => void {
         const colW = (colEls[0] as HTMLElement).offsetWidth || 54;
         const availW = (gameEl.clientWidth || 800) - 10;
         let step = (availW - colW) / (nc - 1); // 每列推进
-        step = Math.min(step, colW * 0.7);     // 列间始终横向重叠≥30%(途游式，紧凑省空间)；列多则更叠
+        step = Math.min(step, colW * 0.8);     // 列间横向重叠~20%(给两位数「10」角标留够宽，不被下一列盖住花色)；列多则更叠
         const ml = step - colW;                // 负=列间重叠
         colEls.forEach((c, i) => { if (i > 0) (c as HTMLElement).style.marginLeft = `${ml}px`; });
       }

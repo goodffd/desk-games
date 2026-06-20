@@ -254,13 +254,13 @@
 }
 .gd-card__rank {
   font-family: 'GDRank', var(--font-ui);  /* Archivo Bold：正常宽度经典扑克粗体数字 */
-  font-size: 1.5rem;
+  font-size: 1.7rem;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 .gd-card__suit {            /* 角标小花色 SVG（四花色统一高度，方块正菱形不挤扁） */
-  width: 15px;
-  height: 15px;
+  width: 21px;
+  height: 21px;
   display: block;
 }
 /* 逢人配：花色位放金「配」字（真粗体），比花色略小 */
@@ -270,18 +270,18 @@
   font-size: 0.9rem;
   color: var(--gold);
 }
-.gd-card__pip {            /* 右下角大花色 SVG */
+.gd-card__pip {            /* 右下角大花色 SVG（够大，填满牌面） */
   position: absolute;
-  right: 4px;
-  bottom: 3px;
-  width: 32px;
-  height: 32px;
+  right: 3px;
+  bottom: 2px;
+  width: 46px;
+  height: 46px;
 }
 /* 出牌区小牌同款缩小 */
-.gd-card--small .gd-card__rank { font-size: 1.12rem; }
-.gd-card--small .gd-card__suit { width: 10px; height: 10px; }
-.gd-card--small .gd-card__suit--wild { font-size: 0.7rem; }
-.gd-card--small .gd-card__pip { width: 22px; height: 22px; right: 2px; bottom: 2px; }
+.gd-card--small .gd-card__rank { font-size: 1.25rem; }
+.gd-card--small .gd-card__suit { width: 14px; height: 14px; }
+.gd-card--small .gd-card__suit--wild { font-size: 0.78rem; }
+.gd-card--small .gd-card__pip { width: 30px; height: 30px; right: 2px; bottom: 2px; }
 
 /* --- 玩家手牌（大牌、重叠扇形） --- */
 .gd-player-hand {
@@ -421,14 +421,14 @@
 @media (max-width: 520px), (max-height: 520px) {
   .gd-card { width: 54px; height: 76px; border-radius: 6px; padding: 3px 4px; }
   .gd-card__corner { top: 2px; left: 4px; }
-  .gd-card__rank { font-size: 1.02rem; }
-  .gd-card__suit { width: 11px; height: 11px; }
-  .gd-card__suit--wild { font-size: 0.66rem; }
-  .gd-card__pip { width: 22px; height: 22px; }
+  .gd-card__rank { font-size: 1.12rem; }
+  .gd-card__suit { width: 15px; height: 15px; }
+  .gd-card__suit--wild { font-size: 0.7rem; }
+  .gd-card__pip { width: 31px; height: 31px; }
   .gd-card--small { width: 36px; height: 50px; }
-  .gd-card--small .gd-card__rank { font-size: 0.72rem; }
-  .gd-card--small .gd-card__suit { width: 8px; height: 8px; }
-  .gd-card--small .gd-card__pip { width: 15px; height: 15px; }
+  .gd-card--small .gd-card__rank { font-size: 0.8rem; }
+  .gd-card--small .gd-card__suit { width: 10px; height: 10px; }
+  .gd-card--small .gd-card__pip { width: 21px; height: 21px; }
   .gd-player-hand { min-height: 76px; padding: 4px 0.3rem 4px; }
   .gd-avatar { width: 34px; height: 34px; }
   .gd-avatar svg { width: 21px; height: 21px; }

@@ -307,7 +307,7 @@
 
 /* --- 手机端：同点数堆成一列向上叠（途游式，省横向空间） --- */
 .gd-player-hand.gd-hand--cols {
-  gap: 3px;
+  gap: 0;                /* 列间距由 JS marginLeft 动态控(列多则重叠) */
   padding: 4px 4px 4px;
   min-height: 0;
 }

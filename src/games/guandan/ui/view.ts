@@ -258,6 +258,17 @@ export function mount(root: HTMLElement): () => void {
         for (const card of g) col.appendChild(makeHandCard(card));
         handEl.appendChild(col);
       }
+      // 按可用宽度横向收紧：列多时列间重叠，整排不溢出屏幕
+      const colEls = handEl.querySelectorAll('.gd-hand-col');
+      const nc = colEls.length;
+      if (nc > 1) {
+        const colW = (colEls[0] as HTMLElement).offsetWidth || 54;
+        const availW = (gameEl.clientWidth || 800) - 10;
+        let step = (availW - colW) / (nc - 1); // 每列推进
+        step = Math.min(step, colW + 4);       // 有富余时最多留 4px 缝
+        const ml = step - colW;                // 负=列间重叠
+        colEls.forEach((c, i) => { if (i > 0) (c as HTMLElement).style.marginLeft = `${ml}px`; });
+      }
       return;
     }
 

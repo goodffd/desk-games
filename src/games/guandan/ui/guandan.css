@@ -374,12 +374,15 @@
   font-size: 1rem;
   font-weight: 600;
   font-family: var(--font-ui);
-  transition: opacity 0.2s, transform 0.1s;
+  transition: filter 0.2s, transform 0.1s;
   min-width: 80px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.45);   /* 浮在牌之上，有立体感 */
 }
 
+/* 禁用：用 filter 变暗，不用 opacity（opacity 会透出底下的牌） */
 .gd-btn:disabled {
-  opacity: 0.4;
+  filter: grayscale(0.4) brightness(0.62);
+  box-shadow: none;
   cursor: not-allowed;
 }
 
@@ -387,14 +390,15 @@
   background: var(--gold);
   color: #1a1208;
 }
-.gd-btn--play:not(:disabled):hover { opacity: 0.85; transform: scale(1.02); }
+.gd-btn--play:not(:disabled):hover { filter: brightness(0.92); transform: scale(1.02); }
 
+/* 不要：实底（原 transparent 会透出底下的牌），保留金边金字的次按钮观感 */
 .gd-btn--pass {
-  background: transparent;
+  background: #1f3320;
   border: 1px solid var(--gold-dim);
   color: var(--gold);
 }
-.gd-btn--pass:not(:disabled):hover { background: rgba(201,168,76,0.1); }
+.gd-btn--pass:not(:disabled):hover { background: #2a4329; }
 
 /* --- 提示信息 --- */
 .gd-hint {

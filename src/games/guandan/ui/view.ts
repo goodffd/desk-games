@@ -147,6 +147,7 @@ function avatarEl(seat: Seat): HTMLElement {
 
 export function mount(root: HTMLElement): () => void {
   let state = startNewDeal();
+  let started = false;    // 点「开始游戏」后才置 true：之前不显示「思考中」等状态文字
   let selectedIds = new Set<number>();
   let dragging = false;   // 滑动选牌进行中
   let dragMode = true;    // 本次划动目标态：true=选中 / false=取消
@@ -363,7 +364,7 @@ export function mount(root: HTMLElement): () => void {
   }
 
   function renderStatus(): void {
-    if (isDealOver(state)) { statusEl.textContent = ''; statusEl.className = 'gd-turn-status'; return; }
+    if (!started || isDealOver(state)) { statusEl.textContent = ''; statusEl.className = 'gd-turn-status'; return; }
     const isFreeLead = state.current === null;
     if (state.turn === HUMAN_SEAT) {
       statusEl.textContent = isFreeLead ? '该你出牌' : '请出牌或不要';
@@ -553,6 +554,8 @@ export function mount(root: HTMLElement): () => void {
   startBtn.addEventListener('click', () => {
     primeAudio();
     startOverlay.remove();
+    started = true;
+    renderStatus(); // 开始后才显示「该你出牌」/「X 思考中」
     if (state.turn !== HUMAN_SEAT) scheduleAi();
   });
   gameEl.appendChild(startOverlay);

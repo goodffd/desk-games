@@ -362,17 +362,17 @@
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  padding: 0.4rem 0.5rem;
+  padding: 34px 0.5rem 0.4rem;   /* 顶部留空间给选中牌上移，不被裁 */
   min-height: 96px;
   position: relative;
   flex-wrap: nowrap;
-  overflow-x: auto;
+  overflow: visible;             /* 关键：不要横向拉条、不裁切上移的选中牌 */
 }
 
-/* 手牌重叠：负 margin 让 27 张能排下 */
+/* 手牌重叠：负 margin 让 27 张紧凑排下，宽度内放得下、不出滚动条 */
 .gd-player-hand .gd-card {
   cursor: pointer;
-  margin: 0 -14px;
+  margin: 0 -19px;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 

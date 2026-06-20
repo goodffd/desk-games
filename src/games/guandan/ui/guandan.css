@@ -263,10 +263,8 @@
 }
 /* 字母(J/Q/K/A)天生比数字宽，横向收窄跟数字看齐 */
 .gd-card__rank--alpha { transform: scaleY(1.32) scaleX(0.85); }
-/* 手牌重叠后右下大花色只会露一小条、像贴到邻牌上——默认手牌只显角标 */
+/* 手牌横向重叠后右下大花色一定被右边的牌/列盖住、像串到邻牌上——手牌只显角标，大花色留给出牌区 */
 .gd-player-hand .gd-card__pip { display: none; }
-/* 但每列最前那张(含单张牌)完整可见，恢复大花色 */
-.gd-player-hand .gd-hand-col .gd-card:last-child .gd-card__pip { display: block; }
 .gd-card__suit {            /* 角标花色图：按高缩放、自然宽度、四花色一致 */
   height: 19px;
   width: auto;

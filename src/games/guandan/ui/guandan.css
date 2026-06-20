@@ -20,7 +20,7 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
-  min-height: 500px;
+  min-height: 0;   /* 不强行撑高：手机横屏(矮视口)才不会把底部按钮/手牌挤出屏外 */
   /* 整局一块连续毡布：中央亮、四周暗角，桌面与手牌/出牌区不分区不裁切 */
   background: radial-gradient(ellipse 94% 84% at 50% 42%, #2c6230 0%, #1b431d 56%, #112d12 100%);
   position: relative;
@@ -414,15 +414,42 @@
 }
 .gd-btn--restart:hover { opacity: 0.85; }
 
-/* --- 手机竖屏自动转横屏：掼蛋牌桌需要横向空间，竖握时整页旋转 90° 显示为横屏 --- */
+/* --- 矮/窄视口(手机任一朝向)：缩小牌与控件，给牌桌留空间、底部不被挤出屏外 --- */
+@media (max-width: 520px), (max-height: 520px) {
+  .gd-card { width: 56px; height: 78px; border-radius: 6px; padding: 3px 4px; }
+  .gd-card__corner { top: 2px; left: 4px; }
+  .gd-card__rank { font-size: 1.05rem; }
+  .gd-card__suit { font-size: 0.85rem; }
+  .gd-card__suit--wild { font-size: 0.72rem; }
+  .gd-card__pip { font-size: 1.45rem; }
+  .gd-card--small { width: 42px; height: 59px; }
+  .gd-card--small .gd-card__rank { font-size: 0.82rem; }
+  .gd-card--small .gd-card__suit { font-size: 0.66rem; }
+  .gd-card--small .gd-card__pip { font-size: 1.05rem; }
+  .gd-player-hand { min-height: 84px; padding: 4px 0.3rem 4px; }
+  .gd-avatar { width: 34px; height: 34px; }
+  .gd-avatar svg { width: 21px; height: 21px; }
+  .gd-seat__info { font-size: 0.6rem; padding: 1px 6px; }
+  .gd-topbar { padding: 0.25rem 0.6rem; }
+  .gd-topbar__title { font-size: 0.85rem; }
+  .gd-btn { padding: 0.3rem 1.1rem; font-size: 0.85rem; }
+  .gd-turn-status { font-size: 0.95rem; }
+  .gd-play__type { font-size: 0.72rem; }
+  .gd-play--left  { left: 92px; }
+  .gd-play--right { right: 92px; }
+  .gd-play--top   { top: 82px; }
+}
+
+/* --- 手机竖屏自动转横屏：掼蛋牌桌需要横向空间，竖握时整页旋转 90° 显示为横屏 ---
+   用 dvh/dvw（动态视口，扣掉浏览器工具栏的真实可见区），避免 100vh 比可见区大导致溢出 */
 @media (orientation: portrait) and (max-width: 920px) {
   html, body { overflow: hidden; }
   .gd-game {
     position: fixed;
     top: 50%;
     left: 50%;
-    width: 100vh;
-    height: 100vw;
+    width: 100dvh;
+    height: 100dvw;
     transform: translate(-50%, -50%) rotate(90deg);
     transform-origin: center center;
   }

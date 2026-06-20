@@ -239,12 +239,15 @@ export function mount(root: HTMLElement): () => void {
       });
       handEl.appendChild(ce);
     }
-    // 动态重叠：按可用宽度算每张露出量，既放得下 27 张又尽量露出点数/花色
-    const cw = 80, n = cards.length;
+    // 动态重叠：按可用宽度算每张露出量，既放得下 27 张又尽量露出点数/花色。
+    // cw 实测当前牌宽（短屏会被 CSS 缩小），保证各尺寸下都贴合不溢出
+    const first = handEl.querySelector('.gd-card') as HTMLElement | null;
+    const cw = first?.offsetWidth || 80;
+    const n = cards.length;
     if (n > 1) {
       const availW = (gameEl.clientWidth || 900) - 16;
       let step = (availW - cw) / (n - 1);
-      step = Math.max(30, Math.min(step, 36));
+      step = Math.max(14, Math.min(step, cw * 0.5)); // 上限=半张牌；下限 14px 保证窄屏挤得下
       const m = (step - cw) / 2;
       handEl.querySelectorAll('.gd-card').forEach(c => { (c as HTMLElement).style.margin = `0 ${m}px`; });
     }
@@ -398,6 +401,11 @@ export function mount(root: HTMLElement): () => void {
   handEl.addEventListener('pointermove', onHandPointerMove);
   window.addEventListener('pointerup', onPointerUp);
 
+  // 转屏/缩放后重算手牌重叠（可用宽度变了），避免溢出
+  const onResize = (): void => { renderHand(); };
+  window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', onResize);
+
   renderAll();
   if (state.turn !== HUMAN_SEAT) scheduleAi();
 
@@ -405,6 +413,8 @@ export function mount(root: HTMLElement): () => void {
     for (const t of timers) clearTimeout(t);
     timers.length = 0;
     window.removeEventListener('pointerup', onPointerUp);
+    window.removeEventListener('resize', onResize);
+    window.removeEventListener('orientationchange', onResize);
     root.innerHTML = '';
   };
 }

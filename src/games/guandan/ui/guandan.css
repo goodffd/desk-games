@@ -12,7 +12,7 @@
   --black: #1a1208;
   --text-light: #e8d9b0;
   --text-dim: #a89070;
-  --border-card: #d4c4a0;
+  --border-card: #d6d4cf;   /* 中性浅灰，去掉金色描边 */
 }
 
 /* --- 游戏根容器（flex 列，topbar + table(撑满) + bottomArea(固定高度贴底)） --- */
@@ -234,51 +234,54 @@
   font-size: 0.34rem;
 }
 
-/* --- 牌面：左上角标(点数 + 花色)，简洁；花色用 GDSuit 字体四花色同度量 --- */
+/* --- 途游式牌面：左上角标(点数+花色) + 右下角大花色，靠这两处填满整张牌 --- */
 .gd-card__corner {
   position: absolute;
-  top: 3px;
-  left: 6px;
+  top: 2px;
+  left: 5px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;       /* 手牌：点数+花色横排紧挨（如「A♠」横着） */
   align-items: center;
-  line-height: 0.88;
+  gap: 1px;
+  line-height: 0.9;
   z-index: 1;
+}
+.gd-card--small .gd-card__corner {  /* 出牌：点数+花色竖排 */
+  flex-direction: column;
+  gap: 0;
+  align-items: center;
+  left: 4px;
 }
 .gd-card__rank {
   font-family: 'GDRank', var(--font-ui);  /* Archivo Bold：正常宽度经典扑克粗体数字 */
-  font-size: 1.45rem;
+  font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
-.gd-card__suit {            /* 角标花色（字体字形，四花色一致） */
-  font-family: 'GDSuit', var(--font-ui);
-  font-size: 1.2rem;
-  line-height: 1;
-  margin-top: 1px;
+.gd-card__suit {            /* 角标小花色 SVG（四花色统一高度，方块正菱形不挤扁） */
+  width: 15px;
+  height: 15px;
+  display: block;
 }
-/* 逢人配：花色位置放金「配」字，真粗体(GDWild)、比花色小一号 */
+/* 逢人配：花色位放金「配」字（真粗体），比花色略小 */
 .gd-card__suit--wild {
   font-family: 'GDWild', var(--font-ui);
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 0.9rem;
   color: var(--gold);
 }
-/* 牌身中心大花色（途游式：角标 + 中心两处花色），同 GDSuit 字体 */
-.gd-card__pip {
+.gd-card__pip {            /* 右下角大花色 SVG */
   position: absolute;
-  top: 56%;
-  left: 52%;
-  transform: translate(-50%, -50%);
-  font-family: 'GDSuit', var(--font-ui);
-  font-size: 2rem;
-  line-height: 1;
+  right: 4px;
+  bottom: 3px;
+  width: 32px;
+  height: 32px;
 }
 /* 出牌区小牌同款缩小 */
-.gd-card--small .gd-card__rank { font-size: 1.18rem; }
-.gd-card--small .gd-card__suit { font-size: 0.92rem; }
-.gd-card--small .gd-card__suit--wild { font-size: 0.78rem; }
-.gd-card--small .gd-card__pip { font-size: 1.5rem; }
+.gd-card--small .gd-card__rank { font-size: 1.12rem; }
+.gd-card--small .gd-card__suit { width: 10px; height: 10px; }
+.gd-card--small .gd-card__suit--wild { font-size: 0.7rem; }
+.gd-card--small .gd-card__pip { width: 22px; height: 22px; right: 2px; bottom: 2px; }
 
 /* --- 玩家手牌（大牌、重叠扇形） --- */
 .gd-player-hand {
@@ -416,16 +419,16 @@
 
 /* --- 矮/窄视口(手机任一朝向)：缩小牌与控件，给牌桌留空间、底部不被挤出屏外 --- */
 @media (max-width: 520px), (max-height: 520px) {
-  .gd-card { width: 56px; height: 78px; border-radius: 6px; padding: 3px 4px; }
+  .gd-card { width: 54px; height: 76px; border-radius: 6px; padding: 3px 4px; }
   .gd-card__corner { top: 2px; left: 4px; }
-  .gd-card__rank { font-size: 1.05rem; }
-  .gd-card__suit { font-size: 0.85rem; }
-  .gd-card__suit--wild { font-size: 0.72rem; }
-  .gd-card__pip { font-size: 1.45rem; }
+  .gd-card__rank { font-size: 1.02rem; }
+  .gd-card__suit { width: 11px; height: 11px; }
+  .gd-card__suit--wild { font-size: 0.66rem; }
+  .gd-card__pip { width: 22px; height: 22px; }
   .gd-card--small { width: 36px; height: 50px; }
   .gd-card--small .gd-card__rank { font-size: 0.72rem; }
-  .gd-card--small .gd-card__suit { font-size: 0.58rem; }
-  .gd-card--small .gd-card__pip { font-size: 0.95rem; }
+  .gd-card--small .gd-card__suit { width: 8px; height: 8px; }
+  .gd-card--small .gd-card__pip { width: 15px; height: 15px; }
   .gd-player-hand { min-height: 76px; padding: 4px 0.3rem 4px; }
   .gd-avatar { width: 34px; height: 34px; }
   .gd-avatar svg { width: 21px; height: 21px; }

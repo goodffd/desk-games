@@ -171,10 +171,13 @@ export function mount(root: HTMLElement): () => void {
       badge.textContent = rankName(finishIdx);
       info.appendChild(badge);
     } else {
-      const count = document.createElement('span');
-      count.className = 'gd-seat__count';
-      count.textContent = `${state.hands[seat]!.length}`;
-      info.appendChild(count);
+      const len = state.hands[seat]!.length;
+      if (len <= 10) { // 仅剩 10 张及以下才显示张数，并光晕醒目提醒
+        const count = document.createElement('span');
+        count.className = 'gd-seat__count gd-seat__count--alert';
+        count.textContent = `${len}`;
+        info.appendChild(count);
+      }
     }
     elx.appendChild(info);
   }

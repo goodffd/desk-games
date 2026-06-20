@@ -85,6 +85,12 @@ export function cardEl(card: Card, level: Rank, small = false): HTMLElement {
   corner.appendChild(suitSpan);
   el.appendChild(corner);
 
+  // 牌身中心大花色（途游：一张牌=角标花色+中心花色，两处）；逢人配中心为真实红心
+  const pip = document.createElement('span');
+  pip.className = 'gd-card__pip';
+  pip.textContent = SUIT_SYMBOL[card.suit] ?? '';
+  el.appendChild(pip);
+
   // 存储牌 id 用于交互
   el.dataset['cardId'] = String(card.id);
 

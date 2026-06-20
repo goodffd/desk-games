@@ -77,6 +77,7 @@ export function cardEl(card: Card, level: Rank, small = false): HTMLElement {
 
   const suitSpan = document.createElement('span');
   suitSpan.className = 'gd-card__suit';
+  if (lbl.suit === '配') suitSpan.classList.add('gd-card__suit--wild'); // 逢人配标记，单独样式
   suitSpan.textContent = lbl.suit;
 
   el.appendChild(rankSpan);

@@ -203,7 +203,9 @@ export function mount(root: HTMLElement): () => void {
   /** 玩家手牌（扇形，可选） */
   function renderHand(): void {
     handEl.innerHTML = '';
-    for (const card of sortedHand(HUMAN_SEAT)) {
+    // 展示顺序：左→右 大→小（即从右到左 小→大）。级牌仅次于大小王由 rankValue/sortHand 保证
+    const cards = [...sortedHand(HUMAN_SEAT)].reverse();
+    for (const card of cards) {
       const ce = cardEl(card, LEVEL);
       if (selectedIds.has(card.id)) ce.classList.add('is-selected');
       ce.addEventListener('click', () => {
@@ -213,6 +215,15 @@ export function mount(root: HTMLElement): () => void {
         renderAll();
       });
       handEl.appendChild(ce);
+    }
+    // 动态重叠：按可用宽度算每张露出量，既放得下 27 张又尽量露出点数/花色
+    const cw = 80, n = cards.length;
+    if (n > 1) {
+      const availW = (gameEl.clientWidth || 900) - 16;
+      let step = (availW - cw) / (n - 1);
+      step = Math.max(26, Math.min(step, 54));
+      const m = (step - cw) / 2;
+      handEl.querySelectorAll('.gd-card').forEach(c => { (c as HTMLElement).style.margin = `0 ${m}px`; });
     }
   }
 

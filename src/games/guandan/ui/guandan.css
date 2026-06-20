@@ -138,7 +138,7 @@
 .gd-play--right  { right: 150px; top: 36%; }
 .gd-play--bottom { bottom: 4px; left: 50%; transform: translateX(-50%); }
 .gd-play__cards { display: flex; flex-wrap: nowrap; }
-.gd-play__cards .gd-card { margin: 0 -22px; }
+.gd-play__cards .gd-card { margin: 0 -12px; }
 .gd-play__type { font-size: 0.6rem; color: var(--gold); margin-top: 1px; }
 .gd-play__pass {
   font-size: 0.8rem; font-weight: 600; color: var(--text-dim);
@@ -239,6 +239,19 @@
 }
 .gd-card--small .gd-card__suit { font-size: 1.05rem; }
 
+/* 逢人配「配」：小号、金底白字徽章，内嵌思源黑体 */
+.gd-card__suit--wild {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--gold);
+  border-radius: 3px;
+  padding: 0 3px;
+  line-height: 1.35;
+  font-family: var(--font-ui);
+}
+.gd-card--small .gd-card__suit--wild { font-size: 0.48rem; }
+
 /* --- 玩家手牌（大牌、重叠扇形） --- */
 .gd-player-hand {
   display: flex;
@@ -263,8 +276,7 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: rgba(0, 0, 0, 0.28);
-  box-shadow: inset 0 0 0 2.5px var(--gold);
+  background: rgba(0, 0, 0, 0.32);
   pointer-events: none;
 }
 

@@ -148,10 +148,11 @@
   pointer-events: none;
 }
 .gd-play:not(.has-play) { display: none; }
-.gd-play--top    { top: 130px; left: 50%; transform: translateX(-50%); }
+/* 四家出牌区围绕牌桌中心摆菱形（相对 gameEl 全高），各朝自家方向偏，不压头像/手牌 */
+.gd-play--top    { top: 20%; left: 50%; transform: translateX(-50%); }
 .gd-play--left   { left: 170px; top: 50%; transform: translateY(-50%); }
 .gd-play--right  { right: 170px; top: 50%; transform: translateY(-50%); }
-.gd-play--bottom { bottom: 54px; left: 50%; transform: translateX(-50%); }
+.gd-play--bottom { top: 66%; left: 50%; transform: translateX(-50%); }
 .gd-play__cards { display: flex; flex-wrap: nowrap; }
 .gd-play__cards .gd-card { margin: 0 -10px; }
 .gd-play__type { font-size: 0.95rem; font-weight: 600; color: var(--gold); margin-top: 3px; }
@@ -489,10 +490,12 @@
   .gd-play__type { font-size: 0.66rem; margin-top: 1px; }
   .gd-play__cards .gd-card { margin: 0 -9px; }
   /* 矮牌桌：4 家出牌区收成紧凑菱形，互不相叠，我方出牌区上移不贴头像 */
-  .gd-play--top    { top: 16%; }
-  .gd-play--bottom { top: 56%; bottom: auto; }
+  .gd-play--top    { top: 33%; }
+  .gd-play--bottom { top: 60%; bottom: auto; }
   .gd-play--left   { left: 68px; top: 50%; }
   .gd-play--right  { right: 68px; top: 50%; }
+  /* 你座位从游戏底边抬起，避免旋转后名字胶囊跑到屏幕左缘被裁 */
+  .gd-hand-row > .gd-seat--bottom { margin-bottom: 30px; }
 }
 
 /* --- 手机竖屏自动转横屏：掼蛋牌桌需要横向空间，竖握时整页旋转 90° 显示为横屏 ---

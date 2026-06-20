@@ -187,8 +187,7 @@ export function mount(root: HTMLElement): () => void {
   // 对家(2)座位留在牌桌顶部；上家(3,左)/下家(1,右)座位改挂 gameEl，按整局全高竖向居中
   //（手机牌桌被手牌区压扁成窄条，若挂 tableEl 则 top:50% 只是窄条中点→旋转后跑偏到屏幕一侧）
   tableEl.appendChild(seatEls[2]);
-  // 对家(2)/你(0)出牌区留牌桌；上家(3)/下家(1)出牌区跟随其座位挂 gameEl，与头像同高(top:50%)对齐
-  for (const s of [0, 2] as Seat[]) tableEl.appendChild(playEls[s]);
+  // 四家出牌区都挂 gameEl，按整局全高摆成围绕中心的菱形（手机牌桌被手牌压扁，挂 tableEl 会全挤到上部串叠）
 
   const statusEl = document.createElement('div');
   statusEl.className = 'gd-turn-status';
@@ -228,8 +227,11 @@ export function mount(root: HTMLElement): () => void {
   gameEl.appendChild(bottomArea);
   gameEl.appendChild(seatEls[1]); // 下家(右)：相对 gameEl 全高竖向居中
   gameEl.appendChild(seatEls[3]); // 上家(左)：相对 gameEl 全高竖向居中
-  gameEl.appendChild(playEls[1]); // 下家出牌区：跟随座位挂 gameEl，同高对齐
-  gameEl.appendChild(playEls[3]); // 上家出牌区：同上
+  // 四家出牌区菱形（围绕中心，朝各自方向偏，不压头像/手牌）
+  gameEl.appendChild(playEls[0]); // 你(下)
+  gameEl.appendChild(playEls[1]); // 下家(右)
+  gameEl.appendChild(playEls[2]); // 对家(上)
+  gameEl.appendChild(playEls[3]); // 上家(左)
   root.appendChild(gameEl);
 
   // ── 渲染 ───────────────────────────────────────────────────

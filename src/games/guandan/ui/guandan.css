@@ -263,6 +263,8 @@
 }
 /* 字母(J/Q/K/A)天生比数字宽，横向收窄跟数字看齐 */
 .gd-card__rank--alpha { transform: scaleY(1.32) scaleX(0.85); }
+/* 「10」两位数太宽：横向压缩 + 缩小 1/0 间距 */
+.gd-card__rank--ten { transform: scaleY(1.32) scaleX(0.74); letter-spacing: -0.09em; }
 /* 手牌默认只显角标；每列最前那张(含单张牌)完整可见，恢复右下大花色 */
 .gd-player-hand .gd-card__pip { display: none; }
 .gd-player-hand .gd-hand-col .gd-card:last-child .gd-card__pip { display: block; }

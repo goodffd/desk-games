@@ -88,6 +88,7 @@ export function cardEl(card: Card, level: Rank, small = false): HTMLElement {
   const rankSpan = document.createElement('span');
   rankSpan.className = 'gd-card__rank';
   if (/[JQKA]/.test(lbl.rank)) rankSpan.classList.add('gd-card__rank--alpha'); // 字母比数字宽，单独横向收窄
+  if (lbl.rank === '10') rankSpan.classList.add('gd-card__rank--ten');         // 两位数太宽，横向压缩+缩小1/0间距
   rankSpan.textContent = lbl.rank;
   corner.appendChild(rankSpan);
   if (isWild) {

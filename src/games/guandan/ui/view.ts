@@ -277,8 +277,8 @@ export function mount(root: HTMLElement): () => void {
         const availW = (gameEl.clientWidth || 800) - 10;
         // 列推进至少容下最宽角标(点数+花色)+缝，角标花色不被下一列盖。
         // 量点数宽(文字可靠)+固定预留花色+间距——花色是图片宽度异步，直接量角标会漏掉它
-        let maxRank = 0;
-        handEl.querySelectorAll('.gd-card__rank').forEach(c => { maxRank = Math.max(maxRank, (c as HTMLElement).offsetWidth); });
+        let maxRank = 0; // 用视觉宽度(getBoundingClientRect 含 scaleX 压缩)，让压缩后的「10」也让列更紧凑
+        handEl.querySelectorAll('.gd-card__rank').forEach(c => { maxRank = Math.max(maxRank, c.getBoundingClientRect().width); });
         const suitH = ((handEl.querySelector('.gd-card__suit') as HTMLElement)?.offsetHeight) || 14;
         const suitW = suitH * 1.15; // 花色按高度估宽(最宽红心≈1.08)，不依赖异步图片宽度
         const maxCorner = maxRank + 4 + suitW; // 点数 + 间距 + 花色

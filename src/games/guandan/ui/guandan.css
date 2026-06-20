@@ -242,46 +242,49 @@
   display: flex;
   flex-direction: row;       /* 手牌：点数+花色横排紧挨（如「A♠」横着） */
   align-items: center;
-  gap: 1px;
+  gap: 4px;                  /* 数字↔花色间距 */
   line-height: 0.9;
   z-index: 1;
 }
-.gd-card--small .gd-card__corner {  /* 出牌：点数+花色竖排 */
+.gd-card--small .gd-card__corner {  /* 出牌：点数+花色竖排，间距更大 */
   flex-direction: column;
-  gap: 0;
+  gap: 3px;
   align-items: center;
   left: 4px;
 }
 .gd-card__rank {
-  font-family: 'GDRank', var(--font-ui);  /* Archivo Bold：正常宽度经典扑克粗体数字 */
-  font-size: 1.7rem;
+  font-family: 'GDRank', serif;  /* Besley 板衬线(途游同款，Q 圈内出尾) */
+  font-size: 1.5rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  line-height: 1;
+  display: inline-block;
+  transform: scaleY(1.32);       /* 纵向拉长，复刻途游高窄感 */
+  transform-origin: top center;
 }
-.gd-card__suit {            /* 角标小花色 SVG（四花色统一高度，方块正菱形不挤扁） */
-  width: 21px;
-  height: 21px;
+.gd-card__suit {            /* 角标花色图：按高缩放、自然宽度、四花色一致 */
+  height: 19px;
+  width: auto;
   display: block;
 }
-/* 逢人配：花色位放金「配」字（真粗体），比花色略小 */
+/* 逢人配：花色位放金「配」字（真粗体） */
 .gd-card__suit--wild {
   font-family: 'GDWild', var(--font-ui);
   font-weight: 700;
   font-size: 0.9rem;
   color: var(--gold);
 }
-.gd-card__pip {            /* 右下角大花色 SVG（够大，填满牌面） */
+.gd-card__pip {            /* 右下角大花色图（填满牌面） */
   position: absolute;
   right: 3px;
-  bottom: 2px;
-  width: 46px;
-  height: 46px;
+  bottom: 3px;
+  height: 42px;
+  width: auto;
 }
-/* 出牌区小牌同款缩小 */
-.gd-card--small .gd-card__rank { font-size: 1.25rem; }
-.gd-card--small .gd-card__suit { width: 14px; height: 14px; }
+/* 出牌区小牌同款缩小（竖排角标间距更大） */
+.gd-card--small .gd-card__rank { font-size: 1.12rem; }
+.gd-card--small .gd-card__suit { height: 13px; }
 .gd-card--small .gd-card__suit--wild { font-size: 0.78rem; }
-.gd-card--small .gd-card__pip { width: 30px; height: 30px; right: 2px; bottom: 2px; }
+.gd-card--small .gd-card__pip { height: 26px; right: 2px; bottom: 2px; }
 
 /* --- 玩家手牌（大牌、重叠扇形） --- */
 .gd-player-hand {
@@ -441,14 +444,14 @@
 @media (max-width: 520px), (max-height: 520px) {
   .gd-card { width: 54px; height: 76px; border-radius: 6px; padding: 3px 4px; }
   .gd-card__corner { top: 2px; left: 4px; }
-  .gd-card__rank { font-size: 1.12rem; }
-  .gd-card__suit { width: 15px; height: 15px; }
+  .gd-card__rank { font-size: 1.05rem; }
+  .gd-card__suit { height: 14px; }
   .gd-card__suit--wild { font-size: 0.7rem; }
-  .gd-card__pip { width: 31px; height: 31px; }
+  .gd-card__pip { height: 28px; }
   .gd-card--small { width: 36px; height: 50px; }
-  .gd-card--small .gd-card__rank { font-size: 0.8rem; }
-  .gd-card--small .gd-card__suit { width: 10px; height: 10px; }
-  .gd-card--small .gd-card__pip { width: 21px; height: 21px; }
+  .gd-card--small .gd-card__rank { font-size: 0.76rem; }
+  .gd-card--small .gd-card__suit { height: 9px; }
+  .gd-card--small .gd-card__pip { height: 18px; }
   .gd-player-hand { min-height: 76px; padding: 4px 0.3rem 4px; }
   .gd-avatar { width: 34px; height: 34px; }
   .gd-avatar svg { width: 21px; height: 21px; }

@@ -8,6 +8,7 @@
  */
 
 import type { Card, Rank, ComboType } from '../engine/types';
+import { SUIT_IMG } from './suits';
 
 const RANK_DISPLAY: Record<number, string> = {
   2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7',
@@ -18,23 +19,13 @@ const SUIT_SYMBOL: Record<string, string> = {
   S: '♠', H: '♥', D: '♦', C: '♣',
 };
 
-/** 花色 SVG（24×24，统一高度、四花色比例自然；方块为正菱形不挤扁），fill=currentColor 跟随红/黑 */
-const SUIT_PATH: Record<string, string> = {
-  H: 'M12 21S4 14.5 4 9c0-2.8 2-4.5 4.3-4.5 1.5 0 2.8 1 3.7 2.4C12.9 5.5 14.2 4.5 15.7 4.5 18 4.5 20 6.2 20 9c0 5.5-8 12-8 12z',
-  D: 'M12 3 18.2 12 12 21 5.8 12Z',
-  S: 'M12 3S4.5 8.6 4.5 13.6c0 2.3 1.7 3.8 3.6 3.8.9 0 1.7-.3 2.3-.9-.1 1.8-1 3.4-2.6 4.5h8.4c-1.6-1.1-2.5-2.7-2.6-4.5.6.6 1.4.9 2.3.9 1.9 0 3.6-1.5 3.6-3.8C19.5 8.6 12 3 12 3z',
-  C: 'M12 3a3 3 0 0 0-2.8 4.2 3 3 0 1 0 .1 6 3 3 0 0 0 2.2.5c-.2 2-1.1 4.1-3.7 6.3h8.4c-2.6-2.2-3.5-4.3-3.7-6.3a3 3 0 0 0 2.2-.5 3 3 0 1 0 .1-6A3 3 0 0 0 12 3z',
-};
-const SVG_NS = 'http://www.w3.org/2000/svg';
-function suitSvg(suit: string, cls: string): SVGSVGElement {
-  const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('class', cls);
-  const p = document.createElementNS(SVG_NS, 'path');
-  p.setAttribute('d', SUIT_PATH[suit] ?? '');
-  p.setAttribute('fill', 'currentColor');
-  svg.appendChild(p);
-  return svg;
+/** 花色图（Seedream 生成，已去白底+正色）；按高度缩放，自然宽度，四花色一致 */
+function suitImg(suit: string, cls: string): HTMLImageElement {
+  const img = document.createElement('img');
+  img.className = cls;
+  img.src = SUIT_IMG[suit] ?? '';
+  img.alt = '';
+  return img;
 }
 
 export interface CardLabel {
@@ -104,12 +95,12 @@ export function cardEl(card: Card, level: Rank, small = false): HTMLElement {
     w.textContent = '配';
     corner.appendChild(w);
   } else {
-    corner.appendChild(suitSvg(card.suit, 'gd-card__suit'));
+    corner.appendChild(suitImg(card.suit, 'gd-card__suit'));
   }
   el.appendChild(corner);
 
   // 右下角大花色（途游：左上角标 + 右下大花色填满整张牌）
-  el.appendChild(suitSvg(card.suit, 'gd-card__pip'));
+  el.appendChild(suitImg(card.suit, 'gd-card__pip'));
 
   // 存储牌 id 用于交互
   el.dataset['cardId'] = String(card.id);

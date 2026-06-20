@@ -302,6 +302,26 @@
   touch-action: none;   /* 手指划动连续选牌，不触发页面滚动/缩放 */
 }
 
+/* --- 手机端：同点数堆成一列向上叠（途游式，省横向空间） --- */
+.gd-player-hand.gd-hand--cols {
+  gap: 3px;
+  padding: 4px 4px 4px;
+  min-height: 0;
+}
+.gd-hand-col {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  align-items: center;
+}
+.gd-hand-col .gd-card {
+  margin: 0;            /* 清掉扇形横向负 margin */
+  flex-shrink: 0;
+}
+.gd-hand-col .gd-card + .gd-card {
+  margin-top: -56px;   /* 向上叠，露出每张顶部角标（牌高 76 → 露 ~20px） */
+}
+
 /* 选中：途游式——不上移/不跳动，整张盖一层蒙阴影 + 金边圈标记，点「出牌」才打出 */
 .gd-player-hand .gd-card.is-selected::after {
   content: '';

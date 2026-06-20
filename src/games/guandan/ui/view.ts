@@ -221,26 +221,48 @@ export function mount(root: HTMLElement): () => void {
     return id ? Number(id) : null;
   }
 
-  /** 玩家手牌（扇形，可选） */
+  /** 造一张手牌（含选中态 + 滑动选牌按下事件） */
+  function makeHandCard(card: Card): HTMLElement {
+    const ce = cardEl(card, LEVEL);
+    if (selectedIds.has(card.id)) ce.classList.add('is-selected');
+    ce.addEventListener('pointerdown', (e) => {
+      if (state.turn !== HUMAN_SEAT || isDealOver(state)) return;
+      e.preventDefault();                    // 防文本选择/触摸滚动
+      dragging = true;
+      dragMode = !selectedIds.has(card.id);  // 起手牌决定本次划动是"选"还是"取消"
+      applyCardSelect(card.id, dragMode);
+    });
+    return ce;
+  }
+
+  /** 玩家手牌：桌面=重叠扇形；手机=途游式同点数堆成一列省横向空间 */
   function renderHand(): void {
     handEl.innerHTML = '';
-    // 展示顺序：左→右 大→小（即从右到左 小→大）。级牌仅次于大小王由 rankValue/sortHand 保证
+    // 展示顺序：左→右 大→小。级牌仅次于大小王由 rankValue/sortHand 保证
     const cards = [...sortedHand(HUMAN_SEAT)].reverse();
-    for (const card of cards) {
-      const ce = cardEl(card, LEVEL);
-      if (selectedIds.has(card.id)) ce.classList.add('is-selected');
-      // 滑动选牌：按下即定本次目标态(选/弃)并应用到起手牌；滑过的牌由全局 pointermove 接力
-      ce.addEventListener('pointerdown', (e) => {
-        if (state.turn !== HUMAN_SEAT || isDealOver(state)) return;
-        e.preventDefault();                    // 防文本选择/触摸滚动
-        dragging = true;
-        dragMode = !selectedIds.has(card.id);  // 起手牌决定本次划动是"选"还是"取消"
-        applyCardSelect(card.id, dragMode);
-      });
-      handEl.appendChild(ce);
+    const cols = window.matchMedia('(max-width: 520px), (max-height: 520px)').matches;
+    handEl.classList.toggle('gd-hand--cols', cols);
+
+    if (cols) {
+      // 手机端：同点数堆成一列向上叠
+      const groups: Card[][] = [];
+      const at = new Map<number, number>();
+      for (const card of cards) {
+        const v = rankValue(card, LEVEL);
+        if (!at.has(v)) { at.set(v, groups.length); groups.push([]); }
+        groups[at.get(v)!]!.push(card);
+      }
+      for (const g of groups) {
+        const col = document.createElement('div');
+        col.className = 'gd-hand-col';
+        for (const card of g) col.appendChild(makeHandCard(card));
+        handEl.appendChild(col);
+      }
+      return;
     }
-    // 动态重叠：按可用宽度算每张露出量，既放得下 27 张又尽量露出点数/花色。
-    // cw 实测当前牌宽（短屏会被 CSS 缩小），保证各尺寸下都贴合不溢出
+
+    // 桌面：重叠扇形。cw 实测当前牌宽，按可用宽度算露出量，27 张放得下不溢出
+    for (const card of cards) handEl.appendChild(makeHandCard(card));
     const first = handEl.querySelector('.gd-card') as HTMLElement | null;
     const cw = first?.offsetWidth || 80;
     const n = cards.length;

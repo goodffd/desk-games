@@ -306,20 +306,20 @@
   align-items: center;
   justify-content: center;
   gap: 0;
-  padding: 3px 3px 3px 13px; /* 左侧留出竖排 JOKER 的位置，小丑图整体右移不遮字 */
+  padding: 2px; /* 小丑居中 */
 }
 .gd-card--joker-big { background: linear-gradient(135deg, #fff8f0, #fdeede); }
 .gd-card--joker-small { background: linear-gradient(135deg, #f6f6f8, #eaeaee); }
 
-/* 小丑图（背景图见 joker-img.css）：缩小、右移，不遮左侧 JOKER 字 */
+/* 小丑图（背景图见 joker-img.css）：居中，尽量大但给左侧 JOKER 留位 */
 .gd-joker-fig {
-  width: 40px;
-  height: 64px;
+  width: 46px;
+  height: 70px;
   flex-shrink: 0;
 }
 .gd-card--small .gd-joker-fig {
-  width: 29px;
-  height: 46px;
+  width: 33px;
+  height: 50px;
 }
 /* 小王：整张小丑图 CSS 转灰 */
 .gd-card--joker-small .gd-joker-fig {
@@ -330,14 +330,14 @@
 .gd-joker-word {
   position: absolute;
   top: 3px;
-  left: 2px;
+  left: 1px;
   writing-mode: vertical-rl;
   text-orientation: upright;
   font-size: 0.34rem;
   font-weight: 800;
   letter-spacing: -0.05em;
   line-height: 0.92;
-  text-shadow: 0 0 2px rgba(255,255,255,0.9), 0 0 2px rgba(255,255,255,0.9);
+  text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 1px #fff;
 }
 .gd-card--small .gd-joker-word {
   font-size: 0.28rem;

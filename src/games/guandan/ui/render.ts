@@ -145,10 +145,8 @@ function rankSpeech(key: number, level: Rank): string {
   }
 }
 
-const CN_NUM = ['', '一', '二', '三', '四', '五', '六', '七', '八'];
-
 /** 出牌语音：
- *  - 报牌型：顺子/同花顺/三带二/N连对/钢板/炸弹/天王炸
+ *  - 报牌型：顺子/同花顺/三带二/三连对/钢板/炸弹/天王炸
  *  - 报点数：单张=点数、对子="对"+点数、三同张="3条"+点数 */
 export function comboSpeech(combo: Combo, level: Rank): string {
   switch (combo.type) {
@@ -158,7 +156,7 @@ export function comboSpeech(combo: Combo, level: Rank): string {
     case 'tripleWithPair': return '三带二';
     case 'straight': return '顺子';
     case 'straightFlush': return '同花顺';
-    case 'consecPairs': return (CN_NUM[Math.round(combo.length / 2)] ?? '') + '连对';
+    case 'consecPairs': return '三连对'; // 掼蛋连对固定 3 对(六张)，无四/五连对
     case 'consecTriples': return '钢板';
     case 'bomb': return '炸弹';
     case 'kingBomb': return '天王炸';

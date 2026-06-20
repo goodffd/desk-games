@@ -235,10 +235,10 @@
   z-index: 1;
 }
 .gd-card__rank {
-  font-family: 'GDRank', var(--font-ui);  /* Oswald 子集：经典扑克粗体数字 */
-  font-size: 1.6rem;
-  font-weight: 600;
-  letter-spacing: 0;
+  font-family: 'GDRank', var(--font-ui);  /* Archivo Bold：正常宽度经典扑克粗体数字 */
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 .gd-card__suit {            /* 角标花色（字体字形，四花色一致） */
   font-family: 'GDSuit', var(--font-ui);

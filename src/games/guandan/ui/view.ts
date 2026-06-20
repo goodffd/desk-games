@@ -130,10 +130,9 @@ export function mount(root: HTMLElement): () => void {
   statusEl.className = 'gd-turn-status';
   tableEl.appendChild(statusEl);
 
-  // 底部：玩家信息 + 提示 + 按钮(在手牌上方，仅轮到我时显示) + 手牌
+  // 底部（上→下）：提示、按钮、你信息(头像)、手牌。按钮在头像上方，仅轮到我时显示
   const bottomArea = document.createElement('div');
   bottomArea.className = 'gd-bottom-area';
-  bottomArea.appendChild(seatEls[0]);   // 玩家信息行（头像+名+张数）
 
   const hintEl = document.createElement('div');
   hintEl.className = 'gd-hint';
@@ -149,7 +148,8 @@ export function mount(root: HTMLElement): () => void {
   passBtn.textContent = '不要';
   actionsEl.appendChild(playBtn);
   actionsEl.appendChild(passBtn);
-  bottomArea.appendChild(actionsEl);    // 按钮在手牌上方
+  bottomArea.appendChild(actionsEl);    // 按钮(在头像上方)
+  bottomArea.appendChild(seatEls[0]);   // 你信息行(头像+名+张数)，在按钮下方
 
   const handEl = document.createElement('div');
   handEl.className = 'gd-player-hand';

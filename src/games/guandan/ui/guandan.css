@@ -194,45 +194,37 @@
 /* --- 大小王牌面（全身 Q 版小丑 + 竖排 JOKER） --- */
 .gd-card--joker {
   position: relative;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  padding: 2px; /* 小丑居中 */
 }
 .gd-card--joker-big { background: linear-gradient(135deg, #fff8f0, #fdeede); }
 .gd-card--joker-small { background: linear-gradient(135deg, #f6f6f8, #eaeaee); }
 
-/* 小丑图（背景图见 joker-img.css）：居中，尽量大但给左侧 JOKER 留位 */
+/* 小丑图(背景 contain 见 joker-img.css)：缩小、靠右竖向居中，不压到左侧 JOKER 字 */
 .gd-joker-fig {
-  width: 62px;
-  height: 94px;
-  flex-shrink: 0;
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 50px;
+  height: 80px;
 }
-.gd-card--small .gd-joker-fig {
-  width: 44px;
-  height: 66px;
-}
-/* 小王：整张小丑图 CSS 转灰 */
-.gd-card--joker-small .gd-joker-fig {
-  filter: grayscale(1) brightness(1.06);
-}
+.gd-card--small .gd-joker-fig { width: 33px; height: 53px; }
+.gd-card--joker-small .gd-joker-fig { filter: grayscale(1) brightness(1.06); } /* 小王转灰 */
 
-/* JOKER 竖排（每字母直立、上下叠），居左上角 */
+/* JOKER 竖排：用牌面同款 Besley(GDRank)，靠左上放大、不超牌边 */
 .gd-joker-word {
   position: absolute;
-  top: 3px;
-  left: 1px;
+  top: 5px;
+  left: 4px;
   writing-mode: vertical-rl;
   text-orientation: upright;
-  font-size: 0.44rem;
-  font-weight: 800;
-  letter-spacing: -0.05em;
-  line-height: 0.92;
-  text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 1px #fff;
+  font-family: 'GDRank', serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 0.88;
+  text-shadow: 0 0 2px #fff, 0 0 1px #fff;
 }
-.gd-card--small .gd-joker-word {
-  font-size: 0.34rem;
-}
+.gd-card--small .gd-joker-word { font-size: 0.6rem; top: 3px; left: 2px; }
 
 /* --- 途游式牌面：左上角标(点数+花色) + 右下角大花色，靠这两处填满整张牌 --- */
 .gd-card__corner {
@@ -460,10 +452,10 @@
   .gd-card--small .gd-card__suit { height: 9px; }
   .gd-card--small .gd-card__pip { height: 18px; }
   /* 小丑图跟着牌缩小，别超出牌边界 */
-  .gd-joker-fig { width: 41px; height: 62px; }
-  .gd-card--small .gd-joker-fig { width: 26px; height: 39px; }
-  .gd-joker-word { font-size: 0.36rem; }
-  .gd-card--small .gd-joker-word { font-size: 0.27rem; }
+  .gd-joker-fig { width: 32px; height: 52px; }
+  .gd-card--small .gd-joker-fig { width: 21px; height: 33px; }
+  .gd-joker-word { font-size: 0.62rem; top: 3px; left: 2px; }
+  .gd-card--small .gd-joker-word { font-size: 0.4rem; }
   .gd-player-hand { min-height: 76px; padding: 4px 0.3rem 4px; }
   .gd-avatar { width: 34px; height: 34px; }
   .gd-avatar svg { width: 21px; height: 21px; }

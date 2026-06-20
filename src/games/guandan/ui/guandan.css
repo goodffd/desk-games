@@ -362,6 +362,8 @@
   justify-content: center;
   padding: 0.35rem 0;
   flex-shrink: 0;
+  position: relative;
+  z-index: 8;          /* 出牌/不要 始终在出牌区(z-index 4)之上，不被牌盖住 */
 }
 
 .gd-btn {
@@ -406,6 +408,31 @@
 
 .gd-hint--error { color: #e07050; }
 .gd-hint--info  { color: var(--gold); }
+
+/* --- 开始游戏遮罩（点一下解锁 iOS 音频，首轮语音才响） --- */
+.gd-start {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 120;
+}
+.gd-start__btn {
+  background: var(--gold);
+  color: #1a1208;
+  border: none;
+  border-radius: 12px;
+  padding: 0.9rem 2.8rem;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+}
+.gd-start__btn:hover { opacity: 0.9; }
 
 /* --- 局结弹层 --- */
 .gd-overlay {
@@ -495,7 +522,7 @@
   .gd-play--left   { left: 68px; top: 50%; }
   .gd-play--right  { right: 68px; top: 50%; }
   /* 你座位从游戏底边抬起，避免旋转后名字胶囊跑到屏幕左缘被裁 */
-  .gd-hand-row > .gd-seat--bottom { margin-bottom: 30px; }
+  .gd-hand-row > .gd-seat--bottom { margin-bottom: 52px; }
 }
 
 /* --- 手机竖屏自动转横屏：掼蛋牌桌需要横向空间，竖握时整页旋转 90° 显示为横屏 ---

@@ -400,6 +400,10 @@ export function mount(root: HTMLElement): () => void {
     state = pass(state, seat);
     lastPlays[seat] = 'pass';
     speak('不要');
+    // 一圈结束（其余全过）→ 赢家领新圈：清掉桌面所有出牌/不要，免得盖住赢家(尤其我)选牌
+    if (state.current === null && !isDealOver(state)) {
+      lastPlays = { 0: null, 1: null, 2: null, 3: null };
+    }
   }
 
   function getSelectedCards(): Card[] {
@@ -529,8 +533,6 @@ export function mount(root: HTMLElement): () => void {
       }
     } catch { /* ignore */ }
   };
-  gameEl.addEventListener('pointerdown', primeAudio, { once: true });
-
   // 转屏/缩放后重算手牌重叠（可用宽度变了），避免溢出
   const onResize = (): void => { renderHand(); };
   window.addEventListener('resize', onResize);
@@ -540,7 +542,20 @@ export function mount(root: HTMLElement): () => void {
   // 内嵌字体(GDRank)异步加载：首次布局可能用 fallback 字体量角标宽度→步进算错→角标花色跨叠。
   // 字体就绪后重算手牌，确保步进按真实点数宽度计算。
   if (document.fonts?.ready) void document.fonts.ready.then(() => { renderHand(); });
-  if (state.turn !== HUMAN_SEAT) scheduleAi();
+
+  // 「开始游戏」遮罩：点一下=用户手势，解锁 iOS 音频（首轮 AI 出牌语音才响），再开局
+  const startOverlay = document.createElement('div');
+  startOverlay.className = 'gd-start';
+  const startBtn = document.createElement('button');
+  startBtn.className = 'gd-start__btn';
+  startBtn.textContent = '开始游戏';
+  startOverlay.appendChild(startBtn);
+  startBtn.addEventListener('click', () => {
+    primeAudio();
+    startOverlay.remove();
+    if (state.turn !== HUMAN_SEAT) scheduleAi();
+  });
+  gameEl.appendChild(startOverlay);
 
   return () => {
     for (const t of timers) clearTimeout(t);

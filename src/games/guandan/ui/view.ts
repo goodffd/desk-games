@@ -12,6 +12,7 @@
 
 import '../../../ui/fonts/embedded.css';
 import './guandan.css';
+import './joker-img.css';
 
 import type { Card, Seat } from '../engine/types';
 import { LEVEL } from '../engine/types';

@@ -311,15 +311,19 @@
 .gd-card--joker-big { background: linear-gradient(135deg, #fff8f0, #fdeede); }
 .gd-card--joker-small { background: linear-gradient(135deg, #f6f6f8, #eaeaee); }
 
-/* 全身小丑 SVG：填满牌面 */
+/* 小丑图（背景图见 joker-img.css）：填满牌面 */
 .gd-joker-fig {
-  width: 46px;
-  height: 76px;
+  width: 54px;
+  height: 80px;
   flex-shrink: 0;
 }
 .gd-card--small .gd-joker-fig {
-  width: 33px;
-  height: 55px;
+  width: 40px;
+  height: 58px;
+}
+/* 小王：整张小丑图 CSS 转灰 */
+.gd-card--joker-small .gd-joker-fig {
+  filter: grayscale(1) brightness(1.06);
 }
 
 /* JOKER 竖排（每字母直立、上下叠），居左上角 */

@@ -103,6 +103,7 @@
   gap: 3px;
 }
 .gd-seat--top, .gd-seat--left, .gd-seat--right { position: absolute; z-index: 5; }
+.gd-seat--top.is-active, .gd-seat--left.is-active, .gd-seat--right.is-active { z-index: 8; } /* 当前回合座位(含闹钟)浮到出牌区之上 */
 /* 相对可玩区(playfield)定位：对家贴可玩区顶、上家/下家竖向居中、你贴可玩区底(与对家对称) */
 .gd-seat--top   { top: 2.5%;  left: 50%; transform: translateX(-50%); }
 .gd-seat--left  { left: 6%;  top: 50%; transform: translateY(-50%); }
@@ -613,7 +614,7 @@
   /* 矮牌桌：出牌区随头像内移同步外推，不压头像/张数文字(剩≤10张文字变宽) */
   .gd-play--top    { top: 22%; }                /* 下移，不压对家头像下文字 */
   .gd-play--bottom { top: 64%; bottom: auto; }  /* 与对家出牌区上下对称 */
-  .gd-play--left   { left: 92px; top: 50%; }    /* 上家头像内移到34px、文字变宽，出牌区外推到92px让开 */
+  .gd-play--left   { left: 92px; top: 50%; }
   .gd-play--right  { right: 92px; top: 50%; }
 }
 

@@ -9,8 +9,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 22px;
-  padding: 24px;
+  gap: 14px;
+  padding: 20px;
   box-sizing: border-box;
   background: radial-gradient(ellipse 96% 86% at 50% 40%, #2c6230 0%, #1b431d 56%, #112d12 100%);
   color: var(--text-light, #e8d9b0);
@@ -30,10 +30,10 @@
 /* 品牌标题区 */
 .gd-lobby__brand { text-align: center; user-select: none; }
 .gd-lobby__title {
-  font-size: 42px;
+  font-size: 36px;
   font-weight: 800;
-  letter-spacing: 0.32em;
-  margin-right: -0.32em; /* 抵消末字 letter-spacing，视觉居中 */
+  letter-spacing: 0.3em;
+  margin-right: -0.3em; /* 抵消末字 letter-spacing，视觉居中 */
   color: var(--gold, #c9a84c);
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 240, 200, 0.6);
 }
@@ -48,20 +48,20 @@
 /* 金线卡片：暗底 + 双层金边（外实内虚），柔和投影 */
 .gd-lobby__card {
   position: relative;
-  width: min(420px, 100%);
+  width: min(330px, 92%);
   box-sizing: border-box;
-  padding: 28px 26px;
+  padding: 18px 22px 20px;
   background: linear-gradient(180deg, rgba(10, 24, 12, 0.66), rgba(6, 16, 8, 0.72));
   border: 1px solid var(--gold-dim, #8a6e2a);
-  border-radius: 16px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(201, 168, 76, 0.16);
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(201, 168, 76, 0.16);
 }
 .gd-lobby__card-title {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--text-light, #e8d9b0);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   text-align: center;
 }
 
@@ -71,8 +71,8 @@
 .gd-lobby__input {
   width: 100%;
   box-sizing: border-box;
-  padding: 13px 14px;
-  font-size: 17px;
+  padding: 10px 14px;
+  font-size: 16px;
   font-family: inherit;
   text-align: center;
   letter-spacing: 0.08em;
@@ -92,8 +92,8 @@
 /* 主按钮：金面暗字（与牌桌「下一局/再来一盘」一脉） */
 .gd-lobby__btn {
   width: 100%;
-  margin-top: 18px;
-  padding: 13px 16px;
+  margin-top: 14px;
+  padding: 11px 16px;
   font-size: 16px;
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -121,8 +121,8 @@
 
 /* 错误/提示行 */
 .gd-lobby__err {
-  min-height: 18px;
-  margin-top: 10px;
+  min-height: 14px;
+  margin-top: 8px;
   font-size: 13px;
   text-align: center;
   color: #ec7361;

@@ -115,11 +115,24 @@ describe('planTribute — 进贡/还贡/抗贡 + 首攻', () => {
     expect(plan.firstLeader).toBe(3);
   });
 
-  it('双下(头游+二游同队)：末游→头游、三游→二游 双贡', () => {
-    const hands: Card[][] = [blank(), [n('S', 14)], blank(), [n('D', 14)]];
-    const plan = planTribute([0, 2, 1, 3], hands, 2); // 头0(队0)/二游2(队0) → 双下
+  it('双下双贡：头游拿点数较大的进贡牌、二游拿较小的（与谁出无关，owner ruling）', () => {
+    // finished=[0,2,1,3]：头0/二游2(双下)；三游=座位1 持 K(13)、末游=座位3 持 5。
+    // K 较大 → 头游0 收 K(来自三游1)、二游2 收 5(来自末游3)；若按旧的固定映射(末游→头游)就会反。
+    const hands: Card[][] = [blank(), [n('S', 13)], blank(), [n('S', 5)]];
+    const plan = planTribute([0, 2, 1, 3], hands, 2);
     expect(plan.doubleDown).toBe(true);
     expect(plan.exchanges).toHaveLength(2);
+    const toHead = plan.exchanges.find(e => e.receiver === 0)!;
+    const toSecond = plan.exchanges.find(e => e.receiver === 2)!;
+    expect([toHead.giver, toHead.tribute.id]).toEqual([1, hands[1]![0]!.id]);    // 头游收三游的 K
+    expect([toSecond.giver, toSecond.tribute.id]).toEqual([3, hands[3]![0]!.id]); // 二游收末游的 5
+    expect(plan.firstLeader).toBe(3);
+  });
+
+  it('双下双贡：两张进贡牌点数相等 → 确定性 末游→头游、三游→二游', () => {
+    const hands: Card[][] = [blank(), [n('S', 14)], blank(), [n('D', 14)]]; // 三游1、末游3 各持一张 A(14)
+    const plan = planTribute([0, 2, 1, 3], hands, 2);
+    expect(plan.doubleDown).toBe(true);
     expect(plan.exchanges.map(e => [e.giver, e.receiver])).toEqual([[3, 0], [1, 2]]);
     expect(plan.firstLeader).toBe(3);
   });

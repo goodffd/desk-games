@@ -193,12 +193,22 @@ export function planTribute(finished: Seat[], hands: Card[][], level: Rank): Tri
     return { exchanges: [], resist: true, firstLeader: head, doubleDown };
   }
 
-  const exchanges: TributeExchange[] = doubleDown
-    ? [
-        { giver: last, receiver: head, tribute: largestNonWild(hands[last] as Card[], level) },
-        { giver: third, receiver: second, tribute: largestNonWild(hands[third] as Card[], level) },
-      ]
-    : [{ giver: last, receiver: head, tribute: largestNonWild(hands[last] as Card[], level) }];
+  let exchanges: TributeExchange[];
+  if (doubleDown) {
+    // 双贡：末游、三游各拿最大非王牌进贡；头游拿点数较大的那张、二游拿较小的（与谁出无关，
+    // owner ruling）。相等则末游→头游（确定性）。还贡沿各 exchange 的 giver 原路返还。
+    const tLast = largestNonWild(hands[last] as Card[], level);
+    const tThird = largestNonWild(hands[third] as Card[], level);
+    const lastBigger = rankValue(tLast, level) >= rankValue(tThird, level);
+    const big = lastBigger ? { giver: last, tribute: tLast } : { giver: third, tribute: tThird };
+    const small = lastBigger ? { giver: third, tribute: tThird } : { giver: last, tribute: tLast };
+    exchanges = [
+      { giver: big.giver, receiver: head, tribute: big.tribute },
+      { giver: small.giver, receiver: second, tribute: small.tribute },
+    ];
+  } else {
+    exchanges = [{ giver: last, receiver: head, tribute: largestNonWild(hands[last] as Card[], level) }];
+  }
 
   return { exchanges, resist: false, firstLeader: last, doubleDown };
 }

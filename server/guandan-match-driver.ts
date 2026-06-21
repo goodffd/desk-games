@@ -1,11 +1,17 @@
 import type { Card, Seat, Rank } from '../src/games/guandan/engine/types';
-import { dealHands, startMatch, dealLevel, type MatchState } from '../src/games/guandan/engine/match';
-import { createDeal, play, pass, isDealOver, type DealState } from '../src/games/guandan/engine/game';
+import { dealHands, startMatch, dealLevel, settleDeal, type MatchState, type SettleResult } from '../src/games/guandan/engine/match';
+import { createDeal, play, pass, isDealOver, ranking, type DealState } from '../src/games/guandan/engine/game';
 import { sortHand } from '../src/games/guandan/engine/cards';
 import { isLegalPlay } from '../src/games/guandan/engine/legal';
 import { choosePlay } from '../src/games/guandan/ai/ai';
 
 export type Outbound = { to: 'all' | 'seat'; seat?: Seat; msg: any };
+
+interface PendingResult {
+  finished: Seat[];
+  settle: SettleResult;
+  lastHand: Card[];
+}
 
 export class MatchDriver {
   match: MatchState;
@@ -14,22 +20,28 @@ export class MatchDriver {
   shuffle: (n: number) => number[];
   lastPlays: ({ cards: Card[] } | 'pass' | null)[] = [null, null, null, null];
   lastActor: Seat | null = null;
+  phase: 'playing' | 'dealResult' | 'tribute' | 'matchOver' = 'playing';
+  pendingResult: PendingResult | null = null;
   constructor(opts: { shuffle?: (n: number) => number[] } = {}) {
     this.shuffle = opts.shuffle ?? defaultShuffle;
     this.match = startMatch();
     this.state = createDeal([[], [], [], []], 0, dealLevel(this.match)); // 占位，start() 真发牌
+    this.phase = 'playing';
+    this.pendingResult = null;
   }
   start(): Outbound[] {
     const hands = dealHands(this.shuffle);
     this.state = createDeal(hands, 0, dealLevel(this.match)); // 首局首攻=座位0（无进贡）
     this.lastPlays = [null, null, null, null];
     this.lastActor = null;
+    this.phase = 'playing';
+    this.pendingResult = null;
     return [this.broadcastState(), ...this.handMsgs()];
   }
   publicState() {
     const s = this.state;
-    return {
-      phase: 'playing', turn: s.turn, current: s.current ? { ...s.current.combo, by: s.current.by } : null,
+    const base = {
+      phase: this.phase, turn: s.turn, current: s.current ? { ...s.current.combo, by: s.current.by } : null,
       lastActor: this.lastActor,
       seats: ([0, 1, 2, 3] as Seat[]).map(i => ({
         seat: i, count: s.hands[i]!.length,
@@ -37,6 +49,22 @@ export class MatchDriver {
       })),
       level: s.level, levels: this.match.levels, trumpTeam: this.match.trumpTeam, dealNo: this.match.dealNo,
     };
+    if ((this.phase === 'dealResult' || this.phase === 'matchOver') && this.pendingResult) {
+      const { finished, settle, lastHand } = this.pendingResult;
+      const result = {
+        ranking: finished,
+        gain: settle.gain,
+        passedA: settle.passedA,
+        stuck: settle.stuck,
+        demoted: settle.demoted,
+        lastHand,
+      };
+      if (this.phase === 'matchOver') {
+        return { ...base, result, winner: settle.match.winner };
+      }
+      return { ...base, result };
+    }
+    return base;
   }
   broadcastState(): Outbound { return { to: 'all', msg: { t: 'state', ...this.publicState() } }; }
   handMsgs(): Outbound[] {
@@ -110,8 +138,18 @@ export class MatchDriver {
   }
 
   private afterAction(actor: Seat): Outbound[] {
-    const out: Outbound[] = [this.broadcastState(), { to: 'seat', seat: actor, msg: { t: 'hand', cards: sortHand(this.state.hands[actor]!, this.state.level) } }];
-    // Task 13 会在这里追加：deal over → settle/tribute
+    const out: Outbound[] = [];
+    if (isDealOver(this.state)) {
+      const finished = ranking(this.state);
+      const settle = settleDeal(this.match, finished);
+      this.match = settle.match;
+      const lastSeat = finished[3] as Seat;
+      this.phase = settle.match.over ? 'matchOver' : 'dealResult';
+      this.pendingResult = { finished, settle, lastHand: this.state.hands[lastSeat]! };
+      out.push(this.broadcastState());
+    } else {
+      out.push(this.broadcastState(), { to: 'seat', seat: actor, msg: { t: 'hand', cards: sortHand(this.state.hands[actor]!, this.state.level) } });
+    }
     return out;
   }
   private cardsByIds(seat: Seat, ids: number[]): Card[] | null {

@@ -77,6 +77,24 @@ describe('MatchDriver — 重连/观战补发', () => {
   });
 });
 
+describe('MatchDriver — 局终结算', () => {
+  it('全 AI 自对局打完一局 → 公开态进 dealResult，含 ranking(长度4)', () => {
+    const d = new MatchDriver({ shuffle: defaultShuffleSeeded() }); // 见下：可复现洗牌
+    const out = d.start();
+    for (let s = 0; s < 4; s++) out.push(...d.setAI(s as any, true));
+    const lastState = [...out].reverse().find(o => o.msg.t === 'state')!.msg;
+    expect(['dealResult', 'tribute', 'matchOver']).toContain(lastState.phase);
+    if (lastState.phase === 'dealResult') expect(lastState.result.ranking).toHaveLength(4);
+  });
+});
+// 可复现洗牌：Fisher-Yates with 固定 LCG 种子（测试确定性，不用 Math.random）
+function defaultShuffleSeeded() {
+  let seed = 12345;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  return (n: number) => { const a = Array.from({ length: n }, (_, i) => i);
+    for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = a[i]!; a[i] = a[j]!; a[j] = t; } return a; };
+}
+
 describe('MatchDriver — AI 接管', () => {
   it('setAI(座位X,true) 且轮到该座 → AI 自动推进，turn 不停在 AI 座', () => {
     const d = new MatchDriver({ shuffle: noShuffle }); d.start(); // 轮到座位0

@@ -16,8 +16,7 @@ import { sortHand, rankValue } from '../engine/cards';
 import { isDealOver, ranking } from '../engine/game';
 import { cardEl, rankName } from './render';
 import { VOICE_CLIPS } from './voice-clips';
-import { LocalDriver } from '../driver/local-driver';
-import type { DealOutcome, TributePrompt } from '../driver/types';
+import type { DealOutcome, TributePrompt, GameDriver } from '../driver/types';
 
 /** 级别(Rank 2..14) → 显示文字（打几）。 */
 function levelLabel(r: Rank): string {
@@ -131,6 +130,24 @@ function speak(text: string): void {
   speakTTS(text);
 }
 
+/** AI 等本句报牌播完才出下一手：剩余毫秒（注入给 driver，保持 driver DOM-free）。 */
+export function speechBusyMs(): number { return Math.max(0, gdSpeakEndAt - performance.now()); }
+
+/** iOS：音频要用户手势解锁。首次点击时静音预热一下，之后 AI/对家出牌语音也能响。
+ *  本地由「开始游戏」遮罩调；联机由前置 UI 的点击手势调。 */
+export function primeAudio(): void {
+  try {
+    if (!gdAudio) gdAudio = new Audio();
+    gdAudio.muted = true;
+    gdAudio.src = VOICE_CLIPS['不要'] ?? '';
+    const pr = gdAudio.play();
+    if (pr && typeof pr.then === 'function') {
+      pr.then(() => { if (gdAudio) { gdAudio.pause(); gdAudio.currentTime = 0; gdAudio.muted = false; } })
+        .catch(() => { if (gdAudio) gdAudio.muted = false; });
+    }
+  } catch { /* ignore */ }
+}
+
 /** 头像：圆形 + 简笔人像，按队伍(座%2)配色 */
 function avatarEl(seat: Seat): HTMLElement {
   const av = document.createElement('div');
@@ -143,10 +160,8 @@ function avatarEl(seat: Seat): HTMLElement {
   return av;
 }
 
-export function mount(root: HTMLElement): () => void {
-  // 本地（调试）模式：牌局逻辑/AI/进贡全在 LocalDriver；view 只读快照渲染、调动作、订阅事件。
-  // 注入 speechBusyMs：AI 等本句报牌（gdSpeakEndAt）播完再出下一手，driver 自身保持 DOM-free。
-  const driver = new LocalDriver({ speechBusyMs: () => Math.max(0, gdSpeakEndAt - performance.now()) });
+export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
+  // 牌桌视图：driver 注入（本地 LocalDriver=调试 / 联机 OnlineDriver=正常）。view 只读快照渲染、调动作、订阅事件。
   // 渲染镜像：onChange 把 driver.snapshot() 拷进这些变量后 renderAll（渲染函数体原样不改）。
   const snap0 = driver.snapshot();
   let state = snap0.state;            // 当前这一局引擎态
@@ -715,19 +730,6 @@ export function mount(root: HTMLElement): () => void {
   handEl.addEventListener('pointermove', onHandPointerMove);
   window.addEventListener('pointerup', onPointerUp);
 
-  // iOS：音频要用户手势解锁。首次在游戏内按下时静音预热一下，之后 AI 出牌的语音也能响
-  const primeAudio = (): void => {
-    try {
-      if (!gdAudio) gdAudio = new Audio();
-      gdAudio.muted = true;
-      gdAudio.src = VOICE_CLIPS['不要'] ?? '';
-      const pr = gdAudio.play();
-      if (pr && typeof pr.then === 'function') {
-        pr.then(() => { if (gdAudio) { gdAudio.pause(); gdAudio.currentTime = 0; gdAudio.muted = false; } })
-          .catch(() => { if (gdAudio) gdAudio.muted = false; });
-      }
-    } catch { /* ignore */ }
-  };
   // 转屏/缩放后重算手牌重叠（可用宽度变了），避免溢出
   const onResize = (): void => { if (started) renderHand(); };
   window.addEventListener('resize', onResize);
@@ -738,19 +740,25 @@ export function mount(root: HTMLElement): () => void {
   // 内嵌字体(GDRank)异步加载会重算手牌步进，但同样只在已开始时才重算(开始前没有手牌可算)。
   if (document.fonts?.ready) void document.fonts.ready.then(() => { if (started) renderHand(); });
 
-  // 「开始游戏」遮罩：点一下=用户手势，解锁 iOS 音频（首轮 AI 出牌语音才响），再开局
-  const startOverlay = document.createElement('div');
-  startOverlay.className = 'gd-start';
-  const startBtn = document.createElement('button');
-  startBtn.className = 'gd-start__btn';
-  startBtn.textContent = '开始游戏';
-  startOverlay.appendChild(startBtn);
-  startBtn.addEventListener('click', () => {
-    primeAudio();
-    startOverlay.remove();
-    driver.start(); // started=true + onChange(整屏渲染) + 非我回合起 AI
-  });
-  gameEl.appendChild(startOverlay);
+  if (started) {
+    // 联机：进牌桌时服务端已开打（snapshot.started=true），直接渲染。音频解锁已在前置 UI 手势完成。
+    renderLevels();
+    renderAll();
+  } else {
+    // 本地：「开始游戏」遮罩——点一下=用户手势，解锁 iOS 音频（首轮 AI 语音才响），再 driver.start()。
+    const startOverlay = document.createElement('div');
+    startOverlay.className = 'gd-start';
+    const startBtn = document.createElement('button');
+    startBtn.className = 'gd-start__btn';
+    startBtn.textContent = '开始游戏';
+    startOverlay.appendChild(startBtn);
+    startBtn.addEventListener('click', () => {
+      primeAudio();
+      startOverlay.remove();
+      driver.start(); // started=true + onChange(整屏渲染) + 非我回合起 AI
+    });
+    gameEl.appendChild(startOverlay);
+  }
 
   return () => {
     driver.dispose(); // 清 driver 的 AI 定时器

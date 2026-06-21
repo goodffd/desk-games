@@ -547,6 +547,8 @@
   .gd-avatar { width: 34px; height: 34px; }
   .gd-avatar svg { width: 21px; height: 21px; }
   .gd-seat__info { font-size: 0.6rem; padding: 1px 6px; }
+  /* 张数徽标在手机端缩小：0.98rem(桌面值)在小屏过大、加光晕会压到出牌区。关脉冲、用小静态光晕，光晕不外溢 */
+  .gd-seat__count--alert { font-size: 0.64rem; padding: 0 4px; box-shadow: 0 0 3px 1px rgba(255,210,80,0.75); animation: none; }
   .gd-topbar { padding: 0.25rem 0.6rem; }
   .gd-topbar__title { font-size: 0.85rem; }
   .gd-btn { padding: 0.3rem 1.1rem; font-size: 0.85rem; }

@@ -452,13 +452,14 @@
 }
 .gd-btn--play:not(:disabled):hover { filter: brightness(0.92); transform: scale(1.02); }
 
-/* 不要：实底（原 transparent 会透出底下的牌），无边框、金字 */
+/* 不要：实底暖石灰 + 深色字。原深绿 #1f3320 跟绿毡同色、糊成一片看着像透明；
+   换成明显区别于毡面的中性色，一眼是按钮，又比金色「出牌」次一级 */
 .gd-btn--pass {
-  background: #1f3320;
+  background: #9a917f;
   border: none;
-  color: var(--gold);
+  color: #1f1a12;
 }
-.gd-btn--pass:not(:disabled):hover { background: #2a4329; }
+.gd-btn--pass:not(:disabled):hover { background: #aaa28f; }
 
 /* --- 提示信息 --- */
 .gd-hint {

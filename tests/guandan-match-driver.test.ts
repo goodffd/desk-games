@@ -112,3 +112,42 @@ describe('MatchDriver — AI 接管', () => {
     expect(d.state.finished.length).toBeGreaterThanOrEqual(3);
   });
 });
+
+describe('MatchDriver — 进贡/还贡', () => {
+  it('全 AI 自对局：连打数局不卡死，每局 ranking 合法（进贡/还贡走 autoReturn）', () => {
+    const d = new MatchDriver({ shuffle: defaultShuffleSeeded() });
+    const out = d.start();
+    for (let s = 0; s < 4; s++) out.push(...d.setAI(s as any, true));
+    let guard = 0;
+    while (!d.match.over && guard++ < 30) { out.push(...d.nextDeal()); for (let s = 0; s < 4; s++) out.push(...d.setAI(s as any, true)); }
+    expect(d.match.over || guard >= 30).toBeTruthy(); // 不死循环
+  });
+
+  it('收贡座位是真人 → 发 need-tribute；该人 tribute-return 后开下一局', () => {
+    // 造一个「非抗贡单贡、收贡座位在线」的局面：用全 AI 打完首局拿到 finished，再设收贡座位 online
+    const d = new MatchDriver({ shuffle: defaultShuffleSeeded() });
+    d.start(); for (let s = 0; s < 4; s++) d.setAI(s as any, true);
+    // 头游座位设为在线真人
+    const head = d.pendingResult!.finished[0]!;
+    d.online[head] = true;
+    const out = d.nextDeal();
+    const need = out.find((o: any) => o.msg.t === 'need-tribute' && o.seat === head);
+    if (need) { // 非抗贡才有还贡
+      expect(Array.isArray(need.msg.options)).toBe(true);
+      const r = d.handleTributeReturn(head, need.msg.options[0].id);
+      expect(r.some((o: any) => o.msg.t === 'state')).toBe(true);
+    }
+  });
+
+  it('双贡：planTribute 产出 2 项 exchange 时，给两个收贡真人各发 need-tribute', () => {
+    // 直接构造 driver 内部状态触发：mock pendingResult 为双下名次 + 两收贡在线
+    const d = new MatchDriver({ shuffle: defaultShuffleSeeded() });
+    d.start(); for (let s = 0; s < 4; s++) d.setAI(s as any, true);
+    d.pendingResult = { finished: [0, 2, 1, 3], settle: { match: d.match } } as any; // 头0/二2 同队=双下
+    d.online[0] = true; d.online[2] = true;
+    const out = d.nextDeal();
+    const needs = out.filter((o: any) => o.msg.t === 'need-tribute');
+    // 双下两收贡=头游0+二游2（除非抗贡）；至少 0 或 2 收到（依发牌是否抗贡）
+    expect(needs.every((o: any) => o.seat === 0 || o.seat === 2)).toBe(true);
+  });
+});

@@ -307,3 +307,55 @@ describe('RoomRegistry — play/pass 转 driver', () => {
     expect(JSON.stringify(drv.playCalled)).toBe(before);
   });
 });
+
+describe('RoomRegistry — 再来一盘(restart)', () => {
+  let made: any[]; let reg: any;
+  const makeDrv = (_room: any) => {
+    const id = made.length;
+    const d = {
+      id, match: { over: false }, online: [true, true, true, true], started: false,
+      start() { this.started = true; return [{ to: 'all', msg: { t: 'state', phase: 'playing', turn: 0, drv: id } }]; },
+      setAI(seat: number, on: boolean) { this.online[seat] = !on; return [{ to: 'all', msg: { t: 'state', setAI: seat } }]; },
+    };
+    made.push(d); return d;
+  };
+  beforeEach(() => { made = []; reg = new RoomRegistry(() => 'ABC123', makeDrv); });
+  const hello = (c: any, n: string) => reg.handle(c, { t: 'hello', nick: n });
+  function playing() {
+    const cs = [fakeClient(), fakeClient(), fakeClient(), fakeClient()];
+    cs.forEach((c, i) => hello(c, 'p' + i));
+    reg.handle(cs[0], { t: 'create' });
+    for (let i = 1; i < 4; i++) { reg.handle(cs[i], { t: 'join', code: 'ABC123' }); reg.handle(cs[i], { t: 'take-seat', seat: i }); }
+    reg.handle(cs[0], { t: 'start' });   // made=[drv0]
+    return cs;
+  }
+
+  it('matchOver 后房主 restart → 新建 driver(留座)、AI 座同步 online=false、重发新局态', () => {
+    const cs = playing();
+    const room = reg.rooms.get('ABC123');
+    room.driver.match.over = true;                          // 整盘结束
+    room.seats[2].ai = true; room.seats[2].online = false;  // 座 2 当 AI（掉线）
+    reg.handle(cs[0], { t: 'restart' });
+    expect(made.length).toBe(2);                            // 新建 drv1
+    const nd = made[1];
+    expect(nd.started).toBe(true);                          // 新 driver start()
+    expect(nd.online[2]).toBe(false);                       // setAI 把 AI 座同步为 offline
+    expect(nd.online[0]).toBe(true);                        // 真人座不变
+    expect(cs[0]!.sent).toContainEqual({ t: 'state', phase: 'playing', turn: 0, drv: 1 }); // 房主收到新局态
+  });
+
+  it('非房主 restart → error', () => {
+    const cs = playing();
+    reg.rooms.get('ABC123').driver.match.over = true;
+    reg.handle(cs[2], { t: 'restart' });
+    expect(last(cs[2]).t).toBe('error');
+    expect(made.length).toBe(1);                            // 未新建
+  });
+
+  it('本盘未结束(match.over=false) restart → error，不新建 driver', () => {
+    const cs = playing();
+    reg.handle(cs[0], { t: 'restart' });
+    expect(last(cs[0]).t).toBe('error');
+    expect(made.length).toBe(1);
+  });
+});

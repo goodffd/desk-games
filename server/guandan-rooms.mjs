@@ -139,6 +139,23 @@ export class RoomRegistry {
       this._armTributeTimeout(room, out);
       return;
     }
+    if (msg.t === 'restart') {
+      // 整盘打完 → 房主再来一盘：新开整盘(回打2)、4 座原样留着、掉线/AI 座保持 AI。
+      const room = this.rooms.get(client._room);
+      if (!room || room.status !== 'playing') { client.send({ t: 'error', msg: '房间状态不对' }); return; }
+      if (room.host !== client) { client.send({ t: 'error', msg: '只有房主能再来一盘' }); return; }
+      if (!room.driver || !(room.driver.match && room.driver.match.over)) { client.send({ t: 'error', msg: '本盘未结束' }); return; }
+      room.driver = this.makeDriver ? this.makeDriver(room) : null;
+      if (room.driver) {
+        this._dispatch(room, room.driver.start());                 // 重新发牌 + 公开态 + 各座私有手牌(turn=0)
+        // 掉线/AI 座设为 AI（setAI 会驱动 AI 出牌——start() 不 driveAI，首攻座若是 AI 否则会卡）
+        for (let i = 0; i < 4; i++) {
+          const s = room.seats[i];
+          if (s && s.ai && room.driver.setAI) this._dispatch(room, room.driver.setAI(i, true));
+        }
+      }
+      return;
+    }
   }
   leave(client) {
     const nk = this.nicks.get(client);

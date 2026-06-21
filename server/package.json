@@ -2,7 +2,7 @@
   "name": "desk-games-server",
   "private": true,
   "type": "module",
-  "version": "1.0.0",
-  "description": "desk-games 大厅合并服务（大厅 + 象棋 + /ws）",
-  "dependencies": { "ws": "^8.18.0" }
+  "version": "0.1.0",
+  "dependencies": { "ws": "^8.18.0" },
+  "devDependencies": { "esbuild": "^0.23.0" }
 }

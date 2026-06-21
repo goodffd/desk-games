@@ -1,0 +1,59 @@
+import type { Card, Seat, Rank } from '../src/games/guandan/engine/types';
+import { dealHands, startMatch, dealLevel, type MatchState } from '../src/games/guandan/engine/match';
+import { createDeal, type DealState } from '../src/games/guandan/engine/game';
+import { sortHand } from '../src/games/guandan/engine/cards';
+
+export type Outbound = { to: 'all' | 'seat'; seat?: Seat; msg: any };
+
+export class MatchDriver {
+  match: MatchState;
+  state: DealState;
+  online: boolean[] = [true, true, true, true]; // 座位是否真人在线（false=AI 接管）
+  shuffle: (n: number) => number[];
+  constructor(opts: { shuffle?: (n: number) => number[] } = {}) {
+    this.shuffle = opts.shuffle ?? defaultShuffle;
+    this.match = startMatch();
+    this.state = createDeal([[], [], [], []], 0, dealLevel(this.match)); // 占位，start() 真发牌
+  }
+  start(): Outbound[] {
+    const hands = dealHands(this.shuffle);
+    this.state = createDeal(hands, 0, dealLevel(this.match)); // 首局首攻=座位0（无进贡）
+    return [this.broadcastState(), ...this.handMsgs()];
+  }
+  publicState() {
+    const s = this.state;
+    return {
+      phase: 'playing', turn: s.turn, current: s.current ? { ...s.current.combo, by: s.current.by } : null,
+      lastActor: s.current ? s.current.by : null,
+      seats: ([0, 1, 2, 3] as Seat[]).map(i => ({
+        seat: i, count: s.hands[i]!.length,
+        lastPlay: null, finishRank: rankOf(s.finished, i), online: this.online[i], ai: !this.online[i],
+      })),
+      level: s.level, levels: this.match.levels, trumpTeam: this.match.trumpTeam, dealNo: this.match.dealNo,
+    };
+  }
+  broadcastState(): Outbound { return { to: 'all', msg: { t: 'state', ...this.publicState() } }; }
+  handMsgs(): Outbound[] {
+    return ([0, 1, 2, 3] as Seat[]).map(i => ({
+      to: 'seat', seat: i, msg: { t: 'hand', cards: sortHand(this.state.hands[i]!, this.state.level) },
+    }));
+  }
+  snapshotFor(seat: Seat): Outbound[] {
+    return [
+      this.broadcastState(),
+      { to: 'seat', seat, msg: { t: 'hand', cards: sortHand(this.state.hands[seat]!, this.state.level) } },
+    ];
+  }
+  spectatorSync(_client: unknown): Outbound[] {
+    return [this.broadcastState()];
+  }
+}
+
+function rankOf(finished: Seat[], seat: Seat): 1 | 2 | 3 | 4 | null {
+  const i = finished.indexOf(seat); return i === -1 ? null : ((i + 1) as 1 | 2 | 3 | 4);
+}
+function defaultShuffle(n: number): number[] {
+  const a = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]!; a[i] = a[j]!; a[j] = t; }
+  return a;
+}

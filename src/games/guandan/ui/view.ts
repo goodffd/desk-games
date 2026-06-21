@@ -457,13 +457,14 @@ export function mount(root: HTMLElement): () => void {
     renderStatus();
     renderButtons();
     syncTurnTimer();
-    // 手牌半透明：最新那手牌(z7=lastActor，浮在手牌之上)——无论谁出的、含我自己——只要几何上压到我的
-    // 手牌区，手牌就淡到 45%，让被盖住的牌/「不要」透出来看清；没压到就不淡。
-    // 但轮到我出牌时(state.turn===我)强制恢复不透明：上家出牌压住我的牌后立刻轮到我，此时要看清选牌，
-    // 不能让上家那手牌一直把我手牌压成半透明；等我出牌后(轮到下家、lastActor 变我)再按几何判定淡。
+    // 手牌与最新那手牌(z7=lastActor)的层叠/透明，按是否轮到我分两套：
+    // · 轮到我出牌：手牌浮到 z7 之上(gd-hand--ontop)，把压住我手牌的别家牌盖回去 → 手牌完整不透明、好选牌；
+    // · 没轮到我：手牌在 z7 之下，最新那手牌(无论谁出的、含我自己)只要几何上压到我「具体某张牌」，
+    //   手牌就淡到 45%(gd-hand--dim)，让被盖住的牌/「不要」凸显；没压到不淡。
     // 90° 旋转下各元素包围盒仍是正交矩形，元素间矩形相交判断准确。
-    const dim = state.turn !== HUMAN_SEAT && !isDealOver(state) && latestPlayCoversHand();
-    handEl.classList.toggle('gd-hand--dim', dim);
+    const myTurn = started && !isDealOver(state) && state.turn === HUMAN_SEAT;
+    handEl.classList.toggle('gd-hand--ontop', myTurn);
+    handEl.classList.toggle('gd-hand--dim', !myTurn && started && !isDealOver(state) && latestPlayCoversHand());
   }
 
   // ── 出牌（视图层同时维护 lastPlays） ────────────────────────

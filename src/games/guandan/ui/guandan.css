@@ -366,8 +366,10 @@
   flex-wrap: nowrap;
   overflow: visible;             /* 不出横向拉条 */
 }
-/* 我打出的牌沉到手牌之后时：手牌整体半透明，透出自己刚出的那手牌 */
+/* 没轮到我、别家/我刚出的牌压到我手牌时：手牌整体半透明，凸显那手牌/「不要」 */
 .gd-player-hand.gd-hand--dim { opacity: 0.45; transition: opacity 0.25s; }
+/* 轮到我出牌时：手牌浮到最新出牌(z7)之上，盖住压住我手牌的别家牌，看清自己的牌好选牌 */
+.gd-player-hand.gd-hand--ontop { z-index: 8; }
 
 /* 手牌重叠：大牌更多重叠，27 张排得下不溢出。不做 hover 跳动 */
 .gd-player-hand .gd-card {

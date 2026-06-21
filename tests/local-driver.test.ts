@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import type { Card, Seat } from '../src/games/guandan/engine/types';
 import { rankValue } from '../src/games/guandan/engine/cards';
 import { isDealOver } from '../src/games/guandan/engine/game';
-import { autoReturn } from '../src/games/guandan/engine/match';
+import { autoReturn, returnableCards } from '../src/games/guandan/engine/match';
 import { LocalDriver } from '../src/games/guandan/driver/local-driver';
 import type { GameSnapshot, TributePrompt } from '../src/games/guandan/driver/types';
 
@@ -196,5 +196,32 @@ describe('LocalDriver — 语音/结算/进贡', () => {
     expect(isDealOver(fresh.state)).toBe(false);          // 新局开始
     expect(fresh.state.hands.flat().length).toBe(108);    // 重新发满
     expect(fresh.lastActor).toBeNull();                   // 新局桌面清空
+  });
+
+  // 收贡手选路径的逻辑闸：真机冒烟里 AI 太强、自动人类难赢→收贡 UI 难触发，
+  // 故这里确定性验「resolve 用调用方指定(非 autoReturn)的还贡牌」确实流转——
+  // showTribute 的手选 DOM 本次重构未改，关键就是这张人选牌能否经 resolve 进 giver 手牌。
+  it('resolve 用调用方指定(非 autoReturn)的还贡牌 → 该牌确进 giver 新手牌、进贡牌离开 giver', () => {
+    const p = makeDriver({ firstLeader: 1 });
+    playDealToEnd(p);
+    p.driver.nextDealOrResult();
+    const prompt = p.tributes[0]!;
+    const ex = prompt.plan.exchanges[0]!;
+
+    // 收贡方可还的 ≤10 牌里挑「最大」一张（autoReturn 取最小，故必不同）模拟人类手选
+    const pool = returnableCards(prompt.dealt[ex.receiver]!, prompt.level);
+    expect(pool.length).toBeGreaterThan(0);
+    const chosen = pool.reduce((a, b) => (rankValue(b, prompt.level) > rankValue(a, prompt.level) ? b : a));
+    const auto = autoReturn(prompt.dealt[ex.receiver]!, prompt.level);
+    expect(chosen.id).not.toBe(auto.id); // 确与 autoReturn 不同，才真验「用了人选牌」
+
+    const returns: Card[] = prompt.plan.exchanges.map((e, i) =>
+      i === 0 ? chosen : autoReturn(prompt.dealt[e.receiver]!, prompt.level));
+    prompt.resolve(returns);
+
+    const hands = p.driver.snapshot().state.hands;
+    expect(hands[ex.giver]!.some((c) => c.id === chosen.id)).toBe(true);      // 人选还贡牌进了 giver
+    expect(hands[ex.giver]!.some((c) => c.id === ex.tribute.id)).toBe(false); // 进贡牌已离开 giver
+    expect(hands[ex.receiver]!.some((c) => c.id === ex.tribute.id)).toBe(true); // 进贡牌到了 receiver
   });
 });

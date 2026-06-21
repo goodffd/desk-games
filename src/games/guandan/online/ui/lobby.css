@@ -129,16 +129,15 @@
   letter-spacing: 0.03em;
 }
 
-/* 手机竖握自动转横屏（同牌桌 guandan.css：掼蛋是横屏玩法）：前置 UI 也走横屏，进牌桌无缝。
-   用 dvh/dvw（动态视口，扣浏览器工具栏），避免溢出。 */
-@media (orientation: portrait) and (max-width: 920px) {
-  html, body { overflow: hidden; }
-  .gd-lobby {
-    top: 50%; left: 50%; right: auto; bottom: auto;
-    width: 100dvh; height: 100dvw;
-    transform: translate(-50%, -50%) rotate(90deg);
-    transform-origin: center center;
-  }
+/* 前置 UI 含输入框(昵称/房号)，必须跟随手机真实方向——否则被 CSS rotate 后输入法方向对不上、没法打字。
+   横握手机=横屏(owner 要的,键盘也横屏)；竖握=竖屏(键盘竖屏,能正常输入)。牌桌无输入,仍由 guandan.css 竖握转横屏。
+   竖屏窄屏时大厅两栏改上下堆叠，不挤。 */
+@media (orientation: portrait) and (max-width: 720px) {
+  .gd-lobby--page { justify-content: flex-start; }
+  .gd-lobby__cols { flex-direction: column; overflow-y: auto; }
+  .gd-lobby__cols > .gd-lobby__panel:first-child,
+  .gd-lobby__cols > .gd-lobby__panel:last-child { flex: 0 0 auto; }
+  .gd-lobby__roomlist { max-height: 42vh; }
 }
 
 /* ===== 大厅/房间「页」变体：从居中弹窗改为顶部铺开的整页布局 ===== */

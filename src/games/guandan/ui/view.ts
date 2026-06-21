@@ -459,8 +459,11 @@ export function mount(root: HTMLElement): () => void {
     syncTurnTimer();
     // 手牌半透明：最新那手牌(z7=lastActor，浮在手牌之上)——无论谁出的、含我自己——只要几何上压到我的
     // 手牌区，手牌就淡到 45%，让被盖住的牌/「不要」透出来看清；没压到就不淡。
+    // 但轮到我出牌时(state.turn===我)强制恢复不透明：上家出牌压住我的牌后立刻轮到我，此时要看清选牌，
+    // 不能让上家那手牌一直把我手牌压成半透明；等我出牌后(轮到下家、lastActor 变我)再按几何判定淡。
     // 90° 旋转下各元素包围盒仍是正交矩形，元素间矩形相交判断准确。
-    handEl.classList.toggle('gd-hand--dim', latestPlayCoversHand());
+    const dim = state.turn !== HUMAN_SEAT && !isDealOver(state) && latestPlayCoversHand();
+    handEl.classList.toggle('gd-hand--dim', dim);
   }
 
   // ── 出牌（视图层同时维护 lastPlays） ────────────────────────

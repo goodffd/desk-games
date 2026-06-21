@@ -80,3 +80,44 @@ describe('RoomRegistry — 建房 + 挑座', () => {
     expect(r.seats[1]).toMatchObject({ nick: '甲' });
   });
 });
+
+describe('RoomRegistry — 房主开打', () => {
+  // 假 driver：记录被创建，start() 返回一条广播
+  const fakeDriver = (room: any) => ({ room, started: false,
+    start() { this.started = true; return [{ to: 'all', msg: { t: 'state', phase: 'playing', turn: 0 } }]; } });
+  let reg: any;
+  beforeEach(() => { reg = new RoomRegistry(() => 'ABC123', fakeDriver); });
+  const hello = (c: any, n: string) => reg.handle(c, { t: 'hello', nick: n });
+
+  function fourSeated() {
+    const cs = [fakeClient(), fakeClient(), fakeClient(), fakeClient()];
+    cs.forEach((c, i) => hello(c, '玩家' + i));
+    reg.handle(cs[0], { t: 'create' });                         // 0
+    for (let i = 1; i < 4; i++) { reg.handle(cs[i], { t: 'join', code: 'ABC123' }); reg.handle(cs[i], { t: 'take-seat', seat: i }); }
+    return cs;
+  }
+
+  it('不满 4 人 start → error', () => {
+    const cs = [fakeClient(), fakeClient()]; cs.forEach((c, i) => hello(c, 'p' + i));
+    reg.handle(cs[0], { t: 'create' });
+    reg.handle(cs[1], { t: 'join', code: 'ABC123' }); reg.handle(cs[1], { t: 'take-seat', seat: 1 });
+    reg.handle(cs[0], { t: 'start' });
+    expect(last(cs[0]).t).toBe('error');
+  });
+
+  it('非房主 start → error', () => {
+    const cs = fourSeated();
+    reg.handle(cs[2], { t: 'start' });
+    expect(last(cs[2]).t).toBe('error');
+  });
+
+  it('房主 4 人满 start → playing，建 driver，广播 started + driver 初态', () => {
+    const cs = fourSeated();
+    reg.handle(cs[0], { t: 'start' });
+    expect(cs[0].sent).toContainEqual({ t: 'started' });
+    expect(cs[3].sent).toContainEqual({ t: 'state', phase: 'playing', turn: 0 });
+    const room = reg.rooms.get('ABC123');
+    expect(room.status).toBe('playing');
+    expect(room.driver.started).toBe(true);
+  });
+});

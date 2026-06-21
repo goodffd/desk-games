@@ -58,6 +58,18 @@ export class RoomRegistry {
       this._sendRoom(room);
       return;
     }
+    if (msg.t === 'start') {
+      const room = this.rooms.get(client._room);
+      if (!room || room.status !== 'waiting') { client.send({ t: 'error', msg: '房间状态不对' }); return; }
+      if (room.host !== client) { client.send({ t: 'error', msg: '只有房主能开始' }); return; }
+      if (room.seats.some(s => !s)) { client.send({ t: 'error', msg: '未坐满 4 人' }); return; }
+      room.status = 'playing';
+      room.driver = this.makeDriver ? this.makeDriver(room) : null;
+      this._sendRoom(room);
+      for (const s of room.seats) s.client.send({ t: 'started' });
+      if (room.driver) this._dispatch(room, room.driver.start());
+      return;
+    }
   }
   leave(client) {
     const nk = this.nicks.get(client);
@@ -84,4 +96,16 @@ export class RoomRegistry {
     for (const c of targets) c.send({ t: 'room', code: room.code, status: room.status, seats, you: c._seat ?? null });
   }
   _leaveRoom(client) { /* Task 7 完整实现；此处先占位空函数 */ if (client) { client._room = client._room || null; } }
+  _dispatch(room, outbound) {
+    if (!outbound) return;
+    for (const o of outbound) {
+      if (o.to === 'seat') {
+        const s = room.seats[o.seat];
+        if (s && s.client && s.online) s.client.send(o.msg);
+      } else { // 'all'：房内在线玩家 + 观众
+        for (const s of room.seats) if (s && s.client && s.online) s.client.send(o.msg);
+        for (const sp of room.spectators) sp.send(o.msg);
+      }
+    }
+  }
 }

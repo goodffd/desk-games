@@ -203,7 +203,8 @@
 .gd-room__seat--bottom { grid-column: 2; grid-row: 3; }
 .gd-room__center { grid-column: 2; grid-row: 2; }
 
-.gd-room__seat { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px; }
+/* 每个座=「头像+下方文字」一个单元，单元在格子里居中。网格对称 → 中央开打组落在 4 单元中心 */
+.gd-room__seat { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .gd-room__avatar {
   width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center;
   background: rgba(0, 0, 0, 0.3); border: 2px solid currentColor;
@@ -216,8 +217,9 @@
 .gd-room__name { font-size: 14px; color: var(--text-light, #e8d9b0); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gd-room__take { width: auto; padding: 5px 12px; font-size: 13px; margin: 0; letter-spacing: 0.04em; }
 
-.gd-room__center { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.gd-room__center-count { font-size: 14px; color: var(--text-dim, #a89070); letter-spacing: 0.04em; }
+/* 让「开打按钮」本体居中(=4单元中心)；就座数浮上方、提示浮下方(绝对,不顶按钮) */
+.gd-room__center { position: relative; display: flex; align-items: center; justify-content: center; }
+.gd-room__center-count { position: absolute; bottom: calc(100% + 9px); left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 14px; color: var(--text-dim, #a89070); letter-spacing: 0.04em; }
 /* 开打：人齐了=牌桌「出牌」色(金底暗字)；人没齐=牌桌「不要」色(深绿浅字，不灰化) */
 .gd-room__start {
   width: auto; padding: 10px 32px; font-size: 16px; margin: 0;
@@ -225,4 +227,4 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32);
 }
 .gd-room__start:disabled { filter: none; cursor: default; background: #14210e; color: var(--text-light, #e8d9b0); }
-.gd-room__hint { font-size: 12px; color: var(--text-dim, #a89070); }
+.gd-room__hint { position: absolute; top: calc(100% + 7px); left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 12px; color: var(--text-dim, #a89070); }

@@ -46,6 +46,7 @@
   background: rgba(0, 0, 0, 0.4);
   border-bottom: 1px solid #2a4a2a;
   flex-shrink: 0;
+  position: relative;   /* 给中央级别文字做绝对居中的定位框 */
 }
 
 .gd-topbar__title {
@@ -54,10 +55,13 @@
   letter-spacing: 0.1em;
 }
 
-/* 顶栏中央：两队当前级别（打几） */
+/* 顶栏中央：两队当前级别（打几）。绝对居中于整条顶栏，与下方对家(left:50%)对齐——
+   不随标题/返回按钮宽度不等而被 space-between 推偏 */
 .gd-topbar__levels {
   display: flex; align-items: center; gap: 6px;
   font-size: 0.92rem; font-weight: 700; letter-spacing: 0.02em;
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  white-space: nowrap;
 }
 .gd-lv--me { color: var(--gold); }            /* 我方=你&对家=金 */
 .gd-lv--them { color: #5b9bd5; }              /* 对方=上家&下家=蓝 */

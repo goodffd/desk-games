@@ -140,3 +140,83 @@
     transform-origin: center center;
   }
 }
+
+/* ===== 大厅/房间「页」变体：从居中弹窗改为顶部铺开的整页布局 ===== */
+.gd-lobby--page { justify-content: flex-start; align-items: stretch; gap: 12px; padding: 16px 20px; }
+
+.gd-lobby__header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  width: 100%; max-width: 760px; margin: 0 auto;
+}
+.gd-lobby__brand-sm { font-size: 22px; font-weight: 800; letter-spacing: 0.16em; color: var(--gold, #c9a84c); }
+.gd-lobby__hello { font-size: 14px; color: var(--text-dim, #a89070); }
+
+.gd-lobby__cols { display: flex; gap: 14px; flex: 1; min-height: 0; width: 100%; max-width: 760px; margin: 0 auto; }
+.gd-lobby__panel {
+  display: flex; flex-direction: column; min-height: 0;
+  background: linear-gradient(180deg, rgba(10, 24, 12, 0.62), rgba(6, 16, 8, 0.7));
+  border: 1px solid var(--gold-dim, #8a6e2a); border-radius: 13px; padding: 14px 16px;
+  box-shadow: inset 0 0 0 1px rgba(201, 168, 76, 0.14);
+}
+.gd-lobby__cols > .gd-lobby__panel:first-child { flex: 0 0 40%; }
+.gd-lobby__cols > .gd-lobby__panel:last-child { flex: 1; }
+.gd-lobby__panel-title { font-size: 14px; font-weight: 700; color: var(--text-light, #e8d9b0); letter-spacing: 0.04em; margin-bottom: 12px; }
+.gd-lobby__panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.gd-lobby__panel-head .gd-lobby__panel-title { margin-bottom: 0; }
+
+/* 面板内主按钮：去掉 base 的 margin-top，改用统一下间距 */
+.gd-lobby__panel .gd-lobby__btn { margin-top: 0; margin-bottom: 10px; }
+.gd-lobby__match { margin-top: 4px; font-size: 13px; color: var(--gold, #c9a84c); text-align: center; letter-spacing: 0.04em; }
+
+/* 小按钮（刷新/观战）：非满宽 */
+.gd-lobby__mini { width: auto; padding: 6px 12px; font-size: 13px; margin: 0; letter-spacing: 0.04em; }
+
+.gd-lobby__roomlist { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.gd-lobby__room {
+  display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 9px;
+  background: rgba(0, 0, 0, 0.28); border: 1px solid rgba(201, 168, 76, 0.18);
+}
+.gd-lobby__room-code { font-weight: 800; letter-spacing: 0.08em; color: var(--gold, #c9a84c); font-size: 15px; }
+.gd-lobby__room-meta { flex: 1; font-size: 13px; color: var(--text-dim, #a89070); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gd-lobby__badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; letter-spacing: 0.04em; }
+.gd-lobby__badge--waiting { color: #e8d9b0; background: rgba(201, 168, 76, 0.18); }
+.gd-lobby__badge--playing { color: #1a1208; background: var(--gold, #c9a84c); font-weight: 700; }
+.gd-lobby__empty { margin: auto; padding: 24px 12px; font-size: 13px; color: var(--text-dim, #a89070); text-align: center; line-height: 1.6; }
+
+/* ===== 房间页（十字环桌）===== */
+.gd-room__codewrap { display: flex; align-items: baseline; gap: 8px; cursor: pointer; user-select: none; }
+.gd-room__codelabel { font-size: 13px; color: var(--text-dim, #a89070); }
+.gd-room__code { font-size: 24px; font-weight: 800; letter-spacing: 0.18em; color: var(--gold, #c9a84c); }
+.gd-room__copied { font-size: 12px; color: #7ec77e; transition: opacity 0.3s; }
+
+.gd-room__table {
+  flex: 1; min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  gap: 6px; align-items: center; justify-items: center;
+  width: 100%; max-width: 600px; margin: 0 auto;
+}
+.gd-room__seat--top { grid-column: 2; grid-row: 1; }
+.gd-room__seat--left { grid-column: 1; grid-row: 2; }
+.gd-room__seat--right { grid-column: 3; grid-row: 2; }
+.gd-room__seat--bottom { grid-column: 2; grid-row: 3; }
+.gd-room__center { grid-column: 2; grid-row: 2; }
+
+.gd-room__seat { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px; }
+.gd-room__avatar {
+  width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(0, 0, 0, 0.3); border: 2px solid currentColor;
+}
+.gd-room__avatar svg { width: 30px; height: 30px; }
+.gd-room__avatar--team0 { color: #e0b84c; }
+.gd-room__avatar--team1 { color: #5b9bd5; }
+.gd-room__avatar.is-empty { color: #5a6a52; border-style: dashed; }
+.gd-room__seat.is-you .gd-room__avatar { box-shadow: 0 0 0 2px #fff, 0 0 12px 3px rgba(255, 224, 130, 0.7); }
+.gd-room__name { font-size: 14px; color: var(--text-light, #e8d9b0); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gd-room__take { width: auto; padding: 5px 12px; font-size: 13px; margin: 0; letter-spacing: 0.04em; }
+
+.gd-room__center { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.gd-room__center-count { font-size: 14px; color: var(--text-dim, #a89070); letter-spacing: 0.04em; }
+.gd-room__start { width: auto; padding: 10px 32px; font-size: 16px; margin: 0; }
+.gd-room__hint { font-size: 12px; color: var(--text-dim, #a89070); }

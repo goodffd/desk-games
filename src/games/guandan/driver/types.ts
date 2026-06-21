@@ -8,7 +8,7 @@
 
 import type { Card, Seat, Rank, Combo } from '../engine/types';
 import type { DealState } from '../engine/game';
-import type { MatchState, TributePlan } from '../engine/match';
+import type { MatchState, TributePlan, SettleResult } from '../engine/match';
 
 /** 某家桌面「上一手」：一手牌(Combo) / 不要 / 无。沿用 view.ts 的形状。 */
 export type LastPlay = Combo | 'pass' | null;
@@ -56,8 +56,9 @@ export interface GameDriver {
   freshMatch(): void;
   /** 状态变 → view 拷快照 + renderAll。 */
   onChange(cb: () => void): void;
-  /** 一局结束 → view 弹结算层。 */
-  onResult(cb: () => void): void;
+  /** 一局结束 → view 弹结算层。settle = 本局结算结果（升级数/过A/卡A/降级/赢家队），
+   *  driver 已据它更新 match（snapshot().match 为结算后级别）；OnlineDriver 将来用服务端下发的结果填同形状。 */
+  onResult(cb: (settle: SettleResult) => void): void;
   /** 进贡阶段 → view 弹进贡/还贡层。 */
   onTribute(cb: (p: TributePrompt) => void): void;
   /** 报牌/不要语音。 */

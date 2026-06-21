@@ -73,7 +73,7 @@ export interface GameDriver {
   nextDealOrResult(): void;               // 一局结束后推进：结算→onResult；点「下一局」→进贡/开新局
   freshMatch(): void;                     // 再来一盘
   onChange(cb: () => void): void;         // 状态变→view 拷快照+renderAll
-  onResult(cb: () => void): void;         // 一局结束→view 弹 showResult
+  onResult(cb: (settle: SettleResult) => void): void; // 一局结束→view 弹 showResult(读 settle 升级数/过A/卡A/降级)
   onTribute(cb: (p: TributePrompt) => void): void; // 进贡阶段→view 弹 showTribute
   onSpeak(cb: (text: string) => void): void;       // 报牌/不要语音
   onHint(cb: (text: string, kind: 'info'|'warn') => void): void; // 文案提示
@@ -81,7 +81,12 @@ export interface GameDriver {
 }
 ```
 
-> 注：`onResult`/进贡/下一局的编排——本地现状是「出完牌 isDealOver → showResult 弹层，弹层里「下一局」按钮 → nextDeal → 进贡」。重构后：driver 在 afterAction 检测 isDealOver → fire `onResult`；view 的 showResult 弹层「下一局」按钮 → `driver.nextDealOrResult()` → driver 算 planTribute → fire `onTribute`（或抗贡直接开局 fire onChange+onHint）。`freshMatch` 同理由「再来一盘」按钮调。
+> 注：`onResult`/进贡/下一局的编排——本地现状是「出完牌 isDealOver → showResult 弹层，弹层里「下一局」按钮 → nextDeal → 进贡」。重构后：driver 在 afterAction 检测 isDealOver → `settleDeal`（更新 match）→ fire `onResult(settle)`；view 的 showResult 弹层「下一局」按钮 → `driver.nextDealOrResult()` → driver 算 planTribute → fire `onTribute`（或抗贡直接开局 fire onChange+onHint）。`freshMatch` 同理由「再来一盘」按钮调。
+>
+> **执行中修订（2026-06-21，Task 2 实施时）**：
+> - `onResult` 由原计划的 `() => void` 改为 **`(settle: SettleResult) => void`**：showResult 渲染升级弹层需要 `gain/passedA/stuck/demoted/winTeam`——这些是 `settleDeal` 的派生返回值，并非全存于 `MatchState`，无法仅凭 snapshot.match 重建。settle 移进 driver（为 OnlineDriver 用服务端结果铺路）后，必须经 onResult 载荷递给 view。Task 1 的 `driver/types.ts` 已同步（import `SettleResult`）。
+> - 关于进贡结果提示文案（「X进贡♥给Y」用 `SEAT_LABELS`/`cardBrief`，属展示层）：driver **不**构建该串，仅 `onTribute` 递 `{dealt,plan,level,resolve}`；view 在 `resolve` 后自行用 plan/level 拼提示。driver 的 `onHint` 只发**无座位/牌标签的固定串**（抗贡「对方持两张大王…」），保持 driver 不依赖 UI 标签。
+> - `LocalDriver` 构造注入项最终定为 `{ shuffle?, schedule?, clearScheduled?, speechBusyMs?, firstLeader? }`：`speechBusyMs()` 由 view 喂语音结束剩余 ms（替代 DOM 里的 `gdSpeakEndAt - performance.now()`，driver 保持 DOM-free）；`firstLeader()` 让单测可定首攻、确定性验「非我回合 AI 自动推进」。`comboSpeech`（纯字符串函数）由 driver 从 `../ui/render` import 构建 onSpeak 文本。
 
 ---
 

@@ -60,3 +60,19 @@ describe('MatchDriver — 出牌/不要', () => {
     expect(out.find((o: any) => o.msg.t === 'error')).toBeTruthy();
   });
 });
+
+describe('MatchDriver — 重连/观战补发', () => {
+  it('syncSeat：给该座补发 公开态(seat 定向) + 自己手牌', () => {
+    const d = new MatchDriver({ shuffle: noShuffle }); d.start();
+    const out = d.syncSeat(2);
+    expect(out.find((o: any) => o.to === 'seat' && o.seat === 2 && o.msg.t === 'state')).toBeTruthy();
+    const h = out.find((o: any) => o.to === 'seat' && o.seat === 2 && o.msg.t === 'hand');
+    expect(h!.msg.cards).toHaveLength(27);
+  });
+  it('spectatorSync：只补公开态，无 hand', () => {
+    const d = new MatchDriver({ shuffle: noShuffle }); d.start();
+    const out = d.spectatorSync({} as any);
+    expect(out.some((o: any) => o.msg.t === 'hand')).toBe(false);
+    expect(out.some((o: any) => o.msg.t === 'state')).toBe(true);
+  });
+});

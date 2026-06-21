@@ -43,14 +43,14 @@ export class MatchDriver {
       to: 'seat', seat: i, msg: { t: 'hand', cards: sortHand(this.state.hands[i]!, this.state.level) },
     }));
   }
-  snapshotFor(seat: Seat): Outbound[] {
+  syncSeat(seat: Seat): Outbound[] {
     return [
-      this.broadcastState(),
+      { to: 'seat', seat, msg: { t: 'state', ...this.publicState() } },
       { to: 'seat', seat, msg: { t: 'hand', cards: sortHand(this.state.hands[seat]!, this.state.level) } },
     ];
   }
   spectatorSync(_client: unknown): Outbound[] {
-    return [this.broadcastState()];
+    return [{ to: 'all', msg: { t: 'state', ...this.publicState() } }];
   }
   handlePlay(seat: Seat, cardIds: number[]): Outbound[] {
     if (this.state.turn !== seat) return [err(seat, '还没轮到你')];

@@ -38,6 +38,7 @@ export class RoomRegistry {
       this._seat(room, client, 0);              // 房主默认坐 0
       client.send({ t: 'created', code, isPrivate: room.isPrivate });
       this._sendRoom(room);
+      if (!room.isPrivate) this._broadcastLobby();
       return;
     }
     if (msg.t === 'join') {
@@ -68,6 +69,7 @@ export class RoomRegistry {
       this._sendRoom(room);
       for (const s of room.seats) s.client.send({ t: 'started' });
       if (room.driver) this._dispatch(room, room.driver.start());
+      if (!room.isPrivate) this._broadcastLobby();
       return;
     }
     if (msg.t === 'match') {
@@ -85,7 +87,28 @@ export class RoomRegistry {
         this._sendRoom(room);
         for (const s of room.seats) s.client.send({ t: 'started' });
         if (room.driver) this._dispatch(room, room.driver.start());
+        if (!room.isPrivate) this._broadcastLobby();
       }
+      return;
+    }
+    if (msg.t === 'lobby') {
+      this.lobby.add(client);
+      client.send({ t: 'lobby', rooms: this._snapshot() });
+      return;
+    }
+    if (msg.t === 'spectate') {
+      const room = this.rooms.get(msg.code);
+      if (!room || room.isPrivate || room.status !== 'playing') {
+        client.send({ t: 'error', msg: '无法观战' });
+        return;
+      }
+      this._leaveRoom(client);
+      room.spectators.add(client);
+      client._room = room.code;
+      client._seat = 'spectator';
+      client.send({ t: 'spectating', code: room.code, seats: this._seatInfo(room) });
+      if (room.driver && room.driver.spectatorSync) this._dispatch(room, room.driver.spectatorSync(client));
+      this._broadcastLobby();
       return;
     }
   }
@@ -127,5 +150,22 @@ export class RoomRegistry {
         for (const sp of room.spectators) sp.send(o.msg);
       }
     }
+  }
+  _snapshot() {
+    const out = [];
+    for (const r of this.rooms.values()) {
+      if (r.isPrivate) continue;
+      out.push({
+        code: r.code,
+        status: r.status,
+        players: r.seats.filter(Boolean).map(s => s.nick),
+        spectators: r.spectators.size
+      });
+    }
+    return out;
+  }
+  _broadcastLobby() {
+    const rooms = this._snapshot();
+    for (const c of this.lobby) c.send({ t: 'lobby', rooms });
   }
 }

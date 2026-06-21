@@ -144,3 +144,40 @@ describe('RoomRegistry — 随机匹配', () => {
     expect(reg.queue.length).toBe(3);
   });
 });
+
+describe('RoomRegistry — 大厅 + 观战', () => {
+  const fakeDriver = (room: any) => ({ start: () => [], spectatorSync: () => [{ to: 'all', msg: { t: 'state', phase: 'playing' } }] });
+  let reg: any;
+  beforeEach(() => { reg = new RoomRegistry(() => 'ABC123', fakeDriver); });
+  const hello = (c: any, n: string) => reg.handle(c, { t: 'hello', nick: n });
+  function playingRoom() {
+    const cs = [fakeClient(), fakeClient(), fakeClient(), fakeClient()];
+    cs.forEach((c, i) => hello(c, 'p' + i));
+    reg.handle(cs[0], { t: 'create' });
+    for (let i = 1; i < 4; i++) { reg.handle(cs[i], { t: 'join', code: 'ABC123' }); reg.handle(cs[i], { t: 'take-seat', seat: i }); }
+    reg.handle(cs[0], { t: 'start' });
+    return cs;
+  }
+
+  it('lobby 订阅 → 收公开房列表', () => {
+    playingRoom();
+    const v = fakeClient(); reg.handle(v, { t: 'lobby' });
+    const lob = [...v.sent].reverse().find((m: any) => m.t === 'lobby');
+    expect(lob.rooms.find((r: any) => r.code === 'ABC123')).toBeTruthy();
+  });
+
+  it('spectate playing 房 → spectating + 进观众集', () => {
+    playingRoom();
+    const v = fakeClient(); hello(v, '观'); reg.handle(v, { t: 'spectate', code: 'ABC123' });
+    expect([...v.sent].reverse().find((m: any) => m.t === 'spectating')).toBeTruthy();
+    expect(reg.rooms.get('ABC123').spectators.has(v)).toBe(true);
+  });
+
+  it('观战者发 play → 被忽略（不进 driver）', () => {
+    playingRoom();
+    const v = fakeClient(); hello(v, '观'); reg.handle(v, { t: 'spectate', code: 'ABC123' });
+    const before = v.sent.length;
+    reg.handle(v, { t: 'play', cardIds: [1, 2] });
+    expect(v.sent.length).toBe(before); // 无响应
+  });
+});

@@ -217,3 +217,37 @@ describe('RoomRegistry — 掉线', () => {
     expect(reg.rooms.has('ABC123')).toBe(false);
   });
 });
+
+describe('RoomRegistry — 重连', () => {
+  const drv = (room: any) => ({ start: () => [], setAI: () => [], syncSeat: (seat: number) => [{ to: 'seat', seat, msg: { t: 'state', resync: seat } }] });
+  let reg: any;
+  beforeEach(() => { reg = new RoomRegistry(() => 'ABC123', drv); });
+  const hello = (c: any, n: string) => reg.handle(c, { t: 'hello', nick: n });
+  function playing() {
+    const cs = [fakeClient(), fakeClient(), fakeClient(), fakeClient()];
+    cs.forEach((c, i) => hello(c, 'p' + i));
+    reg.handle(cs[0], { t: 'create' });
+    for (let i = 1; i < 4; i++) { reg.handle(cs[i], { t: 'join', code: 'ABC123' }); reg.handle(cs[i], { t: 'take-seat', seat: i }); }
+    reg.handle(cs[0], { t: 'start' });
+    return cs;
+  }
+
+  it('掉线后 rejoin → 收回座位、收 rejoined + 重发态、其余收 peer-back', () => {
+    const cs = playing();
+    reg.leave(cs[2]);
+    const re = fakeClient();
+    reg.handle(re, { t: 'rejoin', code: 'ABC123', nick: 'p2' });
+    expect(re.sent).toContainEqual({ t: 'rejoined', seat: 2 });
+    expect(re.sent).toContainEqual({ t: 'state', resync: 2 });
+    const room = reg.rooms.get('ABC123');
+    expect(room.seats[2]).toMatchObject({ online: true, ai: false, nick: 'p2' });
+    expect(cs[0].sent).toContainEqual({ t: 'peer-back', seat: 2 });
+  });
+
+  it('座位未掉线 / 昵称不符 → error', () => {
+    playing();
+    const re = fakeClient();
+    reg.handle(re, { t: 'rejoin', code: 'ABC123', nick: 'p2' }); // p2 仍在线
+    expect(last(re).t).toBe('error');
+  });
+});

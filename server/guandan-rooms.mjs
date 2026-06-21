@@ -111,6 +111,21 @@ export class RoomRegistry {
       this._broadcastLobby();
       return;
     }
+    if (msg.t === 'rejoin') {
+      const room = this.rooms.get(msg.code);
+      const idx = room ? room.seats.findIndex(s => s && !s.online && s.nick === msg.nick) : -1;
+      if (idx === -1) { client.send({ t: 'error', msg: '无法重连：房间不存在或座位已占' }); return; }
+      this._leaveRoom(client);
+      room.seats[idx].client = client; room.seats[idx].online = true; room.seats[idx].ai = false;
+      client._room = room.code; client._seat = idx;
+      this.nicks.set(client, msg.nick); this.byNick.add(this._nickKey(msg.nick)); // 重登昵称维持判重一致
+      client.send({ t: 'rejoined', seat: idx });
+      if (room.driver && room.driver.setAI) this._dispatch(room, room.driver.setAI(idx, false));
+      if (room.driver && room.driver.syncSeat) this._dispatch(room, room.driver.syncSeat(idx));
+      for (const s of room.seats) if (s && s.client && s.online && s.client !== client) s.client.send({ t: 'peer-back', seat: idx });
+      this._sendRoom(room);
+      return;
+    }
   }
   leave(client) {
     const nk = this.nicks.get(client);

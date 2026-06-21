@@ -21,7 +21,7 @@ import { cardEl, comboSpeech, rankName } from './render';
 import { VOICE_CLIPS } from './voice-clips';
 import {
   startMatch, settleDeal, planTribute, autoReturn, applyTribute, dealLevel,
-  type MatchState,
+  returnableCards, type MatchState, type TributePlan,
 } from '../engine/match';
 
 /** 级别(Rank 2..14) → 显示文字（打几）。 */
@@ -41,6 +41,7 @@ function cardBrief(c: Card, level: Rank): string {
 }
 
 const HUMAN_SEAT: Seat = 0;
+const TURN_SECONDS = 20;   // 每回合倒计时秒数，超时自动出牌
 
 // 座位名称。出牌序 0→1→2→3（逆时针）：座1=右(下家) 座2=上(对家) 座3=左(上家)
 const SEAT_LABELS: Record<Seat, string> = { 0: '你', 1: '下家', 2: '对家', 3: '上家' };
@@ -174,6 +175,9 @@ export function mount(root: HTMLElement): () => void {
   let lastPlays: Record<Seat, LastPlay> = { 0: null, 1: null, 2: null, 3: null };
   let lastActor: Seat | null = null; // 最近出牌/不要的人：其出牌区浮到手牌区之上，其余沉到手牌区之下
   const timers: number[] = [];
+  let timedSeat: Seat | null = null; // 当前在倒计时的座位
+  let turnStartedAt = 0;             // 本回合开始时间戳
+  let turnTick: number | null = null;
 
   const sortedHand = (seat: Seat): Card[] => sortHand(state.hands[seat]!, state.level);
 
@@ -282,14 +286,6 @@ export function mount(root: HTMLElement): () => void {
 
     elx.appendChild(avatarEl(seat));
 
-    // 对手轮到时在其头像上方显示「思考中」（替代中央状态文字）
-    if (active && seat !== HUMAN_SEAT) {
-      const think = document.createElement('div');
-      think.className = 'gd-seat__thinking';
-      think.textContent = '思考中';
-      elx.appendChild(think);
-    }
-
     const info = document.createElement('div');
     info.className = 'gd-seat__info';
     const name = document.createElement('span');
@@ -311,6 +307,13 @@ export function mount(root: HTMLElement): () => void {
         count.textContent = `${len}`;
         info.appendChild(count);
       }
+    }
+    // 轮到该家：信息下方放倒计时（闹钟动画），替代原「思考中」；超时自动出牌
+    if (active) {
+      const timer = document.createElement('div');
+      timer.className = 'gd-seat__timer';
+      timer.innerHTML = '<span class="gd-seat__clock">⏰</span><span class="gd-seat__timer-sec">' + TURN_SECONDS + '</span>';
+      info.appendChild(timer);
     }
     elx.appendChild(info);
   }
@@ -435,6 +438,7 @@ export function mount(root: HTMLElement): () => void {
     renderHand();
     renderStatus();
     renderButtons();
+    syncTurnTimer();
   }
 
   // ── 出牌（视图层同时维护 lastPlays） ────────────────────────
@@ -468,6 +472,53 @@ export function mount(root: HTMLElement): () => void {
     renderAll();
     if (isDealOver(state)) showResult();
     else if (state.turn !== HUMAN_SEAT) scheduleAi();
+  }
+
+  // ── 回合倒计时（替代「思考中」）：超时自动出牌 ──────────────────
+  /** 在 renderAll 后调用：检测回合切换 → 重置计时；启停 tick。 */
+  function syncTurnTimer(): void {
+    const active = (started && !isDealOver(state)) ? state.turn : null;
+    if (active !== timedSeat) { timedSeat = active; turnStartedAt = performance.now(); }
+    if (active === null) {
+      if (turnTick !== null) { window.clearInterval(turnTick); turnTick = null; }
+      return;
+    }
+    if (turnTick === null) turnTick = window.setInterval(tickTurn, 250);
+    paintTurnTimer();
+  }
+  function paintTurnTimer(): void {
+    if (timedSeat === null) return;
+    const remain = Math.max(0, TURN_SECONDS - (performance.now() - turnStartedAt) / 1000);
+    const sec = seatEls[timedSeat]!.querySelector('.gd-seat__timer-sec');
+    if (sec) sec.textContent = String(Math.ceil(remain));
+    const t = seatEls[timedSeat]!.querySelector('.gd-seat__timer');
+    if (t) t.classList.toggle('gd-seat__timer--low', remain <= 5);
+  }
+  function tickTurn(): void {
+    if (timedSeat === null || !started || isDealOver(state) || state.turn !== timedSeat) {
+      if (turnTick !== null) { window.clearInterval(turnTick); turnTick = null; }
+      return;
+    }
+    const remain = TURN_SECONDS - (performance.now() - turnStartedAt) / 1000;
+    paintTurnTimer();
+    if (remain <= 0) {
+      const seat = timedSeat;
+      if (turnTick !== null) { window.clearInterval(turnTick); turnTick = null; }
+      autoPlayTimeout(seat);
+    }
+  }
+  /** 回合超时：自动出一手（AI 策略兜底，保证合法）。 */
+  function autoPlayTimeout(seat: Seat): void {
+    if (!started || isDealOver(state) || state.turn !== seat) return;
+    try {
+      const decision = choosePlay(state, seat);
+      if (decision === null) applyPass(seat);
+      else applyPlay(seat, decision);
+    } catch (e) {
+      console.error('autoPlay error', e);
+      if (state.current !== null) applyPass(seat); else return;
+    }
+    afterAction();
   }
 
   function handlePlay(): void {
@@ -507,7 +558,7 @@ export function mount(root: HTMLElement): () => void {
       if (isDealOver(state)) showResult();
       else if (state.turn !== HUMAN_SEAT) scheduleAi();
     };
-    timers.push(window.setTimeout(act, 450)); // 基础思考时间；再叠加等上句报牌播完
+    timers.push(window.setTimeout(act, 1200 + Math.floor(Math.random() * 1300))); // 思考 1.2~2.5s(让倒计时可见)+ 等上句报牌播完
   }
 
   // ── 局终 / 整盘编排 ─────────────────────────────────────────
@@ -524,27 +575,107 @@ export function mount(root: HTMLElement): () => void {
     if (state.turn !== HUMAN_SEAT) scheduleAi();
   }
 
-  /** 进下一局：按新级牌发牌 → 进贡/还贡(自动) → 定首攻开局。 */
+  /** 进贡结束后真正开新局（清状态、渲染、AI 接手）。 */
+  function startDealAfterTribute(level: Rank, tributed: Card[][], firstLeader: Seat): void {
+    state = startNewDeal(level, tributed, firstLeader);
+    selectedIds.clear();
+    lastPlays = { 0: null, 1: null, 2: null, 3: null };
+    lastActor = null;
+    renderAll();
+    if (state.turn !== HUMAN_SEAT) scheduleAi();
+  }
+
+  /** 进下一局：按新级牌发牌 → 进贡/还贡(人类收贡手选、AI 自动) → 定首攻开局。 */
   function nextDeal(): void {
     const finished = ranking(state);     // 上一局名次（settle 已用，进贡再用）
     const level = dealLevel(match);      // 新级牌 = 上局赢家队级别
     const dealt = deal(makeDeck(), randomShuffle);
     const plan = planTribute(finished, dealt, level);
-    const returns = plan.exchanges.map(ex => autoReturn(dealt[ex.receiver]!, level));
-    const tributed = applyTribute(dealt, plan, returns);
-    state = startNewDeal(level, tributed, plan.firstLeader);
-    selectedIds.clear();
-    lastPlays = { 0: null, 1: null, 2: null, 3: null };
-    lastActor = null;
-    renderAll();
     if (plan.resist) {
-      showHint('对方持双大王，抗贡！本局免进贡', 'info');
-    } else {
-      const parts = plan.exchanges.map(ex =>
-        `${SEAT_LABELS[ex.giver]}进贡 ${cardBrief(ex.tribute, level)} 给 ${SEAT_LABELS[ex.receiver]}`);
-      showHint(parts.join('；') + '（已自动还贡 ≤10）', 'info');
+      startDealAfterTribute(level, dealt, plan.firstLeader);
+      showHint('对方持两张大王，抗贡！本局免进贡', 'info');
+      return;
     }
-    if (state.turn !== HUMAN_SEAT) scheduleAi();
+    // 进贡阶段（含进贡动画 + 人类还贡手选）
+    showTribute(dealt, plan, level, (returns) => {
+      const tributed = applyTribute(dealt, plan, returns);
+      startDealAfterTribute(level, tributed, plan.firstLeader);
+      const parts = plan.exchanges.map(ex =>
+        `${SEAT_LABELS[ex.giver]}进贡${cardBrief(ex.tribute, level)}给${SEAT_LABELS[ex.receiver]}`);
+      showHint(parts.join('；'), 'info');
+    });
+  }
+
+  /**
+   * 进贡阶段弹层：展示进贡(动画滑入) + 人类收贡时手选 ≤10 还贡。点「确定」回调 returns 开局。
+   * 人类为收贡方时须手选；AI 收贡 autoReturn；人类仅为进贡方时无需选(进贡牌自动取最大)。
+   */
+  function showTribute(dealt: Card[][], plan: TributePlan, level: Rank, onDone: (returns: Card[]) => void): void {
+    const overlay = document.createElement('div');
+    overlay.className = 'gd-overlay';
+    const box = document.createElement('div');
+    box.className = 'gd-tribute';
+    const title = document.createElement('div');
+    title.className = 'gd-result__title';
+    title.textContent = '进贡 · 还贡';
+    box.appendChild(title);
+
+    const returns: Card[] = new Array(plan.exchanges.length);
+    let humanIdx = -1; // 人类作为收贡方的 exchange 下标
+
+    plan.exchanges.forEach((ex, i) => {
+      const row = document.createElement('div');
+      row.className = 'gd-tribute__row';
+      const g = document.createElement('span');
+      g.className = 'gd-tribute__who'; g.textContent = SEAT_LABELS[ex.giver];
+      const arrow = document.createElement('span');
+      arrow.className = 'gd-tribute__arrow'; arrow.textContent = '进贡 ⟶';
+      const card = cardEl(ex.tribute, level, true);
+      card.classList.add('gd-tribute__fly');
+      const r = document.createElement('span');
+      r.className = 'gd-tribute__who'; r.textContent = SEAT_LABELS[ex.receiver];
+      row.append(g, arrow, card, r);
+      box.appendChild(row);
+      if (ex.receiver === HUMAN_SEAT) humanIdx = i;
+      else returns[i] = autoReturn(dealt[ex.receiver]!, level);
+    });
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.className = 'gd-btn gd-btn--restart';
+
+    if (humanIdx >= 0) {
+      const ex = plan.exchanges[humanIdx]!;
+      const cands = returnableCards(dealt[HUMAN_SEAT]!, level);
+      const pool = sortHand(cands.length ? cands : dealt[HUMAN_SEAT]!, level); // 无≤10兜底全手牌
+      const hint = document.createElement('div');
+      hint.className = 'gd-tribute__hint';
+      hint.textContent = `你收到 ${cardBrief(ex.tribute, level)}，选一张${cands.length ? ' ≤10 ' : ''}牌还贡给 ${SEAT_LABELS[ex.giver]}`;
+      box.appendChild(hint);
+      const picks = document.createElement('div');
+      picks.className = 'gd-tribute__picks';
+      for (const c of pool) {
+        const ce = cardEl(c, level, true);
+        ce.classList.add('gd-tribute__pickcard');
+        ce.addEventListener('click', () => {
+          returns[humanIdx] = c;
+          picks.querySelectorAll('.gd-tribute__pickcard').forEach(x => x.classList.remove('is-picked'));
+          ce.classList.add('is-picked');
+          confirmBtn.disabled = false;
+        });
+        picks.appendChild(ce);
+      }
+      box.appendChild(picks);
+      confirmBtn.disabled = true; // 须先选还贡牌
+    }
+
+    confirmBtn.textContent = '确定，开局';
+    confirmBtn.addEventListener('click', () => {
+      overlay.remove();
+      onDone(returns);
+    });
+    box.appendChild(confirmBtn);
+    overlay.appendChild(box);
+    gameEl.appendChild(overlay);
   }
 
   function showResult(): void {
@@ -583,6 +714,20 @@ export function mount(root: HTMLElement): () => void {
       gainEl.textContent = `${teamName(settle.winTeam)}升 ${settle.gain} 级 → 打${levelLabel(match.levels[settle.winTeam])}`;
     }
     box.appendChild(gainEl);
+
+    // 末游没出完的牌（本局结束时仍在手）
+    const last = ranks[3]!;
+    const leftover = sortHand(state.hands[last]!, state.level);
+    if (leftover.length > 0) {
+      const lbl = document.createElement('div');
+      lbl.className = 'gd-result__leftlabel';
+      lbl.textContent = `末游 ${SEAT_LABELS[last]} 剩 ${leftover.length} 张`;
+      box.appendChild(lbl);
+      const lcards = document.createElement('div');
+      lcards.className = 'gd-result__leftover';
+      for (const c of leftover) lcards.appendChild(cardEl(c, state.level, true));
+      box.appendChild(lcards);
+    }
 
     const btn = document.createElement('button');
     btn.className = 'gd-btn gd-btn--restart';
@@ -660,6 +805,7 @@ export function mount(root: HTMLElement): () => void {
   return () => {
     for (const t of timers) clearTimeout(t);
     timers.length = 0;
+    if (turnTick !== null) { window.clearInterval(turnTick); turnTick = null; }
     window.removeEventListener('pointerup', onPointerUp);
     window.removeEventListener('resize', onResize);
     window.removeEventListener('orientationchange', onResize);

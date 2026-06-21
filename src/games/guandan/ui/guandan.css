@@ -121,21 +121,21 @@
   margin-top: 3px;
 }
 /* 对手轮到时：头像上方「思考中」浮标（替代中央状态文字） */
-.gd-seat__thinking {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-bottom: 4px;
-  white-space: nowrap;
-  background: rgba(0,0,0,0.6);
-  color: var(--gold);
-  font-size: 0.64rem;
-  font-weight: 600;
-  padding: 1px 8px;
-  border-radius: 9px;
+/* 回合倒计时（闹钟动画）：在头像信息下方，替代原「思考中」 */
+.gd-seat__timer {
+  display: flex; align-items: center; justify-content: center; gap: 2px;
+  margin-top: 2px; white-space: nowrap;
+  font-size: 0.72rem; font-weight: 700; color: var(--gold);
   pointer-events: none;
 }
+.gd-seat__clock {
+  display: inline-block; font-size: 0.82rem;
+  transform-origin: 50% 12%;
+  animation: gd-clock-ring 0.7s ease-in-out infinite;
+}
+@keyframes gd-clock-ring { 0%,100% { transform: rotate(-15deg); } 50% { transform: rotate(15deg); } }
+.gd-seat__timer--low { color: #ec5a3e; }
+.gd-seat__timer--low .gd-seat__clock { animation-duration: 0.28s; }
 
 /* 头像（圆形简笔人像，按队伍配色：你&对家=金，上家&下家=蓝） */
 .gd-avatar {
@@ -260,7 +260,7 @@
   width: 56px;
   height: 90px;
 }
-.gd-card--small .gd-joker-fig { width: 33px; height: 53px; }
+.gd-card--small .gd-joker-fig { width: 42px; height: 66px; }  /* 出牌区小丑图放大，仍靠右不压左侧 JOKER 字、不超牌边 */
 .gd-card--joker-small .gd-joker-fig { filter: grayscale(1) brightness(1.06); } /* 小王转灰 */
 
 /* JOKER 竖排：逐字母 flex 竖列，用牌面同款 Besley(GDRank)；line-height<1 压缩字母竖向间距、不超牌边 */
@@ -528,6 +528,41 @@
   margin-bottom: 1.2rem;
 }
 
+/* 末游没出完的牌 */
+.gd-result__leftlabel { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.4rem; }
+.gd-result__leftover {
+  display: flex; flex-wrap: wrap; gap: 4px; justify-content: center;
+  max-width: 86vw; margin-bottom: 1.1rem;
+}
+
+/* --- 进贡 · 还贡 弹层 --- */
+.gd-tribute {
+  background: linear-gradient(145deg, #2a1f0e, #1e1608);
+  border: 1px solid var(--gold);
+  border-radius: 12px;
+  padding: 1.3rem 1.8rem;
+  text-align: center;
+  max-width: 92vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+.gd-tribute__row {
+  display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0.45rem 0;
+}
+.gd-tribute__who { color: var(--gold); font-weight: 600; font-size: 0.95rem; }
+.gd-tribute__arrow { color: var(--text-dim); font-size: 0.85rem; }
+.gd-tribute__fly { animation: gd-tribute-fly 0.5s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes gd-tribute-fly {
+  from { transform: translateX(-48px) scale(0.82); opacity: 0; }
+  to   { transform: translateX(0) scale(1); opacity: 1; }
+}
+.gd-tribute__hint { color: var(--text-light); font-size: 0.9rem; margin: 0.9rem 0 0.55rem; }
+.gd-tribute__picks {
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 86vw; margin-bottom: 1rem;
+}
+.gd-tribute__pickcard { cursor: pointer; transition: transform 0.12s; }
+.gd-tribute__pickcard:hover { transform: translateY(-4px); }
+.gd-tribute__pickcard.is-picked { outline: 3px solid var(--gold); border-radius: 6px; transform: translateY(-6px); }
+
 .gd-btn--restart {
   background: var(--gold);
   color: #1a1208;
@@ -551,7 +586,7 @@
   .gd-card--small .gd-card__pip { height: 18px; }
   /* 小丑图跟着牌缩小，别超出牌边界 */
   .gd-joker-fig { width: 27px; height: 46px; }
-  .gd-card--small .gd-joker-fig { width: 21px; height: 33px; }
+  .gd-card--small .gd-joker-fig { width: 24px; height: 38px; } /* 出牌区小丑图放大、不蹭 JOKER 字 */
   .gd-joker-word { font-size: 0.40rem; top: 3px; left: 2px; }
   .gd-card--small .gd-joker-word { font-size: 0.36rem; }
   .gd-player-hand { min-height: 60px; padding: 4px 0.3rem 4px; }
@@ -570,14 +605,14 @@
   .gd-play__cards .gd-card { margin: 0; }
   .gd-play__cards .gd-card + .gd-card { margin-left: -18px; }
   .gd-card--small .gd-card__suit--wild { font-size: 0.46rem; } /* 出牌区「配」字缩小，不压大花色 */
-  .gd-actions { top: 28%; }   /* 手机端按钮挪到手牌右侧的空白区，不压手牌 */
+  .gd-actions { top: 32%; }   /* 尽量靠中、让开手牌右侧 */
   /* 上家右移、下家左移：剩≤10张时名字旁加张数徽标变宽，贴边居中会被屏幕边缘裁掉左/右侧 */
   .gd-seat--left  { left: 34px; }
   .gd-seat--right { right: 34px; }
   .gd-bottom-area { padding-bottom: 70px; } /* 手机让位量(头像+名 ~52px + 小边距) */
   /* 矮牌桌：出牌区随头像内移同步外推，不压头像/张数文字(剩≤10张文字变宽) */
   .gd-play--top    { top: 22%; }                /* 下移，不压对家头像下文字 */
-  .gd-play--bottom { top: 52%; bottom: auto; }
+  .gd-play--bottom { top: 64%; bottom: auto; }  /* 与对家出牌区上下对称 */
   .gd-play--left   { left: 92px; top: 50%; }    /* 上家头像内移到34px、文字变宽，出牌区外推到92px让开 */
   .gd-play--right  { right: 92px; top: 50%; }
 }

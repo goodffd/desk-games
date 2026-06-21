@@ -4,5 +4,5 @@ src/shell/links.ts
 .claude/
 
 # 联机服务端构建产物 / 依赖
-server/match-driver.bundle.mjs
+server/guandan-match-driver.bundle.mjs
 server/node_modules

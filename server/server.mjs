@@ -11,6 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { WebSocketServer } from 'ws';
 import { RoomRegistry } from './rooms.mjs';
+import { RoomRegistry as GuandanRooms } from './guandan-rooms.mjs';
+import { MatchDriver } from './guandan-match-driver.bundle.mjs';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const HUB_INDEX = join(__dir, '..', 'dist', 'index.html');          // 游戏大厅(desk-games)
@@ -35,11 +37,33 @@ const server = useTls
   : createHttpServer(handler);
 
 const reg = new RoomRegistry();
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 1 << 20 });
+const wss = new WebSocketServer({ noServer: true, maxPayload: 1 << 20 });
 wss.on('connection', (ws) => {
   const client = { send: (m) => { try { ws.send(JSON.stringify(m)); } catch {} } };
   ws.on('message', (data) => { try { reg.handle(client, JSON.parse(data.toString())); } catch {} });
   ws.on('close', () => reg.leave(client));
+});
+
+// 掼蛋联机：独立 RoomRegistry + /ws-guandan，与象棋 /ws 并存（owner: 跟象棋隔离）
+const TRIBUTE_TIMEOUT = 30000;
+const gReg = new GuandanRooms(undefined, () => new MatchDriver({}), TRIBUTE_TIMEOUT);
+const gwss = new WebSocketServer({ noServer: true, maxPayload: 1 << 20 });
+gwss.on('connection', (ws) => {
+  const client = { send: (m) => { try { ws.send(JSON.stringify(m)); } catch {} } };
+  ws.on('message', (data) => { try { gReg.handle(client, JSON.parse(data.toString())); } catch {} });
+  ws.on('close', () => gReg.leave(client));
+});
+
+// 统一升级路由：按路径分派到对应 WebSocketServer
+server.on('upgrade', (req, socket, head) => {
+  const pathname = (req.url || '/').split('?')[0];
+  if (pathname === '/ws') {
+    wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+  } else if (pathname === '/ws-guandan') {
+    gwss.handleUpgrade(req, socket, head, (ws) => gwss.emit('connection', ws, req));
+  } else {
+    socket.destroy();
+  }
 });
 
 server.listen(PORT, () => console.log(`hub on :${PORT} (${useTls ? 'https/wss' : 'http/ws'}; / → 大厅, /xiangqi → 象棋, /ws → 联机)`));

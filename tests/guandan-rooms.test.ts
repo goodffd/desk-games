@@ -252,3 +252,58 @@ describe('RoomRegistry — 重连', () => {
     expect(last(re).t).toBe('error');
   });
 });
+
+describe('RoomRegistry — play/pass 转 driver', () => {
+  function fakeDriverWithPlay() {
+    return {
+      started: false,
+      playCalled: null as any,
+      passCalled: null as any,
+      start() { this.started = true; return [{ to: 'all', msg: { t: 'state', phase: 'playing', turn: 0 } }]; },
+      handlePlay(seat: number, cardIds: number[]) { this.playCalled = { seat, cardIds }; return [{ to: 'all', msg: { t: 'state', phase: 'playing', turn: 1 } }]; },
+      handlePass(seat: number) { this.passCalled = seat; return [{ to: 'all', msg: { t: 'state', phase: 'playing', turn: 1 } }]; },
+    };
+  }
+
+  let reg: any;
+  let cs: any[];
+  let drv: any;
+  beforeEach(() => {
+    drv = fakeDriverWithPlay();
+    reg = new RoomRegistry(() => 'ABC123', () => drv);
+    cs = [fakeClient(), fakeClient(), fakeClient(), fakeClient()];
+    cs.forEach((c, i) => reg.handle(c, { t: 'hello', nick: 'p' + i }));
+    reg.handle(cs[0], { t: 'create' });
+    for (let i = 1; i < 4; i++) {
+      reg.handle(cs[i], { t: 'join', code: 'ABC123' });
+      reg.handle(cs[i], { t: 'take-seat', seat: i });
+    }
+    reg.handle(cs[0], { t: 'start' });
+  });
+
+  it('play 消息转 driver.handlePlay，outbound 广播给所有玩家', () => {
+    reg.handle(cs[0], { t: 'play', cardIds: [42, 43] });
+    expect(drv.playCalled).toEqual({ seat: 0, cardIds: [42, 43] });
+    // all 4 clients receive the state broadcast from handlePlay
+    cs.forEach(c => {
+      expect(c.sent).toContainEqual({ t: 'state', phase: 'playing', turn: 1 });
+    });
+  });
+
+  it('pass 消息转 driver.handlePass，outbound 广播给所有玩家', () => {
+    reg.handle(cs[1], { t: 'pass' });
+    expect(drv.passCalled).toBe(1);
+    cs.forEach(c => {
+      expect(c.sent).toContainEqual({ t: 'state', phase: 'playing', turn: 1 });
+    });
+  });
+
+  it('观战者发 play → 忽略，driver 不被调用', () => {
+    const v = fakeClient();
+    reg.handle(v, { t: 'hello', nick: '观众' });
+    reg.handle(v, { t: 'spectate', code: 'ABC123' });
+    const before = JSON.stringify(drv.playCalled);
+    reg.handle(v, { t: 'play', cardIds: [1] });
+    expect(JSON.stringify(drv.playCalled)).toBe(before);
+  });
+});

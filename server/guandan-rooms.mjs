@@ -6,9 +6,10 @@ function defaultCode() {
 }
 
 export class RoomRegistry {
-  constructor(codeGen = defaultCode, makeDriver = null) {
+  constructor(codeGen = defaultCode, makeDriver = null, tributeTimeoutMs = 0) {
     this.codeGen = codeGen;
     this.makeDriver = makeDriver;       // (room) => MatchDriver；Task 9 接入
+    this.tributeTimeoutMs = tributeTimeoutMs;
     this.rooms = new Map();             // code -> room
     this.nicks = new Map();             // client -> nick(原样)
     this.byNick = new Set();            // nickKey 占用集
@@ -126,6 +127,18 @@ export class RoomRegistry {
       this._sendRoom(room);
       return;
     }
+    if (msg.t === 'play' || msg.t === 'pass' || msg.t === 'tribute-return') {
+      const room = this.rooms.get(client._room);
+      if (!room || room.status !== 'playing' || client._seat === 'spectator' || typeof client._seat !== 'number') return;
+      if (!room.driver) return;
+      let out;
+      if (msg.t === 'play') out = room.driver.handlePlay(client._seat, msg.cardIds || []);
+      else if (msg.t === 'pass') out = room.driver.handlePass(client._seat);
+      else out = room.driver.handleTributeReturn(client._seat, msg.cardId);
+      this._dispatch(room, out);
+      this._armTributeTimeout(room, out);
+      return;
+    }
   }
   leave(client) {
     const nk = this.nicks.get(client);
@@ -195,6 +208,27 @@ export class RoomRegistry {
         for (const sp of room.spectators) sp.send(o.msg);
       }
     }
+    // 自动续局：dealResult 后自动触发 nextDeal（matchOver 不续）
+    const hasDealResult = (outbound || []).some(o => o.msg && o.msg.t === 'state' && o.msg.phase === 'dealResult');
+    if (hasDealResult && room.driver && !room._advancing && typeof room.driver.nextDeal === 'function') {
+      room._advancing = true;
+      setImmediate(() => {
+        room._advancing = false;
+        if (room.driver && typeof room.driver.nextDeal === 'function') {
+          const o = room.driver.nextDeal();
+          this._dispatch(room, o);
+          this._armTributeTimeout(room, o);
+        }
+      });
+    }
+  }
+  _armTributeTimeout(room, out) {
+    const needsTribute = (out || []).some(o => o.msg && o.msg.t === 'need-tribute');
+    if (needsTribute && !room._tributeTimer && this.tributeTimeoutMs) {
+      room._tributeTimer = setTimeout(() => { room._tributeTimer = null; if (room.driver) this._dispatch(room, room.driver.forceAutoReturn()); }, this.tributeTimeoutMs);
+    }
+    const leftTribute = (out || []).some(o => o.msg && o.msg.t === 'state' && o.msg.phase === 'playing');
+    if (leftTribute && room._tributeTimer) { clearTimeout(room._tributeTimer); room._tributeTimer = null; }
   }
   _snapshot() {
     const out = [];

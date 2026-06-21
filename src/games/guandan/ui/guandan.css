@@ -416,7 +416,7 @@
 /* 出牌/不要：移到手牌下方、底部「你」人像的左右两侧（出牌在左、不要在右），
    居中 + 大 gap 让人像落在两按钮中间的空洞里，不盖人像、也不再压手牌选牌 */
 .gd-actions {
-  display: flex;
+  display: none;       /* 默认隐藏：renderButtons 仅在轮到我时设为 flex（开始前不渲染→保持隐藏） */
   gap: 120px;          /* 中间空洞容纳「你」人像 + 名字/张数 */
   justify-content: center;
   align-items: center;

@@ -431,7 +431,7 @@ export function mount(root: HTMLElement): () => void {
   }
 
   function renderButtons(): void {
-    const isHumanTurn = state.turn === HUMAN_SEAT && !isDealOver(state);
+    const isHumanTurn = started && state.turn === HUMAN_SEAT && !isDealOver(state);
     actionsEl.style.display = isHumanTurn ? 'flex' : 'none'; // 途游式：仅轮到我时显示按钮
     playBtn.disabled = !isHumanTurn;
     passBtn.disabled = !isHumanTurn || state.current === null; // 自己领出时不能"不要"
@@ -805,14 +805,14 @@ export function mount(root: HTMLElement): () => void {
     } catch { /* ignore */ }
   };
   // 转屏/缩放后重算手牌重叠（可用宽度变了），避免溢出
-  const onResize = (): void => { renderHand(); };
+  const onResize = (): void => { if (started) renderHand(); };
   window.addEventListener('resize', onResize);
   window.addEventListener('orientationchange', onResize);
 
-  renderAll();
-  // 内嵌字体(GDRank)异步加载：首次布局可能用 fallback 字体量角标宽度→步进算错→角标花色跨叠。
-  // 字体就绪后重算手牌，确保步进按真实点数宽度计算。
-  if (document.fonts?.ready) void document.fonts.ready.then(() => { renderHand(); });
+  // 挂载时不渲染这副牌——开始遮罩是半透明黑，若此时 renderAll 会把手牌透过遮罩半隐半现露出来。
+  // 牌面留到点「开始游戏」后(startBtn 里 renderAll)再生成。顶栏级别(renderLevels)已在上方单独渲染。
+  // 内嵌字体(GDRank)异步加载会重算手牌步进，但同样只在已开始时才重算(开始前没有手牌可算)。
+  if (document.fonts?.ready) void document.fonts.ready.then(() => { if (started) renderHand(); });
 
   // 「开始游戏」遮罩：点一下=用户手势，解锁 iOS 音频（首轮 AI 出牌语音才响），再开局
   const startOverlay = document.createElement('div');

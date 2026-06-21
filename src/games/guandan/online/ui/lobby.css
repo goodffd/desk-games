@@ -217,8 +217,9 @@
 .gd-room__name { font-size: 14px; color: var(--text-light, #e8d9b0); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gd-room__take { width: auto; padding: 5px 12px; font-size: 13px; margin: 0; letter-spacing: 0.04em; }
 
-/* 让「开打按钮」本体居中(=4单元中心)；就座数浮上方、提示浮下方(绝对,不顶按钮) */
-.gd-room__center { position: relative; display: flex; align-items: center; justify-content: center; }
+/* 让「开打按钮」本体对齐 4 单元的真实视觉中心(头像+名字像素中点,比格子盒中心低 ~7px)；
+   就座数浮上方、提示浮下方(绝对,不顶按钮)。 */
+.gd-room__center { position: relative; display: flex; align-items: center; justify-content: center; transform: translateY(7px); }
 .gd-room__center-count { position: absolute; bottom: calc(100% + 9px); left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 14px; color: var(--text-dim, #a89070); letter-spacing: 0.04em; }
 /* 开打：人齐了=牌桌「出牌」色(金底暗字)；人没齐=牌桌「不要」色(深绿浅字，不灰化) */
 .gd-room__start {

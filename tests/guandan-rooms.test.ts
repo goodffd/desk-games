@@ -35,3 +35,48 @@ describe('RoomRegistry — 昵称', () => {
     expect(last(b)).toEqual({ t: 'hello-ok' });
   });
 });
+
+describe('RoomRegistry — 建房 + 挑座', () => {
+  let reg: any;
+  beforeEach(() => { reg = new RoomRegistry(() => 'ABC123'); });
+  const hello = (c: any, nick: string) => reg.handle(c, { t: 'hello', nick });
+  const roomMsg = (c: any) => [...c.sent].reverse().find((m: any) => m.t === 'room');
+
+  it('create → created + room(房主落座 0，其余空)', () => {
+    const a = fakeClient(); hello(a, '甲');
+    reg.handle(a, { t: 'create' });
+    expect(a.sent).toContainEqual({ t: 'created', code: 'ABC123', isPrivate: false });
+    const r = roomMsg(a);
+    expect(r.status).toBe('waiting');
+    expect(r.you).toBe(0);
+    expect(r.seats[0]).toMatchObject({ nick: '甲', online: true, ai: false });
+    expect(r.seats[1]).toBeNull();
+  });
+
+  it('join + take-seat：乙坐座位 2，双方都收到更新的 room', () => {
+    const a = fakeClient(); const b = fakeClient(); hello(a, '甲'); hello(b, '乙');
+    reg.handle(a, { t: 'create' });
+    reg.handle(b, { t: 'join', code: 'ABC123' });
+    reg.handle(b, { t: 'take-seat', seat: 2 });
+    expect(roomMsg(b).you).toBe(2);
+    expect(roomMsg(a).seats[2]).toMatchObject({ nick: '乙', online: true });
+  });
+
+  it('坐已占座位 → error，原座位不变', () => {
+    const a = fakeClient(); const b = fakeClient(); hello(a, '甲'); hello(b, '乙');
+    reg.handle(a, { t: 'create' });            // 甲在 0
+    reg.handle(b, { t: 'join', code: 'ABC123' });
+    reg.handle(b, { t: 'take-seat', seat: 0 }); // 抢甲的座
+    expect(last(b).t).toBe('error');
+  });
+
+  it('换座：甲从 0 换到 1，座位 0 释放', () => {
+    const a = fakeClient(); hello(a, '甲');
+    reg.handle(a, { t: 'create' });
+    reg.handle(a, { t: 'take-seat', seat: 1 });
+    const r = roomMsg(a);
+    expect(r.you).toBe(1);
+    expect(r.seats[0]).toBeNull();
+    expect(r.seats[1]).toMatchObject({ nick: '甲' });
+  });
+});

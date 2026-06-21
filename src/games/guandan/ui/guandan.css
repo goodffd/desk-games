@@ -363,6 +363,8 @@
   flex-wrap: nowrap;
   overflow: visible;             /* 不出横向拉条 */
 }
+/* 我打出的牌沉到手牌之后时：手牌整体半透明，透出自己刚出的那手牌 */
+.gd-player-hand.gd-hand--dim { opacity: 0.45; transition: opacity 0.25s; }
 
 /* 手牌重叠：大牌更多重叠，27 张排得下不溢出。不做 hover 跳动 */
 .gd-player-hand .gd-card {
@@ -606,7 +608,7 @@
   .gd-play__cards .gd-card { margin: 0; }
   .gd-play__cards .gd-card + .gd-card { margin-left: -18px; }
   .gd-card--small .gd-card__suit--wild { font-size: 0.46rem; } /* 出牌区「配」字缩小，不压大花色 */
-  .gd-actions { top: 32%; }   /* 尽量靠中、让开手牌右侧 */
+  .gd-actions { top: 26%; }   /* 抬到手牌上方,选牌不被按钮挡 */
   /* 上家右移、下家左移：剩≤10张时名字旁加张数徽标变宽，贴边居中会被屏幕边缘裁掉左/右侧 */
   .gd-seat--left  { left: 34px; }
   .gd-seat--right { right: 34px; }

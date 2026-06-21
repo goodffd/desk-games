@@ -439,6 +439,9 @@ export function mount(root: HTMLElement): () => void {
     renderStatus();
     renderButtons();
     syncTurnTimer();
+    // 我出的牌沉到手牌之后(非最新)时，手牌整体调半透明，好看清自己刚打出的牌
+    const myPlayed = lastPlays[HUMAN_SEAT];
+    handEl.classList.toggle('gd-hand--dim', myPlayed !== null && myPlayed !== 'pass' && lastActor !== HUMAN_SEAT);
   }
 
   // ── 出牌（视图层同时维护 lastPlays） ────────────────────────

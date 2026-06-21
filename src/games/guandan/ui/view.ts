@@ -433,16 +433,31 @@ export function mount(root: HTMLElement): () => void {
     passBtn.disabled = !isHumanTurn || state.current === null; // 自己领出时不能"不要"
   }
 
+  /** 最新那手牌(z7=lastActor 的出牌区)是否几何上压到我的手牌区 → 决定手牌要不要淡。
+   *  所有人(含我自己)统一按矩形相交判定：真盖到才淡，没盖到不淡。 */
+  function latestPlayCoversHand(): boolean {
+    if (lastActor === null) return false;
+    const pe = playEls[lastActor]!;
+    if (!pe.classList.contains('has-play')) return false;
+    const pr = pe.getBoundingClientRect();
+    const hr = handEl.getBoundingClientRect();
+    if (hr.width === 0 || hr.height === 0) return false;
+    // 需实质相交(两向都 ≥10px)才算压到——边缘相切(出牌区贴着手牌上/下沿)不算，避免一出牌手牌就闪透明
+    const ix = Math.min(pr.right, hr.right) - Math.max(pr.left, hr.left);
+    const iy = Math.min(pr.bottom, hr.bottom) - Math.max(pr.top, hr.top);
+    return ix >= 10 && iy >= 10;
+  }
+
   function renderAll(): void {
     for (const s of [0, 1, 2, 3] as Seat[]) { renderSeatInfo(s); renderPlay(s); }
     renderHand();
     renderStatus();
     renderButtons();
     syncTurnTimer();
-    // 我刚出牌/不要、还没人盖过(lastActor 仍是我)时，手牌整体调半透明，让浮在最上的「这手牌 / 不要」凸显出来
-    // （尤其牌多时手牌密集，不透明的「不要」标签会淹没在牌堆里，手牌淡下去才看得清）；下家一动(lastActor 变)即恢复不透明
-    const myPlayed = lastPlays[HUMAN_SEAT];
-    handEl.classList.toggle('gd-hand--dim', lastActor === HUMAN_SEAT && myPlayed !== null);
+    // 手牌半透明：最新那手牌(z7=lastActor，浮在手牌之上)——无论谁出的、含我自己——只要几何上压到我的
+    // 手牌区，手牌就淡到 45%，让被盖住的牌/「不要」透出来看清；没压到就不淡。
+    // 90° 旋转下各元素包围盒仍是正交矩形，元素间矩形相交判断准确。
+    handEl.classList.toggle('gd-hand--dim', latestPlayCoversHand());
   }
 
   // ── 出牌（视图层同时维护 lastPlays） ────────────────────────

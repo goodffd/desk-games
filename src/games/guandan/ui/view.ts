@@ -410,10 +410,11 @@ export function mount(root: HTMLElement): () => void {
       const suitW = suitH * 1.15; // 花色按高度估宽(最宽红心≈1.08)，不依赖异步图片宽度
       const maxCorner = maxRank + 4 + suitW; // 点数 + 间距 + 花色
       const fitStep = (availW - colW) / (nc - 1);
-      // 手机：列叠更紧——只露点数+大半个花色即可辨认(点数才是关键)，整排更聚拢、不显松散
+      // 手机：列叠更紧，但仍须完整露出角标(点数+花色)——缝从桌面的 6px 收到 2px，
+      // 不能再切进花色(否则左上花色被下一张盖、跨牌叠加)。
       const isMobile = window.matchMedia('(max-width: 520px), (max-height: 520px)').matches;
-      const cap = isMobile ? (maxRank + 3 + suitW * 0.55) : (maxCorner + 6);
-      const step = Math.min(fitStep, cap); // 列少时按 cap 摆(手机更小=叠更多)，列多时按 fitStep 收紧不溢出
+      const cap = maxCorner + (isMobile ? 2 : 6);
+      const step = Math.min(fitStep, cap); // 列少时按 cap 摆(手机缝更小=叠更多)，列多时按 fitStep 收紧不溢出
       const ml = step - colW;                // 负=列间重叠
       colEls.forEach((c, i) => { if (i > 0) (c as HTMLElement).style.marginLeft = `${ml}px`; });
     }

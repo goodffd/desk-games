@@ -70,11 +70,31 @@ export class RoomRegistry {
       if (room.driver) this._dispatch(room, room.driver.start());
       return;
     }
+    if (msg.t === 'match') {
+      this._leaveRoom(client);
+      if (!this.queue.includes(client)) this.queue.push(client);
+      if (this.queue.length >= 4) {
+        const four = this.queue.splice(0, 4);
+        const code = this._newCode();
+        const room = { code, isPrivate: false, host: four[0],
+          seats: [null, null, null, null], spectators: new Set(), pendingSync: new Set(),
+          status: 'playing', driver: null };
+        this.rooms.set(code, room);
+        four.forEach((c, i) => this._seat(room, c, i));
+        room.driver = this.makeDriver ? this.makeDriver(room) : null;
+        this._sendRoom(room);
+        for (const s of room.seats) s.client.send({ t: 'started' });
+        if (room.driver) this._dispatch(room, room.driver.start());
+      }
+      return;
+    }
   }
   leave(client) {
     const nk = this.nicks.get(client);
     if (nk) { this.byNick.delete(this._nickKey(nk)); this.nicks.delete(client); }
     this.lobby.delete(client);
+    const qi = this.queue.indexOf(client);
+    if (qi >= 0) this.queue.splice(qi, 1);
   }
   _newCode() { let c = this.codeGen(); while (this.rooms.has(c)) c = this.codeGen(); return c; }
   _seat(room, client, i) {

@@ -121,3 +121,26 @@ describe('RoomRegistry — 房主开打', () => {
     expect(room.driver.started).toBe(true);
   });
 });
+
+describe('RoomRegistry — 随机匹配', () => {
+  let codes: string[]; let reg: any;
+  const fakeDriver = (room: any) => ({ start: () => [{ to: 'all', msg: { t: 'state', phase: 'playing', turn: 0 } }] });
+  beforeEach(() => { codes = ['M00001']; reg = new RoomRegistry(() => codes.shift() || 'X' + Math.random(), fakeDriver); });
+  const hello = (c: any, n: string) => reg.handle(c, { t: 'hello', nick: n });
+
+  it('凑够 4 人自动开局：四人各落一座、收 started', () => {
+    const cs = [fakeClient(), fakeClient(), fakeClient(), fakeClient()];
+    cs.forEach((c, i) => { hello(c, 'q' + i); reg.handle(c, { t: 'match' }); });
+    cs.forEach(c => expect(c.sent).toContainEqual({ t: 'started' }));
+    const room = reg.rooms.get('M00001');
+    expect(room.status).toBe('playing');
+    expect(room.seats.map((s: any) => s.nick).sort()).toEqual(['q0', 'q1', 'q2', 'q3']);
+  });
+
+  it('不足 4 人时只入池不开局', () => {
+    const cs = [fakeClient(), fakeClient(), fakeClient()];
+    cs.forEach((c, i) => { hello(c, 'q' + i); reg.handle(c, { t: 'match' }); });
+    cs.forEach(c => expect(c.sent).not.toContainEqual({ t: 'started' }));
+    expect(reg.queue.length).toBe(3);
+  });
+});

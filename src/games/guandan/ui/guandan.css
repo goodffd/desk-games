@@ -389,14 +389,14 @@
   pointer-events: none;
 }
 
-/* --- 操作按钮 --- */
+/* --- 操作按钮：绝对定位钉死在可玩区固定位置，不随手牌张数变化而上下移动 --- */
 .gd-actions {
   display: flex;
   gap: 0.8rem;
   justify-content: center;
   padding: 0.35rem 0;
-  flex-shrink: 0;
-  position: relative;
+  position: absolute;
+  top: 52%; left: 50%; transform: translateX(-50%);
   z-index: 8;          /* 出牌/不要 始终在出牌区(z-index 4)之上，不被牌盖住 */
 }
 
@@ -557,6 +557,7 @@
   .gd-play__type { font-size: 0.66rem; margin-top: 1px; }
   .gd-play__cards .gd-card { margin: 0 -9px; }
   .gd-card--small .gd-card__suit--wild { font-size: 0.46rem; } /* 出牌区「配」字缩小，不压大花色 */
+  .gd-actions { top: 28%; }   /* 手机端按钮挪到手牌右侧的空白区，不压手牌 */
   /* 上家右移、下家左移：剩≤10张时名字旁加张数徽标变宽，贴边居中会被屏幕边缘裁掉左/右侧 */
   .gd-seat--left  { left: 34px; }
   .gd-seat--right { right: 34px; }

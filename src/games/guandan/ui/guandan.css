@@ -298,7 +298,7 @@
 }
 .gd-card--small .gd-card__corner {  /* 出牌：点数+花色竖排，间距更大 */
   flex-direction: column;
-  gap: 5px;
+  gap: 9px;                          /* 桌面：点数↔花色再拉开 */
   align-items: center;
   left: 4px;
 }
@@ -592,6 +592,7 @@
   .gd-card__pip { height: 22px; }
   .gd-hand-col .gd-card + .gd-card { margin-top: -40px; } /* 手机牌高 60 → 露 ~20px */
   .gd-card--small { width: 36px; height: 50px; }
+  .gd-card--small .gd-card__corner { gap: 5px; }  /* 手机小牌矮，角标间距维持原样不拉大 */
   .gd-card--small .gd-card__rank { font-size: 0.76rem; }
   .gd-card--small .gd-card__suit { height: 9px; }
   .gd-card--small .gd-card__pip { height: 18px; }

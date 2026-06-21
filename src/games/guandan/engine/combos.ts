@@ -185,9 +185,20 @@ export function identify(cards: Card[], level: Rank): Combo | null {
     return makeCombo('single', cards, rankValue(c0, level));
   }
 
+  // --- pair of two SAME real jokers (对小王 / 对大王) — owner ruling 2026-06-21: allowed;
+  //     一大王+一小王 does NOT pair. Must precede the allNormal guard. key=16(小王)/17(大王)，
+  //     即 对大王 > 对小王 > 对级牌；非炸弹，可被任意炸弹/天王炸压。 ---
+  if (n === 2) {
+    const a = cards[0]!;
+    const b = cards[1]!;
+    if (a.kind === 'joker' && b.kind === 'joker') {
+      return a.big === b.big ? makeCombo('pair', cards, rankValue(a, level)) : null;
+    }
+  }
+
   // From here on, jokers may only appear inside a bomb-of-a-kind... which is
   // impossible (jokers have no rank). So any combo containing a joker (other
-  // than the kingBomb handled above) is illegal.
+  // than the kingBomb / same-joker pair handled above) is illegal.
   if (!allNormal(cards)) return null;
 
   const groups = groupByNaturalRank(cards);

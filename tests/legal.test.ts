@@ -94,6 +94,35 @@ describe('allReadings: enumerates all legal readings of a fixed group', () => {
 });
 
 // ---------------------------------------------------------------------------
+describe('对王 (双小王/双大王) — owner ruling 2026-06-21', () => {
+  it('allReadings: 两大王→pair17, 两小王→pair16, 一大一小→无读法', () => {
+    expect(has(allReadings([jb(), jb()], L), 'pair', 17)).toBe(true);
+    expect(has(allReadings([js(), js()], L), 'pair', 16)).toBe(true);
+    expect(allReadings([jb(), js()], L)).toEqual([]);
+  });
+
+  it('enumerateLeads: 手里两小王→含对小王(16); 两大王→含对大王(17)', () => {
+    expect(has(enumerateLeads([js(), js(), n('S', 3)], L), 'pair', 16)).toBe(true);
+    expect(has(enumerateLeads([jb(), jb(), n('S', 3)], L), 'pair', 17)).toBe(true);
+  });
+
+  it('isLegalPlay: 对小王可领出、可压对A；一大一小非法', () => {
+    const s1 = js();
+    const s2 = js();
+    expect(isLegalPlay([s1, s2], null, [s1, s2], L)).toBe(true);
+    const pairA = identify([n('S', 14), n('H', 14)], L)!;
+    expect(isLegalPlay([s1, s2], pairA, [s1, s2], L)).toBe(true);
+    const b = jb();
+    expect(isLegalPlay([b, s1], null, [b, s1], L)).toBe(false);
+  });
+
+  it('enumerateFollows: 对小王能压一手对8', () => {
+    const pair8 = identify([n('S', 8), n('H', 8)], L)!;
+    expect(has(enumerateFollows([js(), js()], pair8, L), 'pair', 16)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 describe('enumerateLeads: brief Step 1 core hand', () => {
   const hand = () => [
     n('S', 3),

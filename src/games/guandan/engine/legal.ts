@@ -281,6 +281,9 @@ export function enumerateLeads(hand: Card[], level: Rank): Combo[] {
     const got = takeAtPoint(idx, r, 2, W, 0);
     if (got) record(out, got.cards, 'pair', level);
   }
+  // 对王(双小王/双大王)：两张同种真王成对(owner ruling 2026-06-21)；一大一小不算对，逢人配不可凑王对。
+  if (idx.bigJokers.length >= 2) record(out, [idx.bigJokers[0]!, idx.bigJokers[1]!], 'pair', level);
+  if (idx.smallJokers.length >= 2) record(out, [idx.smallJokers[0]!, idx.smallJokers[1]!], 'pair', level);
 
   // ----- triples (3 same point) -----
   // Same candidate-point treatment; a level triple needs ≥1 real level card since only

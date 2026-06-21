@@ -76,19 +76,23 @@ describe('identify: pair', () => {
     expect(identify([n('S', 5), n('H', 6)], L)).toBeNull();
   });
 
-  it('two big jokers → null (jokers do not form ordinary pairs; only 四大天王)', () => {
-    expect(identify([jb(), jb()], L)).toBeNull();
+  it('two big jokers → pair key=17 (对大王，owner ruling 2026-06-21)', () => {
+    const c = identify([jb(), jb()], L)!;
+    expect(c.type).toBe('pair');
+    expect(c.key).toBe(17);
   });
 
-  it('two small jokers → null', () => {
-    expect(identify([js(), js()], L)).toBeNull();
+  it('two small jokers → pair key=16 (对小王)', () => {
+    const c = identify([js(), js()], L)!;
+    expect(c.type).toBe('pair');
+    expect(c.key).toBe(16);
   });
 
   it('one joker + one normal → null', () => {
     expect(identify([jb(), n('S', 5)], L)).toBeNull();
   });
 
-  it('big joker + small joker → null (not a pair)', () => {
+  it('big joker + small joker → null (一大一小不算对)', () => {
     expect(identify([jb(), js()], L)).toBeNull();
   });
 });
@@ -407,6 +411,16 @@ describe('beats: same type / same length compares key', () => {
     const b = id([n('H', 13)]);
     expect(beats(a, b)).toBe(true);
   });
+
+  it('对大王(17) beats 对小王(16)', () => {
+    expect(beats(id([jb(), jb()]), id([js(), js()]))).toBe(true);
+    expect(beats(id([js(), js()]), id([jb(), jb()]))).toBe(false);
+  });
+
+  it('对小王(16) beats 对级牌(15) 与 对A(14)', () => {
+    expect(beats(id([js(), js()]), id([n('S', 2), n('H', 2)]))).toBe(true);
+    expect(beats(id([js(), js()]), id([n('S', 14), n('H', 14)]))).toBe(true);
+  });
 });
 
 describe('beats: different type or length is incomparable (non-bombs)', () => {
@@ -449,6 +463,15 @@ describe('beats: bombs beat all non-bombs', () => {
     const kb = id([jb(), jb(), js(), js()]);
     const triple = id(cards(['S', 9], ['H', 9], ['D', 9]));
     expect(beats(kb, triple)).toBe(true);
+  });
+
+  it('4炸 与 四大天王 都能压 对大王 (对王是非炸弹对子)', () => {
+    const pairKings = id([jb(), jb()]);
+    const bomb = id(cards(['S', 7], ['H', 7], ['D', 7], ['C', 7]));
+    const kb = id([jb(), jb(), js(), js()]);
+    expect(beats(bomb, pairKings)).toBe(true);
+    expect(beats(pairKings, bomb)).toBe(false);
+    expect(beats(kb, pairKings)).toBe(true);
   });
 });
 

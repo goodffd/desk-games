@@ -410,7 +410,10 @@ export function mount(root: HTMLElement): () => void {
       const suitW = suitH * 1.15; // 花色按高度估宽(最宽红心≈1.08)，不依赖异步图片宽度
       const maxCorner = maxRank + 4 + suitW; // 点数 + 间距 + 花色
       const fitStep = (availW - colW) / (nc - 1);
-      const step = Math.min(fitStep, maxCorner + 6); // 列叠紧些：角标右留 ~2-3px 缝(牌缩小后角标也小，够用)
+      // 手机：列叠更紧——只露点数+大半个花色即可辨认(点数才是关键)，整排更聚拢、不显松散
+      const isMobile = window.matchMedia('(max-width: 520px), (max-height: 520px)').matches;
+      const cap = isMobile ? (maxRank + 3 + suitW * 0.55) : (maxCorner + 6);
+      const step = Math.min(fitStep, cap); // 列少时按 cap 摆(手机更小=叠更多)，列多时按 fitStep 收紧不溢出
       const ml = step - colW;                // 负=列间重叠
       colEls.forEach((c, i) => { if (i > 0) (c as HTMLElement).style.marginLeft = `${ml}px`; });
     }

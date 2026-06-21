@@ -76,3 +76,21 @@ describe('MatchDriver — 重连/观战补发', () => {
     expect(out.some((o: any) => o.msg.t === 'state')).toBe(true);
   });
 });
+
+describe('MatchDriver — AI 接管', () => {
+  it('setAI(座位X,true) 且轮到该座 → AI 自动推进，turn 不停在 AI 座', () => {
+    const d = new MatchDriver({ shuffle: noShuffle }); d.start(); // 轮到座位0
+    const out = d.setAI(0, true);
+    expect(out.some((o: any) => o.msg.t === 'state')).toBe(true);
+    // 座位0 被 AI 接管且首攻 → 应已自动出牌，turn 前移
+    expect(d.online[0]).toBe(false);
+    expect(d.state.turn).not.toBe(0);
+  });
+
+  it('全 4 座 AI → 一路自动打完整局不卡死', () => {
+    const d = new MatchDriver({ shuffle: noShuffle }); d.start();
+    for (let s = 0; s < 4; s++) d.setAI(s as any, true);
+    // setAI 链式驱动后，本局应已结束（finished 满 4 或 deal over）
+    expect(d.state.finished.length).toBeGreaterThanOrEqual(3);
+  });
+});

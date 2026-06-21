@@ -3,6 +3,7 @@ import { dealHands, startMatch, dealLevel, type MatchState } from '../src/games/
 import { createDeal, play, pass, isDealOver, type DealState } from '../src/games/guandan/engine/game';
 import { sortHand } from '../src/games/guandan/engine/cards';
 import { isLegalPlay } from '../src/games/guandan/engine/legal';
+import { choosePlay } from '../src/games/guandan/ai/ai';
 
 export type Outbound = { to: 'all' | 'seat'; seat?: Seat; msg: any };
 
@@ -52,30 +53,65 @@ export class MatchDriver {
   spectatorSync(_client: unknown): Outbound[] {
     return [{ to: 'all', msg: { t: 'state', ...this.publicState() } }];
   }
+
+  // ── PUBLIC: validate → applyPlay → afterAction → driveAI ──────────────────
   handlePlay(seat: Seat, cardIds: number[]): Outbound[] {
     if (this.state.turn !== seat) return [err(seat, '还没轮到你')];
     const cards = this.cardsByIds(seat, cardIds);
     if (!cards) return [err(seat, '牌不在你手里')];
     if (!isLegalPlay(cards, this.state.current?.combo ?? null, this.state.hands[seat]!, this.state.level))
       return [err(seat, '不合规')];
+    this.applyPlay(seat, cards);
+    return [...this.afterAction(seat), ...this.driveAI()];
+  }
+  handlePass(seat: Seat): Outbound[] {
+    if (this.state.turn !== seat) return [err(seat, '还没轮到你')];
+    if (this.state.current === null) return [err(seat, '领出不能不要')];
+    this.applyPass(seat);
+    return [...this.afterAction(seat), ...this.driveAI()];
+  }
+
+  // ── PRIVATE: state-advancing core (no driveAI) ────────────────────────────
+  private applyPlay(seat: Seat, cards: Card[]): void {
     const wasLead = this.state.current === null;
     this.state = play(this.state, seat, cards);
     if (wasLead) this.lastPlays = [null, null, null, null];
     this.lastPlays[seat] = { cards };
     this.lastActor = seat;
-    return this.afterAction(seat);
   }
-  handlePass(seat: Seat): Outbound[] {
-    if (this.state.turn !== seat) return [err(seat, '还没轮到你')];
-    if (this.state.current === null) return [err(seat, '领出不能不要')];
+  private applyPass(seat: Seat): void {
     this.state = pass(this.state, seat);
     this.lastPlays[seat] = 'pass';
     this.lastActor = seat;
-    return this.afterAction(seat);
   }
+
+  // ── AI 接管 ───────────────────────────────────────────────────────────────
+  setAI(seat: Seat, on: boolean): Outbound[] {
+    this.online[seat] = !on;
+    const out: Outbound[] = [this.broadcastState()];
+    out.push(...this.driveAI());
+    return out;
+  }
+
+  private driveAI(): Outbound[] {
+    const out: Outbound[] = [];
+    let guard = 0;
+    while (!isDealOver(this.state) && !this.online[this.state.turn] && guard++ < 200) {
+      const seat = this.state.turn;
+      const decision = choosePlay(this.state, seat);
+      if (decision === null) {
+        this.applyPass(seat);
+      } else {
+        this.applyPlay(seat, decision);
+      }
+      out.push(...this.afterAction(seat));
+    }
+    return out;
+  }
+
   private afterAction(actor: Seat): Outbound[] {
     const out: Outbound[] = [this.broadcastState(), { to: 'seat', seat: actor, msg: { t: 'hand', cards: sortHand(this.state.hands[actor]!, this.state.level) } }];
-    // Task 13 会在这里追加：deal over → settle/tribute；AI 续手
+    // Task 13 会在这里追加：deal over → settle/tribute
     return out;
   }
   private cardsByIds(seat: Seat, ids: number[]): Card[] | null {

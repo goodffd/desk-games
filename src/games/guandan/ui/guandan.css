@@ -450,7 +450,6 @@
   background: var(--gold);
   color: #1a1208;
 }
-.gd-btn--play:not(:disabled):hover { filter: brightness(0.92); transform: scale(1.02); }
 
 /* 不要：跟桌面展示的「不要」标签(.gd-play__pass)同款——深底 #14210e + 浅米字，视觉统一，
    实底一眼是块按钮，不糊进绿毡（桌面+手机一致） */
@@ -459,7 +458,13 @@
   border: none;
   color: var(--text-light);
 }
-.gd-btn--pass:not(:disabled):hover { background: #1f3318; }
+
+/* hover 效果只在真能悬停的设备(鼠标/桌面)生效；触屏会"卡住"hover 态——
+   手机点过不要后按钮会一直停在 hover 色(深绿)看着像变回旧色，必须用 @media(hover) 隔离 */
+@media (hover: hover) {
+  .gd-btn--play:not(:disabled):hover { filter: brightness(0.92); transform: scale(1.02); }
+  .gd-btn--pass:not(:disabled):hover { background: #1f3318; }
+}
 
 /* --- 提示信息 --- */
 .gd-hint {

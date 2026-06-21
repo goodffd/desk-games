@@ -204,7 +204,10 @@
 .gd-play__type { font-size: 0.95rem; font-weight: 600; color: var(--gold); margin-top: 3px; }
 .gd-play__pass {
   font-size: 1.05rem; font-weight: 700; color: var(--text-light);
-  background: rgba(0,0,0,0.4); padding: 4px 16px; border-radius: 13px;
+  /* 实底不透明（原 rgba .4 会透出底下手牌→显得发虚、牌多时埋在牌堆看不清）；z7 在最上层，
+     实底后无论压在手牌还是绿毡上都清清楚楚，且我和别家「不要」长得一样 */
+  background: #14210e; padding: 4px 16px; border-radius: 13px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
 }
 
 /* 中央轮次提示：桌面/手机都不显示——轮到谁由头像高亮 + 出牌/不要按钮指示，桌布中央不放文字 */

@@ -1,26 +1,134 @@
 /**
- * 掼蛋游戏模块入口（控制器）
- * 导出 guandanModule: GameModule（接入壳 registry）。
- *
- * 路由分流（SPEC：正常=联机、本地对 AI=调试）：
- *  - `/guandan?debug` → 本地对 3 AI（LocalDriver，开发不起服务端就能调引擎/UI）。
- *  - `/guandan`（正常）→ 联机流（昵称→大厅→建房/匹配→OnlineDriver 牌桌）。**Task 10 接入**。
+ * 掼蛋游戏模块入口（控制器）。
+ * 路由分流：`/guandan?debug` → 本地对 AI(LocalDriver)；`/guandan` → 联机流。
+ * 联机状态机：昵称 → 大厅(建房/匹配/加入/观战) → 房间(挑座/开打) → 牌桌(OnlineDriver)。
+ * 控制器只编排：session 收发 + UI 切换 + 开打挂牌桌 + 掉线/重连 toast。规则/AI 全在服务端。
  */
-
 import type { GameModule } from '../../shell/types';
+import type { Seat } from './engine/types';
+import { navigate } from '../../shell/nav';
 import { LocalDriver } from './driver/local-driver';
-import { mountTable, speechBusyMs } from './ui/view';
+import { OnlineDriver } from './driver/online-driver';
+import { OnlineSession } from './online/session';
+import { c2s, type LobbyRoom, type SeatInfo } from './online/protocol';
+import './online/ui/lobby.css';
+import { mountTable, speechBusyMs, primeAudio, setTableHost } from './ui/view';
+import { renderNickname, type NicknameHandle } from './online/ui/nickname';
+import { renderLobby, type LobbyHandle } from './online/ui/lobby';
+import { renderRoom, type RoomHandle, type RoomState } from './online/ui/room';
+
+const SEAT_LABELS: Record<number, string> = { 0: '你', 1: '下家', 2: '对家', 3: '上家' };
+
+function onlineMount(root: HTMLElement): () => void {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const session = new OnlineSession(`${proto}://${location.host}/ws-guandan`);
+
+  let nickH: NicknameHandle | null = null;
+  let lobbyH: LobbyHandle | null = null;
+  let roomH: RoomHandle | null = null;
+  let tableCleanup: (() => void) | null = null;
+  let driver: OnlineDriver | null = null;
+
+  let mySeat: Seat | 'spectator' | null = null;
+  let isHost = false;
+  let onTable = false;
+
+  function clearScreen(): void {
+    nickH?.cleanup(); lobbyH?.cleanup(); roomH?.cleanup(); tableCleanup?.();
+    nickH = lobbyH = roomH = null; tableCleanup = null;
+    if (driver) { driver.dispose(); driver = null; }
+    onTable = false;
+    root.innerHTML = '';
+  }
+
+  function toast(text: string): void {
+    const t = document.createElement('div');
+    t.className = 'gd-toast';
+    t.textContent = text;
+    root.appendChild(t);
+    window.setTimeout(() => t.remove(), 3800);
+  }
+  function peerLabel(serverSeat: number): string {
+    const base = typeof mySeat === 'number' ? mySeat : 0;
+    return SEAT_LABELS[(serverSeat - base + 4) % 4] ?? '某家';
+  }
+
+  function showNickname(): void {
+    clearScreen();
+    nickH = renderNickname(root, {
+      initial: session.nick,
+      onSubmit: (n) => { primeAudio(); session.setNick(n); session.send(c2s.hello(n)); },
+    });
+  }
+  function showLobby(): void {
+    clearScreen();
+    mySeat = null; isHost = false;
+    lobbyH = renderLobby(root, {
+      nick: session.nick, rooms: [],
+      onCreate: () => session.send(c2s.create(false)),
+      onMatch: () => { lobbyH?.setMatching(true); session.send(c2s.match()); },
+      onJoin: (code) => session.send(c2s.join(code)),
+      onSpectate: (code) => session.send(c2s.spectate(code)),
+      onRefresh: () => session.send(c2s.lobby()),
+    });
+    session.send(c2s.lobby());
+  }
+  function showRoom(code: string, seats: (SeatInfo | null)[], you: Seat | 'spectator' | null): void {
+    const state: RoomState = { seats, you, isHost };
+    if (roomH) { roomH.update(state); return; }
+    clearScreen();
+    roomH = renderRoom(root, {
+      code, initial: state,
+      onTakeSeat: (s) => session.send(c2s.takeSeat(s)),
+      onStart: () => session.send(c2s.start()),
+      onLeave: () => { session.clearRoom(); navigate('/'); },
+    });
+  }
+  function ensureTable(): void {
+    if (onTable || mySeat === null) return;
+    clearScreen();
+    onTable = true;
+    setTableHost(isHost);
+    driver = new OnlineDriver(session, mySeat);
+    tableCleanup = mountTable(root, driver);
+  }
+
+  // ── session 事件 → 状态机 ──
+  session.onOpen(() => { if (!session.savedRoom()) showNickname(); }); // 有房况：session 自动 rejoin，等 rejoined
+  session.on('hello-ok', () => showLobby());
+  session.on('rename-ok', () => showLobby());
+  session.on('nick-taken', () => nickH?.showError('昵称已被占用，换一个'));
+  session.on('lobby', (m) => lobbyH?.update((m as { rooms: LobbyRoom[] }).rooms));
+  session.on('created', () => { isHost = true; });
+  session.on('room', (m) => {
+    const r = m as { code: string; status: 'waiting' | 'playing'; seats: (SeatInfo | null)[]; you: Seat | 'spectator' | null };
+    mySeat = r.you;
+    if (typeof r.you === 'number') session.saveRoom(r.code, r.you); // 重连凭据
+    if (r.status === 'waiting') showRoom(r.code, r.seats, r.you);
+  });
+  session.on('spectating', () => { mySeat = 'spectator'; ensureTable(); });
+  session.on('rejoined', (m) => { mySeat = (m as { seat: Seat }).seat; ensureTable(); });
+  session.on('started', () => ensureTable());
+  session.on('state', () => { if (mySeat !== null) ensureTable(); }); // 观战/重连首个 state 兜底挂台
+  session.on('peer-offline', (m) => toast(`${peerLabel((m as { seat: number }).seat)} 掉线，AI 接管`));
+  session.on('peer-back', (m) => toast(`${peerLabel((m as { seat: number }).seat)} 回来了`));
+  session.on('room-closed', () => { session.clearRoom(); toast('房间已解散'); showLobby(); });
+  session.on('error', (m) => { lobbyH?.setMatching(false); toast((m as { msg: string }).msg); });
+
+  session.connect();
+  return () => { clearScreen(); session.dispose(); };
+}
 
 function mount(root: HTMLElement): () => void {
-  // Task 6：先打通 ?debug 本地通路（注入 view 的 speechBusyMs，让 AI 等报牌播完）。
-  // 正常联机流在 Task 10 接入；本任务两条路径暂都走本地 LocalDriver，保证可运行。
-  const driver = new LocalDriver({ speechBusyMs });
-  return mountTable(root, driver);
+  if (new URLSearchParams(location.search).has('debug')) {
+    return mountTable(root, new LocalDriver({ speechBusyMs }));
+  }
+  return onlineMount(root);
 }
 
 export const guandanModule: GameModule = {
   id: 'guandan',
   name: '掼蛋',
-  desc: '升级类扑克，2v2 四人局，1 人类对 3 AI，固定打 2',
+  desc: '升级类扑克，2v2 四人局，建房或匹配 4 人联机（?debug 单机对 AI）',
   mount,
 };

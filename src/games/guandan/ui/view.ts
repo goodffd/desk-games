@@ -133,6 +133,10 @@ function speak(text: string): void {
 /** AI 等本句报牌播完才出下一手：剩余毫秒（注入给 driver，保持 driver DOM-free）。 */
 export function speechBusyMs(): number { return Math.max(0, gdSpeakEndAt - performance.now()); }
 
+/** 联机整盘结束「再来一盘」只对房主显示（本地恒 true）。控制器在挂联机牌桌前调 setTableHost。 */
+let tableIsHost = true;
+export function setTableHost(v: boolean): void { tableIsHost = v; }
+
 /** iOS：音频要用户手势解锁。首次点击时静音预热一下，之后 AI/对家出牌语音也能响。
  *  本地由「开始游戏」遮罩调；联机由前置 UI 的点击手势调。 */
 export function primeAudio(): void {
@@ -666,12 +670,20 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
       selectedIds.clear(); clearHint();
     };
     if (settle.match.over) {
-      // 整盘结束 → 再来一盘（本地 freshMatch；联机房主 freshMatch=发 restart。非房主隐藏在 Task 10 细化）
-      const btn = document.createElement('button');
-      btn.className = 'gd-btn gd-btn--restart';
-      btn.textContent = '再来一盘';
-      btn.addEventListener('click', () => { closeResult(); driver.freshMatch(); });
-      box.appendChild(btn);
+      if (!driver.autoAdvance || tableIsHost) {
+        // 整盘结束 → 再来一盘（本地 freshMatch；联机房主 freshMatch=发 restart）
+        const btn = document.createElement('button');
+        btn.className = 'gd-btn gd-btn--restart';
+        btn.textContent = '再来一盘';
+        btn.addEventListener('click', () => { closeResult(); driver.freshMatch(); });
+        box.appendChild(btn);
+      } else {
+        // 联机非房主：等房主再来一盘
+        const waiting = document.createElement('div');
+        waiting.className = 'gd-result__gain';
+        waiting.textContent = '等房主再来一盘…';
+        box.appendChild(waiting);
+      }
     } else if (!driver.autoAdvance) {
       // 本地 → 手动「下一局」（进贡/抗贡）
       const btn = document.createElement('button');

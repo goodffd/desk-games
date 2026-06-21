@@ -12,6 +12,7 @@ export interface LobbyOpts {
   onCreate: () => void;                 // 建房邀请（房号约朋友）
   onMatch: () => void;                  // 随机匹配
   onSpectate: (code: string) => void;   // 观战进行中的公开房
+  onJoin: (code: string) => void;       // 输房号加入好友的房
   onRefresh: () => void;                // 刷新大厅房列表
 }
 
@@ -42,6 +43,20 @@ export function renderLobby(root: HTMLElement, opts: LobbyOpts): LobbyHandle {
   matchState.textContent = '匹配中…等待凑齐 4 人';
   matchState.style.display = 'none';
   left.appendChild(matchState);
+  // 输房号加入好友的房
+  left.appendChild(text('div', 'gd-lobby__or', '— 或 输房号加入 —'));
+  const joinRow = el('div', 'gd-lobby__joinrow');
+  const joinInput = document.createElement('input');
+  joinInput.className = 'gd-lobby__input gd-lobby__joininput';
+  joinInput.maxLength = 6;
+  joinInput.placeholder = '6 位房号';
+  joinInput.autocomplete = 'off';
+  joinInput.addEventListener('input', () => { joinInput.value = joinInput.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
+  const doJoin = (): void => { const c = joinInput.value.trim(); if (c.length >= 4) opts.onJoin(c); };
+  joinInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doJoin(); });
+  const joinBtn = button('gd-lobby__btn--ghost gd-lobby__mini', '加入', doJoin);
+  joinRow.append(joinInput, joinBtn);
+  left.appendChild(joinRow);
   cols.appendChild(left);
 
   // 右：大厅
@@ -71,7 +86,9 @@ export function renderLobby(root: HTMLElement, opts: LobbyOpts): LobbyHandle {
       row.appendChild(meta);
       const playing = r.status === 'playing';
       row.appendChild(text('span', `gd-lobby__badge gd-lobby__badge--${playing ? 'playing' : 'waiting'}`, playing ? '进行中' : '等待中'));
-      if (playing) row.appendChild(button('gd-lobby__btn--ghost gd-lobby__mini', '观战', () => opts.onSpectate(r.code)));
+      row.appendChild(playing
+        ? button('gd-lobby__btn--ghost gd-lobby__mini', '观战', () => opts.onSpectate(r.code))
+        : button('gd-lobby__btn--ghost gd-lobby__mini', '加入', () => opts.onJoin(r.code)));
       list.appendChild(row);
     }
   }

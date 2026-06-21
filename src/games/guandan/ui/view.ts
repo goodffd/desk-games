@@ -11,15 +11,34 @@ import './joker-img.css';
 import './rank-font.css';
 import { navigate } from '../../../shell/nav';
 
-import type { Card, Seat, Combo } from '../engine/types';
-import { LEVEL } from '../engine/types';
+import type { Card, Seat, Combo, Rank } from '../engine/types';
 import { makeDeck, deal, sortHand, rankValue } from '../engine/cards';
-import { createDeal, play, pass, isDealOver, ranking, levelGain } from '../engine/game';
+import { createDeal, play, pass, isDealOver, ranking } from '../engine/game';
 import type { DealState } from '../engine/game';
 import { isLegalPlay } from '../engine/legal';
 import { choosePlay } from '../ai/ai';
 import { cardEl, comboSpeech, rankName } from './render';
 import { VOICE_CLIPS } from './voice-clips';
+import {
+  startMatch, settleDeal, planTribute, autoReturn, applyTribute, dealLevel,
+  type MatchState,
+} from '../engine/match';
+
+/** 级别(Rank 2..14) → 显示文字（打几）。 */
+function levelLabel(r: Rank): string {
+  return r === 11 ? 'J' : r === 12 ? 'Q' : r === 13 ? 'K' : r === 14 ? 'A' : String(r);
+}
+
+/** 队名：队 0 = 我方(你&对家)，队 1 = 对方(上家&下家)。 */
+const teamName = (t: 0 | 1): string => (t === 0 ? '我方' : '对方');
+
+/** 简短牌名（进贡提示用）。 */
+function cardBrief(c: Card, level: Rank): string {
+  if (c.kind === 'joker') return c.big ? '大王' : '小王';
+  if (c.suit === 'H' && c.rank === level) return '红心配';
+  const SU: Record<string, string> = { S: '♠', H: '♥', D: '♦', C: '♣' };
+  return `${levelLabel(c.rank)}${SU[c.suit] ?? ''}`;
+}
 
 const HUMAN_SEAT: Seat = 0;
 
@@ -40,11 +59,11 @@ function randomShuffle(n: number): number[] {
 }
 
 /** 出牌展示排序：同点数聚一起，组越大越靠前（三带二=三同在前/对子在后；连对/钢板/顺子自然成组） */
-function sortComboCards(cards: Card[]): Card[] {
+function sortComboCards(cards: Card[], level: Rank): Card[] {
   const cnt = new Map<number, number>();
-  for (const c of cards) { const v = rankValue(c, LEVEL); cnt.set(v, (cnt.get(v) ?? 0) + 1); }
+  for (const c of cards) { const v = rankValue(c, level); cnt.set(v, (cnt.get(v) ?? 0) + 1); }
   return [...cards].sort((a, b) => {
-    const va = rankValue(a, LEVEL), vb = rankValue(b, LEVEL);
+    const va = rankValue(a, level), vb = rankValue(b, level);
     const ca = cnt.get(va)!, cb = cnt.get(vb)!;
     if (ca !== cb) return cb - ca; // 大组在前
     return va - vb;                // 同组按点数升序
@@ -125,12 +144,12 @@ function speak(text: string): void {
   speakTTS(text);
 }
 
-function startNewDeal(): DealState {
-  const deck = makeDeck();
-  const hands = deal(deck, randomShuffle);
-  const sortedHands = hands.map(h => sortHand(h, LEVEL));
-  const firstLeader = Math.floor(Math.random() * 4) as Seat;
-  return createDeal(sortedHands, firstLeader, LEVEL);
+/** 发一局：按级牌 level 发牌+排序+定首攻（首局随机首攻；后续局由调用方传 hands/firstLeader）。 */
+function startNewDeal(level: Rank, hands?: Card[][], firstLeader?: Seat): DealState {
+  const dealt = hands ?? deal(makeDeck(), randomShuffle);
+  const sortedHands = dealt.map(h => sortHand(h, level));
+  const leader = firstLeader ?? (Math.floor(Math.random() * 4) as Seat);
+  return createDeal(sortedHands, leader, level);
 }
 
 /** 头像：圆形 + 简笔人像，按队伍(座%2)配色 */
@@ -146,7 +165,8 @@ function avatarEl(seat: Seat): HTMLElement {
 }
 
 export function mount(root: HTMLElement): () => void {
-  let state = startNewDeal();
+  let match: MatchState = startMatch();          // 整盘状态（两队级别/庄家/打A过A）
+  let state = startNewDeal(dealLevel(match));     // 当前这一局
   let started = false;    // 点「开始游戏」后才置 true：之前不显示「思考中」等状态文字
   let selectedIds = new Set<number>();
   let dragging = false;   // 滑动选牌进行中
@@ -155,7 +175,7 @@ export function mount(root: HTMLElement): () => void {
   let lastActor: Seat | null = null; // 最近出牌/不要的人：其出牌区浮到手牌区之上，其余沉到手牌区之下
   const timers: number[] = [];
 
-  const sortedHand = (seat: Seat): Card[] => sortHand(state.hands[seat]!, LEVEL);
+  const sortedHand = (seat: Seat): Card[] => sortHand(state.hands[seat]!, state.level);
 
   // ── DOM 骨架 ───────────────────────────────────────────────
   root.innerHTML = '';
@@ -168,12 +188,23 @@ export function mount(root: HTMLElement): () => void {
   const topbarTitle = document.createElement('span');
   topbarTitle.className = 'gd-topbar__title';
   topbarTitle.textContent = '掼蛋';
+  // 顶栏中央：两队当前级别（打几），跨局实时更新
+  const levelsEl = document.createElement('div');
+  levelsEl.className = 'gd-topbar__levels';
   const backBtn = document.createElement('button');
   backBtn.className = 'gd-topbar__back';
   backBtn.textContent = '← 返回大厅';
   backBtn.addEventListener('click', () => { navigate('/'); });
   topbar.appendChild(topbarTitle);
+  topbar.appendChild(levelsEl);
   topbar.appendChild(backBtn);
+  function renderLevels(): void {
+    levelsEl.innerHTML =
+      `<span class="gd-lv gd-lv--me">我方 打${levelLabel(match.levels[0])}</span>` +
+      `<span class="gd-lv__sep">·</span>` +
+      `<span class="gd-lv gd-lv--them">对方 打${levelLabel(match.levels[1])}</span>`;
+  }
+  renderLevels();
 
   // 牌桌（绝对定位四家 + 四个出牌区 + 中央状态）
   const tableEl = document.createElement('div');
@@ -301,7 +332,7 @@ export function mount(root: HTMLElement): () => void {
     } else {
       const cardsDiv = document.createElement('div');
       cardsDiv.className = 'gd-play__cards';
-      for (const c of sortComboCards(lp.cards).slice(0, 14)) cardsDiv.appendChild(cardEl(c, LEVEL, true));
+      for (const c of sortComboCards(lp.cards, state.level).slice(0, 14)) cardsDiv.appendChild(cardEl(c, state.level, true));
       elx.appendChild(cardsDiv);
       // 牌型不再用文字说明，改用语音播报（见 applyPlay → speak）
     }
@@ -324,7 +355,7 @@ export function mount(root: HTMLElement): () => void {
 
   /** 造一张手牌（含选中态 + 滑动选牌按下事件） */
   function makeHandCard(card: Card): HTMLElement {
-    const ce = cardEl(card, LEVEL);
+    const ce = cardEl(card, state.level);
     if (selectedIds.has(card.id)) ce.classList.add('is-selected');
     ce.addEventListener('pointerdown', (e) => {
       if (state.turn !== HUMAN_SEAT || isDealOver(state)) return;
@@ -347,7 +378,7 @@ export function mount(root: HTMLElement): () => void {
     const groups: Card[][] = [];
     const at = new Map<number, number>();
     for (const card of cards) {
-      const v = rankValue(card, LEVEL);
+      const v = rankValue(card, state.level);
       if (!at.has(v)) { at.set(v, groups.length); groups.push([]); }
       groups[at.get(v)!]!.push(card);
     }
@@ -413,7 +444,7 @@ export function mount(root: HTMLElement): () => void {
     if (wasLead) lastPlays = { 0: null, 1: null, 2: null, 3: null }; // 新一圈：清掉上圈
     lastPlays[seat] = state.current ? state.current.combo : null;
     lastActor = seat; // 这家刚出牌：其出牌区浮到手牌之上，下一家出牌时再沉下去
-    if (state.current) speak(comboSpeech(state.current.combo, LEVEL)); // 语音：牌型/具体点数(见 comboSpeech)
+    if (state.current) speak(comboSpeech(state.current.combo, state.level)); // 语音：牌型/具体点数(见 comboSpeech)
   }
   function applyPass(seat: Seat): void {
     state = pass(state, seat);
@@ -442,7 +473,7 @@ export function mount(root: HTMLElement): () => void {
   function handlePlay(): void {
     const cards = getSelectedCards();
     if (cards.length === 0) { showHint('请先选择要出的牌', 'error'); return; }
-    if (!isLegalPlay(cards, state.current?.combo ?? null, state.hands[HUMAN_SEAT]!, LEVEL)) {
+    if (!isLegalPlay(cards, state.current?.combo ?? null, state.hands[HUMAN_SEAT]!, state.level)) {
       showHint('所选牌不合法，请重新选择', 'error'); return;
     }
     applyPlay(HUMAN_SEAT, cards);
@@ -479,18 +510,58 @@ export function mount(root: HTMLElement): () => void {
     timers.push(window.setTimeout(act, 450)); // 基础思考时间；再叠加等上句报牌播完
   }
 
-  // ── 局终 ───────────────────────────────────────────────────
+  // ── 局终 / 整盘编排 ─────────────────────────────────────────
+  /** 重置整盘从打 2 开打（再来一盘）。 */
+  function freshMatch(): void {
+    match = startMatch();
+    state = startNewDeal(dealLevel(match));
+    selectedIds.clear();
+    lastPlays = { 0: null, 1: null, 2: null, 3: null };
+    lastActor = null;
+    renderLevels();
+    clearHint();
+    renderAll();
+    if (state.turn !== HUMAN_SEAT) scheduleAi();
+  }
+
+  /** 进下一局：按新级牌发牌 → 进贡/还贡(自动) → 定首攻开局。 */
+  function nextDeal(): void {
+    const finished = ranking(state);     // 上一局名次（settle 已用，进贡再用）
+    const level = dealLevel(match);      // 新级牌 = 上局赢家队级别
+    const dealt = deal(makeDeck(), randomShuffle);
+    const plan = planTribute(finished, dealt, level);
+    const returns = plan.exchanges.map(ex => autoReturn(dealt[ex.receiver]!, level));
+    const tributed = applyTribute(dealt, plan, returns);
+    state = startNewDeal(level, tributed, plan.firstLeader);
+    selectedIds.clear();
+    lastPlays = { 0: null, 1: null, 2: null, 3: null };
+    lastActor = null;
+    renderAll();
+    if (plan.resist) {
+      showHint('对方持双大王，抗贡！本局免进贡', 'info');
+    } else {
+      const parts = plan.exchanges.map(ex =>
+        `${SEAT_LABELS[ex.giver]}进贡 ${cardBrief(ex.tribute, level)} 给 ${SEAT_LABELS[ex.receiver]}`);
+      showHint(parts.join('；') + '（已自动还贡 ≤10）', 'info');
+    }
+    if (state.turn !== HUMAN_SEAT) scheduleAi();
+  }
+
   function showResult(): void {
     const ranks = ranking(state);
-    const gain = levelGain(state);
+    const settle = settleDeal(match, ranks);
+    match = settle.match;            // 升级 / 打A过A 已结算
+    renderLevels();
+
     const overlay = document.createElement('div');
     overlay.className = 'gd-overlay';
     const box = document.createElement('div');
     box.className = 'gd-result';
     const title = document.createElement('div');
     title.className = 'gd-result__title';
-    title.textContent = '本局结束';
+    title.textContent = settle.passedA ? `🎉 ${teamName(settle.winTeam)}打 A 过 A，赢下整盘！` : '本局结束';
     box.appendChild(title);
+
     const rankList = document.createElement('ul');
     rankList.className = 'gd-result__ranking';
     for (let i = 0; i < ranks.length; i++) {
@@ -499,23 +570,29 @@ export function mount(root: HTMLElement): () => void {
       rankList.appendChild(li);
     }
     box.appendChild(rankList);
+
     const gainEl = document.createElement('div');
     gainEl.className = 'gd-result__gain';
-    gainEl.textContent = `${gain.team === 0 ? '你方（你&对家）' : '对手（上家&下家）'} 升 ${gain.gain} 级`;
+    if (settle.passedA) {
+      gainEl.textContent = `${teamName(settle.winTeam)}（${settle.winTeam === 0 ? '你&对家' : '上家&下家'}）打 A 过 A，胜！`;
+    } else if (settle.demoted) {
+      gainEl.textContent = `${teamName(settle.winTeam)}连续卡 A 三次，降回 打2`;
+    } else if (settle.stuck) {
+      gainEl.textContent = `${teamName(settle.winTeam)}卡 A（对家末游、差一级没过），继续打 A`;
+    } else {
+      gainEl.textContent = `${teamName(settle.winTeam)}升 ${settle.gain} 级 → 打${levelLabel(match.levels[settle.winTeam])}`;
+    }
     box.appendChild(gainEl);
-    const restartBtn = document.createElement('button');
-    restartBtn.className = 'gd-btn gd-btn--restart';
-    restartBtn.textContent = '重新发牌';
-    restartBtn.addEventListener('click', () => {
+
+    const btn = document.createElement('button');
+    btn.className = 'gd-btn gd-btn--restart';
+    btn.textContent = settle.match.over ? '再来一盘' : '下一局';
+    btn.addEventListener('click', () => {
       overlay.remove();
-      state = startNewDeal();
-      selectedIds.clear();
-      lastPlays = { 0: null, 1: null, 2: null, 3: null };
-      clearHint();
-      renderAll();
-      if (state.turn !== HUMAN_SEAT) scheduleAi();
+      if (settle.match.over) freshMatch();
+      else nextDeal();
     });
-    box.appendChild(restartBtn);
+    box.appendChild(btn);
     overlay.appendChild(box);
     gameEl.appendChild(overlay);
   }

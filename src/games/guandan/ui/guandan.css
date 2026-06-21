@@ -54,6 +54,15 @@
   letter-spacing: 0.1em;
 }
 
+/* 顶栏中央：两队当前级别（打几） */
+.gd-topbar__levels {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.92rem; font-weight: 700; letter-spacing: 0.02em;
+}
+.gd-lv--me { color: var(--gold); }            /* 我方=你&对家=金 */
+.gd-lv--them { color: #5b9bd5; }              /* 对方=上家&下家=蓝 */
+.gd-lv__sep { color: var(--text-dim); font-weight: 400; }
+
 .gd-topbar__back {
   background: transparent;
   border: 1px solid var(--gold-dim);
@@ -553,6 +562,7 @@
   .gd-seat__count--alert { font-size: 0.64rem; padding: 0 4px; box-shadow: 0 0 3px 1px rgba(255,210,80,0.75); animation: none; }
   .gd-topbar { padding: 0.25rem 0.6rem; }
   .gd-topbar__title { font-size: 0.85rem; }
+  .gd-topbar__levels { font-size: 0.74rem; gap: 4px; }
   .gd-btn { padding: 0.3rem 1.1rem; font-size: 0.85rem; }
   /* 手机牌桌矮：藏中央状态文字(头像高亮+按钮已足够指示)，腾空间防各家出牌区相叠 */
   .gd-turn-status { display: none; }

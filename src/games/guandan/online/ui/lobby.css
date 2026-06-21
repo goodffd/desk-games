@@ -17,10 +17,10 @@
   font-family: var(--font-ui, system-ui, sans-serif);
   overflow: auto;
 }
-/* 四周内描的暗金晕，强化"金线棋牌室"质感，不抢内容 */
+/* 四周内描的暗金晕，强化"金线棋牌室"质感，不抢内容（absolute=跟 .gd-lobby 一起旋转） */
 .gd-lobby::before {
   content: '';
-  position: fixed;
+  position: absolute;
   inset: 14px;
   border: 1px solid rgba(201, 168, 76, 0.22);
   border-radius: 18px;
@@ -127,4 +127,16 @@
   text-align: center;
   color: #ec7361;
   letter-spacing: 0.03em;
+}
+
+/* 手机竖握自动转横屏（同牌桌 guandan.css：掼蛋是横屏玩法）：前置 UI 也走横屏，进牌桌无缝。
+   用 dvh/dvw（动态视口，扣浏览器工具栏），避免溢出。 */
+@media (orientation: portrait) and (max-width: 920px) {
+  html, body { overflow: hidden; }
+  .gd-lobby {
+    top: 50%; left: 50%; right: auto; bottom: auto;
+    width: 100dvh; height: 100dvw;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center center;
+  }
 }

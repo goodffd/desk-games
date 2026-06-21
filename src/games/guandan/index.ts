@@ -12,7 +12,7 @@ import { OnlineDriver } from './driver/online-driver';
 import { OnlineSession } from './online/session';
 import { c2s, type LobbyRoom, type SeatInfo } from './online/protocol';
 import './online/ui/lobby.css';
-import { mountTable, speechBusyMs, primeAudio, setTableHost } from './ui/view';
+import { mountTable, speechBusyMs, primeAudio, setTableHost, setSeatNames } from './ui/view';
 import { renderNickname, type NicknameHandle } from './online/ui/nickname';
 import { renderLobby, type LobbyHandle } from './online/ui/lobby';
 import { renderRoom, type RoomHandle, type RoomState } from './online/ui/room';
@@ -32,6 +32,18 @@ function onlineMount(root: HTMLElement): () => void {
   let mySeat: Seat | 'spectator' | null = null;
   let isHost = false;
   let onTable = false;
+  let roomSeats: (SeatInfo | null)[] = []; // 最近的座位昵称（牌桌 state 不带昵称，从 room/spectating 取）
+
+  function applySeatNames(): void {
+    if (mySeat === null || !roomSeats.length) { setSeatNames(null); return; }
+    const base = typeof mySeat === 'number' ? mySeat : 0; // egocentric：view 座 i → 服务端座
+    const names = [0, 1, 2, 3].map((v) => {
+      const ss = (v + base) % 4;
+      const nick = roomSeats[ss]?.nick ?? null;
+      return (typeof mySeat === 'number' && ss === mySeat && nick) ? `${nick}（你）` : nick;
+    });
+    setSeatNames(names);
+  }
 
   function clearScreen(): void {
     nickH?.cleanup(); lobbyH?.cleanup(); roomH?.cleanup(); tableCleanup?.();
@@ -89,6 +101,7 @@ function onlineMount(root: HTMLElement): () => void {
     clearScreen();
     onTable = true;
     setTableHost(isHost);
+    applySeatNames(); // 牌桌渲染前确保各座昵称就位
     driver = new OnlineDriver(session, mySeat);
     tableCleanup = mountTable(root, driver);
   }
@@ -103,11 +116,16 @@ function onlineMount(root: HTMLElement): () => void {
   session.on('room', (m) => {
     const r = m as { code: string; status: 'waiting' | 'playing'; seats: (SeatInfo | null)[]; you: Seat | 'spectator' | null };
     mySeat = r.you;
+    roomSeats = r.seats; applySeatNames(); // 牌桌昵称（联机中 room 不再来，故这里抓住）
     if (typeof r.you === 'number') session.saveRoom(r.code, r.you); // 重连凭据
     if (r.status === 'waiting') showRoom(r.code, r.seats, r.you);
   });
-  session.on('spectating', () => { mySeat = 'spectator'; ensureTable(); });
-  session.on('rejoined', (m) => { mySeat = (m as { seat: Seat }).seat; ensureTable(); });
+  session.on('spectating', (m) => {
+    mySeat = 'spectator';
+    roomSeats = (m as { seats: (SeatInfo | null)[] }).seats; applySeatNames();
+    ensureTable();
+  });
+  session.on('rejoined', (m) => { mySeat = (m as { seat: Seat }).seat; applySeatNames(); ensureTable(); });
   session.on('started', () => ensureTable());
   session.on('state', () => { if (mySeat !== null) ensureTable(); }); // 观战/重连首个 state 兜底挂台
   session.on('peer-offline', (m) => toast(`${peerLabel((m as { seat: number }).seat)} 掉线，AI 接管`));
@@ -121,6 +139,7 @@ function onlineMount(root: HTMLElement): () => void {
 
 function mount(root: HTMLElement): () => void {
   if (new URLSearchParams(location.search).has('debug')) {
+    setSeatNames(null); // 本地用 你/下家/对家/上家
     return mountTable(root, new LocalDriver({ speechBusyMs }));
   }
   return onlineMount(root);

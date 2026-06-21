@@ -137,6 +137,10 @@ export function speechBusyMs(): number { return Math.max(0, gdSpeakEndAt - perfo
 let tableIsHost = true;
 export function setTableHost(v: boolean): void { tableIsHost = v; }
 
+/** 联机各座昵称（view 座序，已 egocentric 旋转；本地为 null→用 你/下家/对家/上家）。 */
+let seatNames: (string | null)[] | null = null;
+export function setSeatNames(names: (string | null)[] | null): void { seatNames = names; }
+
 /** iOS：音频要用户手势解锁。首次点击时静音预热一下，之后 AI/对家出牌语音也能响。
  *  本地由「开始游戏」遮罩调；联机由前置 UI 的点击手势调。 */
 export function primeAudio(): void {
@@ -294,7 +298,7 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     info.className = 'gd-seat__info';
     const name = document.createElement('span');
     name.className = 'gd-seat__name';
-    name.textContent = SEAT_LABELS[seat];
+    name.textContent = seatNames?.[seat] || SEAT_LABELS[seat]; // 联机用昵称，本地用 你/下家/对家/上家
     info.appendChild(name);
 
     const finishIdx = state.finished.indexOf(seat);

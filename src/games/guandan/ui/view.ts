@@ -433,19 +433,22 @@ export function mount(root: HTMLElement): () => void {
     passBtn.disabled = !isHumanTurn || state.current === null; // 自己领出时不能"不要"
   }
 
-  /** 最新那手牌(z7=lastActor 的出牌区)是否几何上压到我的手牌区 → 决定手牌要不要淡。
-   *  所有人(含我自己)统一按矩形相交判定：真盖到才淡，没盖到不淡。 */
+  /** 最新那手牌(z7=lastActor 的出牌区)是否几何上压到「具体某张手牌」 → 决定手牌要不要淡。
+   *  所有人(含我自己)统一判定。不能用手牌容器整体包围盒：手牌是「同点数列底部对齐、各列高低不一」
+   *  的阶梯形，容器矩形把短列上方的空角也算进去，出牌区落在空角会误判成压到。改为逐张牌矩形相交，
+   *  且实质相交(两向都≥12px)才算压到——边缘相切不算，避免别家一出牌手牌就闪透明。 */
   function latestPlayCoversHand(): boolean {
     if (lastActor === null) return false;
     const pe = playEls[lastActor]!;
     if (!pe.classList.contains('has-play')) return false;
     const pr = pe.getBoundingClientRect();
-    const hr = handEl.getBoundingClientRect();
-    if (hr.width === 0 || hr.height === 0) return false;
-    // 需实质相交(两向都 ≥10px)才算压到——边缘相切(出牌区贴着手牌上/下沿)不算，避免一出牌手牌就闪透明
-    const ix = Math.min(pr.right, hr.right) - Math.max(pr.left, hr.left);
-    const iy = Math.min(pr.bottom, hr.bottom) - Math.max(pr.top, hr.top);
-    return ix >= 10 && iy >= 10;
+    for (const card of Array.from(handEl.querySelectorAll('.gd-card'))) {
+      const cr = card.getBoundingClientRect();
+      const ix = Math.min(pr.right, cr.right) - Math.max(pr.left, cr.left);
+      const iy = Math.min(pr.bottom, cr.bottom) - Math.max(pr.top, cr.top);
+      if (ix >= 12 && iy >= 12) return true;
+    }
+    return false;
   }
 
   function renderAll(): void {

@@ -186,7 +186,7 @@
 .gd-play--top    { top: 19%; left: 50%; transform: translateX(-50%); }  /* 下移，不压对家头像下文字 */
 .gd-play--left   { left: 14%; top: 50%; transform: translateY(-50%); }
 .gd-play--right  { right: 14%; top: 50%; transform: translateY(-50%); }
-.gd-play--bottom { top: 45%; left: 50%; transform: translateX(-50%); }  /* 上移，与对家出牌对称、在手牌上方可见 */
+.gd-play--bottom { top: 70%; left: 50%; transform: translateX(-50%); }  /* 与对家出牌区上下对称(下沿镜像对家上沿)；落在手牌上，出牌瞬间 z7 可见、下家一出缩到手牌后 */
 .gd-play__cards { display: flex; flex-wrap: nowrap; }
 .gd-play__cards .gd-card { margin: 0 -10px; }
 .gd-play__type { font-size: 0.95rem; font-weight: 600; color: var(--gold); margin-top: 3px; }
@@ -559,11 +559,11 @@
   .gd-seat--left  { left: 34px; }
   .gd-seat--right { right: 34px; }
   .gd-bottom-area { padding-bottom: 70px; } /* 手机让位量(头像+名 ~52px + 小边距) */
-  /* 矮牌桌：4 家出牌区收成紧凑菱形，互不相叠 */
-  .gd-play--top    { top: 16%; }                /* 下移，不压对家头像下文字 */
-  .gd-play--bottom { top: 52%; bottom: auto; }  /* 上移，与对家出牌对称、在手牌上方可见 */
-  .gd-play--left   { left: 68px; top: 50%; }
-  .gd-play--right  { right: 68px; top: 50%; }
+  /* 矮牌桌：出牌区随头像内移同步外推，不压头像/张数文字(剩≤10张文字变宽) */
+  .gd-play--top    { top: 22%; }                /* 下移，不压对家头像下文字 */
+  .gd-play--bottom { top: 52%; bottom: auto; }
+  .gd-play--left   { left: 92px; top: 50%; }    /* 上家头像内移到34px、文字变宽，出牌区外推到92px让开 */
+  .gd-play--right  { right: 92px; top: 50%; }
 }
 
 /* --- 手机竖屏自动转横屏：掼蛋牌桌需要横向空间，竖握时整页旋转 90° 显示为横屏 ---

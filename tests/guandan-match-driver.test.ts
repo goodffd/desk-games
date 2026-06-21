@@ -26,3 +26,37 @@ describe('MatchDriver — 发牌 + 下发', () => {
     expect(st.seats.every((x: any) => x.count === 27 && x.lastPlay === null)).toBe(true);
   });
 });
+
+describe('MatchDriver — 出牌/不要', () => {
+  function freshDeal() { const d = new MatchDriver({ shuffle: noShuffle }); d.start(); return d; }
+  const handOf = (d: any, seat: number) => d.state.hands[seat];
+
+  it('非回合出牌 → error，不推进', () => {
+    const d = freshDeal(); // 首攻=座位0
+    const out = d.handlePlay(1, [handOf(d, 1)[0].id]);
+    expect(out.find((o: any) => o.msg.t === 'error')).toBeTruthy();
+    expect(d.state.turn).toBe(0);
+  });
+
+  it('座位0 合法领出单张 → 推进到下一家 + 公开态含其 lastPlay + 手牌-1', () => {
+    const d = freshDeal();
+    const card = handOf(d, 0)[0];
+    const out = d.handlePlay(0, [card.id]);
+    const st = out.find((o: any) => o.to === 'all' && o.msg.t === 'state')!.msg;
+    expect(st.seats[0].lastPlay).toEqual({ cards: [card] });
+    expect(st.seats[0].count).toBe(26);
+    expect(d.state.turn).toBe(1);
+    // 出牌后只给出牌者补发新手牌
+    const myHand = out.find((o: any) => o.to === 'seat' && o.seat === 0 && o.msg.t === 'hand');
+    expect(myHand!.msg.cards).toHaveLength(26);
+  });
+
+  it('非法组合（乱凑两张）→ error', () => {
+    const d = freshDeal();
+    const h = handOf(d, 0);
+    // 取两张不同点的牌强凑（非对子）——isLegalPlay 应拒
+    const a = h[0]; const b = h.find((c: any) => c.kind === 'normal' && c.rank !== (a.kind === 'normal' ? a.rank : -1));
+    const out = d.handlePlay(0, [a.id, b.id]);
+    expect(out.find((o: any) => o.msg.t === 'error')).toBeTruthy();
+  });
+});

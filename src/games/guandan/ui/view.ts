@@ -481,11 +481,9 @@ export function mount(root: HTMLElement): () => void {
     lastPlays[seat] = 'pass';
     lastActor = seat;
     speak('不要');
-    // 一圈结束（其余全过）→ 赢家领新圈：清掉桌面所有出牌/不要，免得盖住赢家(尤其我)选牌
-    if (state.current === null && !isDealOver(state)) {
-      lastPlays = { 0: null, 1: null, 2: null, 3: null };
-      lastActor = null;
-    }
+    // 不在此清桌面：一圈结束(其余全过)时若立刻清，会把刚喊「不要」收尾这圈的那家「不要」瞬间抹掉
+    // ——声音响了却没显示，牌局尾声(剩牌少、频繁全过收圈)尤其常见。改为留到赢家领新圈时由
+    // applyPlay 的 wasLead 统一清；赢家是我时手牌已 z8 浮在最上盖住桌面旧牌，不会挡选牌。
   }
 
   function getSelectedCards(): Card[] {

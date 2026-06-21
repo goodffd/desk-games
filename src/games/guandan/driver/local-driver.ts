@@ -20,10 +20,10 @@ import { isLegalPlay } from '../engine/legal';
 import { choosePlay } from '../ai/ai';
 import { comboSpeech } from '../ui/render';
 import {
-  startMatch, settleDeal, planTribute, autoReturn, applyTribute, dealLevel,
-  type MatchState, type SettleResult,
+  startMatch, settleDeal, planTribute, autoReturn, applyTribute, dealLevel, returnableCards,
+  type MatchState,
 } from '../engine/match';
-import type { GameDriver, GameSnapshot, TributePrompt, LastPlays } from './types';
+import type { GameDriver, GameSnapshot, TributePrompt, LastPlays, GamePhase, DealOutcome } from './types';
 
 const HUMAN_SEAT: Seat = 0;
 
@@ -59,8 +59,12 @@ export class LocalDriver implements GameDriver {
   private match: MatchState;
   private state: DealState;
   private started = false;
+  private phase: GamePhase = 'playing';
   private lastPlays: LastPlays = emptyLastPlays();
   private lastActor: Seat | null = null;
+
+  /** 本地手动续局（结算弹层显「下一局」）。 */
+  readonly autoAdvance = false;
 
   private readonly shuffle: (n: number) => number[];
   private readonly schedule: (fn: () => void, ms: number) => number;
@@ -70,7 +74,7 @@ export class LocalDriver implements GameDriver {
 
   private readonly timers: number[] = [];
   private changeCb: (() => void) | null = null;
-  private resultCb: ((settle: SettleResult) => void) | null = null;
+  private resultCb: ((o: DealOutcome) => void) | null = null;
   private tributeCb: ((p: TributePrompt) => void) | null = null;
   private speakCb: ((text: string) => void) | null = null;
   private hintCb: ((text: string, kind: 'info' | 'warn') => void) | null = null;
@@ -96,12 +100,12 @@ export class LocalDriver implements GameDriver {
 
   // ── 快照 ───────────────────────────────────────────────────
   snapshot(): GameSnapshot {
-    return { state: this.state, match: this.match, lastPlays: this.lastPlays, lastActor: this.lastActor, started: this.started };
+    return { state: this.state, match: this.match, lastPlays: this.lastPlays, lastActor: this.lastActor, started: this.started, phase: this.phase };
   }
 
   // ── 事件订阅 ───────────────────────────────────────────────
   onChange(cb: () => void): void { this.changeCb = cb; }
-  onResult(cb: (settle: SettleResult) => void): void { this.resultCb = cb; }
+  onResult(cb: (o: DealOutcome) => void): void { this.resultCb = cb; }
   onTribute(cb: (p: TributePrompt) => void): void { this.tributeCb = cb; }
   onSpeak(cb: (text: string) => void): void { this.speakCb = cb; }
   onHint(cb: (text: string, kind: 'info' | 'warn') => void): void { this.hintCb = cb; }
@@ -132,9 +136,12 @@ export class LocalDriver implements GameDriver {
   private after(): void {
     this.fireChange();
     if (isDealOver(this.state)) {
-      const settle = settleDeal(this.match, ranking(this.state));
+      const finished = ranking(this.state);
+      const settle = settleDeal(this.match, finished);
       this.match = settle.match; // 升级/打A过A 已结算；snapshot().match 随之更新
-      this.resultCb?.(settle);
+      this.phase = settle.match.over ? 'matchOver' : 'dealResult';
+      const leftover = this.state.hands[finished[3]!]!; // 末游剩牌
+      this.resultCb?.({ settle, leftover });
     } else if (this.state.turn !== HUMAN_SEAT) {
       this.scheduleAi();
     }
@@ -215,14 +222,25 @@ export class LocalDriver implements GameDriver {
       return;
     }
 
+    this.phase = 'tribute';
+    // 我是收贡方 → 给可还牌池（≤10；无则兜底全手牌，同 view 旧逻辑）；否则 null（仅展示进贡）。
+    const humanEx = plan.exchanges.find((e) => e.receiver === HUMAN_SEAT);
+    const cands = humanEx ? returnableCards(dealt[HUMAN_SEAT]!, level) : [];
+    const myReturnOptions = humanEx ? (cands.length ? cands : dealt[HUMAN_SEAT]!) : null;
+
     this.tributeCb?.({
-      dealt,
-      plan,
+      exchanges: plan.exchanges,
+      myReturnOptions,
       level,
-      resolve: (returns: Card[]): void => {
-        // returns[i] 对应 plan.exchanges[i] 的还贡牌；缺项用 autoReturn 兜底（AI 收贡侧）。
-        const merged = plan.exchanges.map((ex, i) => returns[i] ?? autoReturn(dealt[ex.receiver]!, level));
-        const tributed = applyTribute(dealt, plan, merged);
+      resolve: (returnCardId: number | null): void => {
+        // 我选的还贡牌按 id 取；AI 收贡侧 autoReturn 兜底。
+        const returns = plan.exchanges.map((ex) => {
+          if (ex.receiver === HUMAN_SEAT && returnCardId != null) {
+            return dealt[HUMAN_SEAT]!.find((c) => c.id === returnCardId) ?? autoReturn(dealt[ex.receiver]!, level);
+          }
+          return autoReturn(dealt[ex.receiver]!, level);
+        });
+        const tributed = applyTribute(dealt, plan, returns);
         this.startDealAfterTribute(level, tributed, plan.firstLeader);
       },
     });
@@ -231,6 +249,7 @@ export class LocalDriver implements GameDriver {
   /** 进贡结束（或抗贡）后真正开新局：清桌面、渲染、AI 接手。 */
   private startDealAfterTribute(level: Rank, tributed: Card[][], firstLeader: Seat): void {
     this.state = this.dealNew(level, tributed, firstLeader);
+    this.phase = 'playing';
     this.lastPlays = emptyLastPlays();
     this.lastActor = null;
     this.fireChange();
@@ -241,6 +260,7 @@ export class LocalDriver implements GameDriver {
   freshMatch(): void {
     this.match = startMatch();
     this.state = this.dealNew(dealLevel(this.match));
+    this.phase = 'playing';
     this.lastPlays = emptyLastPlays();
     this.lastActor = null;
     this.fireChange();

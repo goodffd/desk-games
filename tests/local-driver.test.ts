@@ -14,12 +14,22 @@ import { describe, it, expect } from 'vitest';
 import type { Card, Seat } from '../src/games/guandan/engine/types';
 import { rankValue } from '../src/games/guandan/engine/cards';
 import { isDealOver } from '../src/games/guandan/engine/game';
-import { autoReturn, returnableCards } from '../src/games/guandan/engine/match';
 import { LocalDriver } from '../src/games/guandan/driver/local-driver';
 import type { GameSnapshot, TributePrompt } from '../src/games/guandan/driver/types';
 
 /** 即时调度：同步执行（单测里让 AI 一口气推进到底，无定时器）。 */
 const immediate = (fn: () => void): number => { fn(); return 0; };
+
+/** 种子洗牌（确定性、可变 deal）：找「人类为收贡方」的局面用。 */
+function makeSeededShuffle(seed: number): (n: number) => number[] {
+  let s = seed >>> 0;
+  const rnd = (): number => { s = (s * 1664525 + 1013904223) >>> 0; return s / 0x100000000; };
+  return (n: number): number[] => {
+    const a = Array.from({ length: n }, (_, i) => i);
+    for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j]!, a[i]!]; }
+    return a;
+  };
+}
 
 /**
  * 确定性 shuffle，并保证「非抗贡」：把两张大王(deck id 105/107)分到 seat0/seat1。
@@ -45,9 +55,9 @@ interface DriverProbe {
   hints: string[];
 }
 
-function makeDriver(opts: { firstLeader?: Seat; schedule?: (fn: () => void, ms: number) => number } = {}): DriverProbe {
+function makeDriver(opts: { firstLeader?: Seat; schedule?: (fn: () => void, ms: number) => number; shuffle?: (n: number) => number[] } = {}): DriverProbe {
   const driver = new LocalDriver({
-    shuffle: splitJokerShuffle,
+    shuffle: opts.shuffle ?? splitJokerShuffle,
     schedule: opts.schedule ?? immediate,
     clearScheduled: () => {},
     speechBusyMs: () => 0,
@@ -65,7 +75,7 @@ function makeDriver(opts: { firstLeader?: Seat; schedule?: (fn: () => void, ms: 
   let lastWin: number | null = null;
   driver.onChange(() => { probe.changes++; });
   driver.onSpeak((t) => { probe.speaks.push(t); });
-  driver.onResult((settle) => { probe.results++; lastWin = settle.winTeam; });
+  driver.onResult((o) => { probe.results++; lastWin = o.settle.winTeam; });
   driver.onTribute((p) => { probe.tributes.push(p); });
   driver.onHint((t) => { probe.hints.push(t); });
   return probe;
@@ -166,12 +176,15 @@ describe('LocalDriver — 语音/结算/进贡', () => {
     expect(p.speaks).toContain('不要'); // 一整局必有人不要
   });
 
-  it('一局打完 → onResult 触发一次、winTeam 有效', () => {
+  it('一局打完 → onResult 触发一次、winTeam 有效、phase=dealResult、autoAdvance=false', () => {
     const p = makeDriver({ firstLeader: 1 });
+    expect(p.driver.autoAdvance).toBe(false);            // 本地手动续局
+    expect(snap(p).phase).toBe('playing');               // 开局 phase
     playDealToEnd(p);
     expect(isDealOver(snap(p).state)).toBe(true);
     expect(p.results).toBe(1);
     expect([0, 1]).toContain(p.lastSettleWinTeam());
+    expect(['dealResult', 'matchOver']).toContain(snap(p).phase); // 结算阶段
   });
 
   it('nextDealOrResult：非抗贡 → onTribute(exchanges 非空)；resolve → onChange + 新局', () => {
@@ -184,44 +197,41 @@ describe('LocalDriver — 语音/结算/进贡', () => {
 
     expect(p.tributes).toHaveLength(1);          // 进贡阶段(splitJokerShuffle 保证非抗贡)
     const prompt = p.tributes[0]!;
-    expect(prompt.plan.resist).toBe(false);
-    expect(prompt.plan.exchanges.length).toBeGreaterThan(0);
-
-    // 用 autoReturn 兜底每个收贡侧还贡，确定开新局
-    const returns: Card[] = prompt.plan.exchanges.map((ex) => autoReturn(prompt.dealt[ex.receiver]!, prompt.level));
-    prompt.resolve(returns);
+    expect(prompt.exchanges.length).toBeGreaterThan(0);  // 有进贡（归一载荷）
+    expect(snap(p).phase).toBe('tribute');               // 进 tribute 阶段
+    // 我若收贡选一张，否则传 null（AI 侧 driver 内部 autoReturn）
+    prompt.resolve(prompt.myReturnOptions ? prompt.myReturnOptions[0]!.id : null);
 
     expect(p.changes).toBeGreaterThan(changesBefore);     // resolve 触发 onChange
     const fresh = snap(p);
     expect(isDealOver(fresh.state)).toBe(false);          // 新局开始
     expect(fresh.state.hands.flat().length).toBe(108);    // 重新发满
     expect(fresh.lastActor).toBeNull();                   // 新局桌面清空
+    expect(fresh.phase).toBe('playing');                  // 回到 playing
   });
 
-  // 收贡手选路径的逻辑闸：真机冒烟里 AI 太强、自动人类难赢→收贡 UI 难触发，
-  // 故这里确定性验「resolve 用调用方指定(非 autoReturn)的还贡牌」确实流转——
-  // showTribute 的手选 DOM 本次重构未改，关键就是这张人选牌能否经 resolve 进 giver 手牌。
-  it('resolve 用调用方指定(非 autoReturn)的还贡牌 → 该牌确进 giver 新手牌、进贡牌离开 giver', () => {
-    const p = makeDriver({ firstLeader: 1 });
-    playDealToEnd(p);
-    p.driver.nextDealOrResult();
+  // 收贡手选路径逻辑闸：真机冒烟里 AI 太强、自动人类难赢→收贡 UI 难触发，故这里确定性验
+  // 「我(seat0)收贡时 resolve(选牌id) 把人选还贡牌经 applyTribute 送进 giver 手牌」。
+  // showTribute 的手选 DOM 本次未改，关键就是这条流转。用种子 shuffle 搜一个 seat0 收贡的局面。
+  it('我(seat0)收贡时 resolve(选牌id) → 该牌进 giver 手牌、进贡牌到我手里', () => {
+    let hit: DriverProbe | null = null;
+    for (let seed = 1; seed <= 60 && !hit; seed++) {
+      const cand = makeDriver({ firstLeader: (seed % 4) as Seat, shuffle: makeSeededShuffle(seed) });
+      playDealToEnd(cand);
+      cand.driver.nextDealOrResult();
+      const pr = cand.tributes[0];
+      if (pr && pr.myReturnOptions && pr.myReturnOptions.length > 0) hit = cand; // seat0 是收贡方
+    }
+    expect(hit).not.toBeNull(); // 60 个种子里必有 seat0 收贡的局面
+    const p = hit!;
     const prompt = p.tributes[0]!;
-    const ex = prompt.plan.exchanges[0]!;
-
-    // 收贡方可还的 ≤10 牌里挑「最大」一张（autoReturn 取最小，故必不同）模拟人类手选
-    const pool = returnableCards(prompt.dealt[ex.receiver]!, prompt.level);
-    expect(pool.length).toBeGreaterThan(0);
-    const chosen = pool.reduce((a, b) => (rankValue(b, prompt.level) > rankValue(a, prompt.level) ? b : a));
-    const auto = autoReturn(prompt.dealt[ex.receiver]!, prompt.level);
-    expect(chosen.id).not.toBe(auto.id); // 确与 autoReturn 不同，才真验「用了人选牌」
-
-    const returns: Card[] = prompt.plan.exchanges.map((e, i) =>
-      i === 0 ? chosen : autoReturn(prompt.dealt[e.receiver]!, prompt.level));
-    prompt.resolve(returns);
+    const ex = prompt.exchanges.find((e) => e.receiver === 0)!; // 我(seat0)收贡
+    const chosen = prompt.myReturnOptions![prompt.myReturnOptions!.length - 1]!; // 任选一张可还牌
+    prompt.resolve(chosen.id);
 
     const hands = p.driver.snapshot().state.hands;
-    expect(hands[ex.giver]!.some((c) => c.id === chosen.id)).toBe(true);      // 人选还贡牌进了 giver
-    expect(hands[ex.giver]!.some((c) => c.id === ex.tribute.id)).toBe(false); // 进贡牌已离开 giver
-    expect(hands[ex.receiver]!.some((c) => c.id === ex.tribute.id)).toBe(true); // 进贡牌到了 receiver
+    expect(hands[ex.giver]!.some((c) => c.id === chosen.id)).toBe(true);       // 人选还贡牌进了 giver
+    expect(hands[ex.giver]!.some((c) => c.id === ex.tribute.id)).toBe(false);  // 进贡牌已离开 giver
+    expect(hands[0]!.some((c) => c.id === ex.tribute.id)).toBe(true);          // 进贡牌到了我(receiver)
   });
 });

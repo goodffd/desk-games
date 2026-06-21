@@ -16,8 +16,8 @@ import { sortHand, rankValue } from '../engine/cards';
 import { isDealOver, ranking } from '../engine/game';
 import { cardEl, rankName } from './render';
 import { VOICE_CLIPS } from './voice-clips';
-import { autoReturn, returnableCards, type TributePlan, type SettleResult } from '../engine/match';
 import { LocalDriver } from '../driver/local-driver';
+import type { DealOutcome, TributePrompt } from '../driver/types';
 
 /** 级别(Rank 2..14) → 显示文字（打几）。 */
 function levelLabel(r: Rank): string {
@@ -160,6 +160,9 @@ export function mount(root: HTMLElement): () => void {
   let timedSeat: Seat | null = null; // 当前在倒计时的座位
   let turnStartedAt = 0;             // 本回合开始时间戳
   let turnTick: number | null = null;
+  // 弹层引用：onChange 时按 phase 收（本地按钮点击也会直接收，二者幂等；联机无按钮场景靠 phase 收）
+  let tributeOverlay: HTMLElement | null = null;
+  let resultOverlay: HTMLElement | null = null;
 
   const sortedHand = (seat: Seat): Card[] => sortHand(state.hands[seat]!, state.level);
 
@@ -509,9 +512,11 @@ export function mount(root: HTMLElement): () => void {
    * 进贡阶段弹层：展示进贡(动画滑入) + 人类收贡时手选 ≤10 还贡。点「确定」回调 returns 开局。
    * 人类为收贡方时须手选；AI 收贡 autoReturn；人类仅为进贡方时无需选(进贡牌自动取最大)。
    */
-  function showTribute(dealt: Card[][], plan: TributePlan, level: Rank, onDone: (returns: Card[]) => void): void {
+  function showTribute(p: TributePrompt): void {
+    const { exchanges, myReturnOptions, level } = p;
     const overlay = document.createElement('div');
     overlay.className = 'gd-overlay';
+    tributeOverlay = overlay;
     const box = document.createElement('div');
     box.className = 'gd-tribute';
     const title = document.createElement('div');
@@ -519,10 +524,7 @@ export function mount(root: HTMLElement): () => void {
     title.textContent = '进贡 · 还贡';
     box.appendChild(title);
 
-    const returns: Card[] = new Array(plan.exchanges.length);
-    let humanIdx = -1; // 人类作为收贡方的 exchange 下标
-
-    plan.exchanges.forEach((ex, i) => {
+    exchanges.forEach((ex) => {
       const row = document.createElement('div');
       row.className = 'gd-tribute__row';
       const g = document.createElement('span');
@@ -535,28 +537,36 @@ export function mount(root: HTMLElement): () => void {
       r.className = 'gd-tribute__who'; r.textContent = SEAT_LABELS[ex.receiver];
       row.append(g, arrow, card, r);
       box.appendChild(row);
-      if (ex.receiver === HUMAN_SEAT) humanIdx = i;
-      else returns[i] = autoReturn(dealt[ex.receiver]!, level);
     });
 
-    const confirmBtn = document.createElement('button');
-    confirmBtn.className = 'gd-btn gd-btn--restart';
+    // 确定后：收弹层 + 进贡结果文案提示（X 进贡♥给 Y）。
+    const closeAndHint = (): void => {
+      overlay.remove(); if (tributeOverlay === overlay) tributeOverlay = null;
+      selectedIds.clear();
+      const parts = exchanges.map((ex) =>
+        `${SEAT_LABELS[ex.giver]}进贡${cardBrief(ex.tribute, level)}给${SEAT_LABELS[ex.receiver]}`);
+      showHint(parts.join('；'), 'info');
+    };
 
-    if (humanIdx >= 0) {
-      const ex = plan.exchanges[humanIdx]!;
-      const cands = returnableCards(dealt[HUMAN_SEAT]!, level);
-      const pool = sortHand(cands.length ? cands : dealt[HUMAN_SEAT]!, level); // 无≤10兜底全手牌
+    if (myReturnOptions) {
+      // 我收贡：手选一张 ≤10 还贡 → resolve(选的牌 id)
+      const ex = exchanges.find((e) => e.receiver === HUMAN_SEAT)!;
       const hint = document.createElement('div');
       hint.className = 'gd-tribute__hint';
-      hint.textContent = `你收到 ${cardBrief(ex.tribute, level)}，选一张${cands.length ? ' ≤10 ' : ''}牌还贡给 ${SEAT_LABELS[ex.giver]}`;
+      hint.textContent = `你收到 ${cardBrief(ex.tribute, level)}，选一张牌还贡给 ${SEAT_LABELS[ex.giver]}`;
       box.appendChild(hint);
       const picks = document.createElement('div');
       picks.className = 'gd-tribute__picks';
-      for (const c of pool) {
+      let pickedId: number | null = null;
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'gd-btn gd-btn--restart';
+      confirmBtn.textContent = '确定，开局';
+      confirmBtn.disabled = true; // 须先选还贡牌
+      for (const c of sortHand(myReturnOptions, level)) {
         const ce = cardEl(c, level, true);
         ce.classList.add('gd-tribute__pickcard');
         ce.addEventListener('click', () => {
-          returns[humanIdx] = c;
+          pickedId = c.id;
           picks.querySelectorAll('.gd-tribute__pickcard').forEach(x => x.classList.remove('is-picked'));
           ce.classList.add('is-picked');
           confirmBtn.disabled = false;
@@ -564,30 +574,35 @@ export function mount(root: HTMLElement): () => void {
         picks.appendChild(ce);
       }
       box.appendChild(picks);
-      confirmBtn.disabled = true; // 须先选还贡牌
+      confirmBtn.addEventListener('click', () => { p.resolve(pickedId); closeAndHint(); });
+      box.appendChild(confirmBtn);
+    } else if (!driver.autoAdvance) {
+      // 本地非收贡方：确定继续（driver 全 autoReturn 后开新局）
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'gd-btn gd-btn--restart';
+      confirmBtn.textContent = '确定，开局';
+      confirmBtn.addEventListener('click', () => { p.resolve(null); closeAndHint(); });
+      box.appendChild(confirmBtn);
+    } else {
+      // 联机非收贡方：等待（服务端自动收齐还贡→新局 state→phase 变→onChange 收弹层）
+      const waiting = document.createElement('div');
+      waiting.className = 'gd-tribute__hint';
+      waiting.textContent = '等待收贡方还贡…';
+      box.appendChild(waiting);
     }
 
-    confirmBtn.textContent = '确定，开局';
-    confirmBtn.addEventListener('click', () => {
-      overlay.remove();
-      selectedIds.clear();
-      onDone(returns); // driver: applyTribute + 开新局 + onChange（镜像渲染）
-      // 进贡结果提示（展示层文案，driver 不构建）：X 进贡♥给 Y
-      const parts = plan.exchanges.map(ex =>
-        `${SEAT_LABELS[ex.giver]}进贡${cardBrief(ex.tribute, level)}给${SEAT_LABELS[ex.receiver]}`);
-      showHint(parts.join('；'), 'info');
-    });
-    box.appendChild(confirmBtn);
     overlay.appendChild(box);
     gameEl.appendChild(overlay);
   }
 
-  function showResult(settle: SettleResult): void {
+  function showResult(o: DealOutcome): void {
+    const settle = o.settle;
     const ranks = ranking(state);
     // settle 由 driver 结算并经 onResult 载荷传入；match 已结算同步进镜像、renderLevels 已在 onResult handler 调。
 
     const overlay = document.createElement('div');
     overlay.className = 'gd-overlay';
+    resultOverlay = overlay;
     const box = document.createElement('div');
     box.className = 'gd-result';
     const title = document.createElement('div');
@@ -617,9 +632,9 @@ export function mount(root: HTMLElement): () => void {
     }
     box.appendChild(gainEl);
 
-    // 末游没出完的牌（本局结束时仍在手）
+    // 末游没出完的牌：用 driver 提供的 leftover（联机别家手牌是占位，不能读 state.hands）
     const last = ranks[3]!;
-    const leftover = sortHand(state.hands[last]!, state.level);
+    const leftover = sortHand(o.leftover, state.level);
     if (leftover.length > 0) {
       const lbl = document.createElement('div');
       lbl.className = 'gd-result__leftlabel';
@@ -631,17 +646,31 @@ export function mount(root: HTMLElement): () => void {
       box.appendChild(lcards);
     }
 
-    const btn = document.createElement('button');
-    btn.className = 'gd-btn gd-btn--restart';
-    btn.textContent = settle.match.over ? '再来一盘' : '下一局';
-    btn.addEventListener('click', () => {
-      overlay.remove();
-      selectedIds.clear();
-      clearHint();
-      if (settle.match.over) driver.freshMatch();   // 再来一盘
-      else driver.nextDealOrResult();               // 下一局 → 进贡/抗贡（driver 发 onTribute/onHint）
-    });
-    box.appendChild(btn);
+    const closeResult = (): void => {
+      overlay.remove(); if (resultOverlay === overlay) resultOverlay = null;
+      selectedIds.clear(); clearHint();
+    };
+    if (settle.match.over) {
+      // 整盘结束 → 再来一盘（本地 freshMatch；联机房主 freshMatch=发 restart。非房主隐藏在 Task 10 细化）
+      const btn = document.createElement('button');
+      btn.className = 'gd-btn gd-btn--restart';
+      btn.textContent = '再来一盘';
+      btn.addEventListener('click', () => { closeResult(); driver.freshMatch(); });
+      box.appendChild(btn);
+    } else if (!driver.autoAdvance) {
+      // 本地 → 手动「下一局」（进贡/抗贡）
+      const btn = document.createElement('button');
+      btn.className = 'gd-btn gd-btn--restart';
+      btn.textContent = '下一局';
+      btn.addEventListener('click', () => { closeResult(); driver.nextDealOrResult(); });
+      box.appendChild(btn);
+    } else {
+      // 联机非整盘结束 → 服务端自动续局，无按钮（下个 state 到→phase 变→onChange 收弹层）
+      const waiting = document.createElement('div');
+      waiting.className = 'gd-result__gain';
+      waiting.textContent = '下一局准备中…';
+      box.appendChild(waiting);
+    }
     overlay.appendChild(box);
     gameEl.appendChild(overlay);
   }
@@ -663,11 +692,18 @@ export function mount(root: HTMLElement): () => void {
     const s = driver.snapshot();
     state = s.state; match = s.match; lastPlays = s.lastPlays; lastActor = s.lastActor; started = s.started;
   }
-  driver.onChange(() => { syncFromDriver(); renderLevels(); renderAll(); });
+  driver.onChange(() => {
+    syncFromDriver();
+    // 按 phase 收弹层：本地按钮点击也会直接收(幂等)；联机无按钮场景(自动续局/非收贡)靠这里收。
+    const phase = driver.snapshot().phase;
+    if (phase !== 'tribute' && tributeOverlay) { tributeOverlay.remove(); tributeOverlay = null; }
+    if (phase !== 'dealResult' && phase !== 'matchOver' && resultOverlay) { resultOverlay.remove(); resultOverlay = null; }
+    renderLevels(); renderAll();
+  });
   driver.onSpeak((text) => speak(text));                                              // 报牌/不要语音
   driver.onHint((text, kind) => showHint(text, kind === 'warn' ? 'error' : 'info'));  // 抗贡等提示
-  driver.onResult((settle) => { syncFromDriver(); renderLevels(); showResult(settle); }); // 局终结算弹层
-  driver.onTribute((p) => showTribute(p.dealt, p.plan, p.level, p.resolve));          // 进贡/还贡弹层
+  driver.onResult((o) => { syncFromDriver(); renderLevels(); showResult(o); });        // 局终结算弹层
+  driver.onTribute((p) => showTribute(p));                                            // 进贡/还贡弹层
 
   // 滑动选牌：手牌区内 pointermove 经过的牌切到同一目标态；任意处松手结束
   const onHandPointerMove = (e: PointerEvent): void => {

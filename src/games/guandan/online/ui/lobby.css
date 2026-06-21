@@ -163,8 +163,9 @@
 .gd-lobby__panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .gd-lobby__panel-head .gd-lobby__panel-title { margin-bottom: 0; }
 
-/* 面板内主按钮：去掉 base 的 margin-top，改用统一下间距 */
-.gd-lobby__panel .gd-lobby__btn { margin-top: 0; margin-bottom: 10px; }
+/* 面板内主按钮(建房/匹配)：去掉 base 的 margin-top，改用统一下间距。
+   排除 mini(刷新/加入/观战)——否则那 margin-bottom 让 mini 在 flex 居中里被顶高、跟徽章不齐。 */
+.gd-lobby__panel .gd-lobby__btn:not(.gd-lobby__mini) { margin-top: 0; margin-bottom: 10px; }
 .gd-lobby__match { margin-top: 4px; font-size: 13px; color: var(--gold, #c9a84c); text-align: center; letter-spacing: 0.04em; }
 
 /* 小按钮（刷新/观战）：非满宽 */

@@ -24,8 +24,7 @@ export interface RoomHandle {
   cleanup: () => void;
 }
 
-// 服务端座 → 十字格位（你恒在底；座序逆时针 0下/1右/2上/3左，与牌桌一致）。
-// 但联机里"你"可能是任意服务端座，这里以 you 为底做 egocentric 摆位。
+// 服务端座 → 十字格位（固定：座 0下/1右/2上/3左，所有人看到同一布局，不 egocentric）。
 const POS_CLASS = ['gd-room__seat--bottom', 'gd-room__seat--right', 'gd-room__seat--top', 'gd-room__seat--left'];
 
 export function renderRoom(root: HTMLElement, opts: RoomOpts): RoomHandle {
@@ -63,12 +62,12 @@ export function renderRoom(root: HTMLElement, opts: RoomOpts): RoomHandle {
   root.appendChild(wrap);
 
   function renderState(st: RoomState): void {
-    const base: number = typeof st.you === 'number' ? st.you : 0; // egocentric：你在底
-    for (let i = 0; i < 4; i++) {
-      const serverSeat = ((i + base) % 4) as Seat; // 视图位 i → 服务端座
-      const viewPos = ((serverSeat - base + 4) % 4); // = i；摆位类
-      const elx = seatEls[i]!;
-      elx.className = `gd-room__seat ${POS_CLASS[viewPos]} gd-room__seat--team${serverSeat % 2}`;
+    // 房间页固定座位（不 egocentric）：座0=房主恒在底、1右/2上/3左，所有人看到同一布局，
+    // 入座不翻转（避免「房主在底→自己跳到底」的晕）。你那座靠 is-you 高亮 +（你）标。
+    for (let s = 0; s < 4; s++) {
+      const serverSeat = s as Seat;
+      const elx = seatEls[s]!;
+      elx.className = `gd-room__seat ${POS_CLASS[serverSeat]} gd-room__seat--team${serverSeat % 2}`;
       elx.innerHTML = '';
       const info = st.seats[serverSeat] ?? null;
       const isYou = st.you === serverSeat;

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+// @ts-ignore
 import { RoomRegistry } from '../server/guandan-rooms.mjs';
 
 function fakeClient() { const sent: any[] = []; return { sent, send: (m: any) => sent.push(m) }; }
@@ -114,8 +115,8 @@ describe('RoomRegistry — 房主开打', () => {
   it('房主 4 人满 start → playing，建 driver，广播 started + driver 初态', () => {
     const cs = fourSeated();
     reg.handle(cs[0], { t: 'start' });
-    expect(cs[0].sent).toContainEqual({ t: 'started' });
-    expect(cs[3].sent).toContainEqual({ t: 'state', phase: 'playing', turn: 0 });
+    expect(cs[0]!.sent).toContainEqual({ t: 'started' });
+    expect(cs[3]!.sent).toContainEqual({ t: 'state', phase: 'playing', turn: 0 });
     const room = reg.rooms.get('ABC123');
     expect(room.status).toBe('playing');
     expect(room.driver.started).toBe(true);
@@ -208,7 +209,7 @@ describe('RoomRegistry — 掉线', () => {
     const room = reg.rooms.get('ABC123');
     expect(room).toBeTruthy();
     expect(room.seats[2]).toMatchObject({ online: false, ai: true, nick: 'p2' }); // 保留昵称作凭据
-    expect(cs[0].sent).toContainEqual({ t: 'peer-offline', seat: 2 });
+    expect(cs[0]!.sent).toContainEqual({ t: 'peer-offline', seat: 2 });
   });
 
   it('playing 中 4 真人全掉线 → 删房', () => {
@@ -241,7 +242,7 @@ describe('RoomRegistry — 重连', () => {
     expect(re.sent).toContainEqual({ t: 'state', resync: 2 });
     const room = reg.rooms.get('ABC123');
     expect(room.seats[2]).toMatchObject({ online: true, ai: false, nick: 'p2' });
-    expect(cs[0].sent).toContainEqual({ t: 'peer-back', seat: 2 });
+    expect(cs[0]!.sent).toContainEqual({ t: 'peer-back', seat: 2 });
   });
 
   it('座位未掉线 / 昵称不符 → error', () => {

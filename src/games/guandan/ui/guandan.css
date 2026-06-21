@@ -404,14 +404,17 @@
 }
 
 /* --- 操作按钮：绝对定位钉死在可玩区固定位置，不随手牌张数变化而上下移动 --- */
+/* 出牌/不要：移到手牌下方、底部「你」人像的左右两侧（出牌在左、不要在右），
+   居中 + 大 gap 让人像落在两按钮中间的空洞里，不盖人像、也不再压手牌选牌 */
 .gd-actions {
   display: flex;
-  gap: 0.8rem;
+  gap: 120px;          /* 中间空洞容纳「你」人像 + 名字/张数 */
   justify-content: center;
-  padding: 0.35rem 0;
+  align-items: center;
+  padding: 0;
   position: absolute;
-  top: 52%; left: 50%; transform: translateX(-50%);
-  z-index: 8;          /* 出牌/不要 始终在出牌区(z-index 4)之上，不被牌盖住 */
+  bottom: 2.5%; left: 50%; transform: translateX(-50%);  /* 与人像同处可玩区底部 2.5% */
+  z-index: 8;          /* 出牌/不要 在出牌区(z-index 4)之上，不被牌盖住 */
 }
 
 .gd-btn {
@@ -608,7 +611,7 @@
   .gd-play__cards .gd-card { margin: 0; }
   .gd-play__cards .gd-card + .gd-card { margin-left: -18px; }
   .gd-card--small .gd-card__suit--wild { font-size: 0.46rem; } /* 出牌区「配」字缩小，不压大花色 */
-  .gd-actions { top: 26%; }   /* 抬到手牌上方,选牌不被按钮挡 */
+  .gd-actions { gap: 92px; }   /* 手机：人像/张数较窄，缩小中间空洞 */
   /* 上家右移、下家左移：剩≤10张时名字旁加张数徽标变宽，贴边居中会被屏幕边缘裁掉左/右侧 */
   .gd-seat--left  { left: 34px; }
   .gd-seat--right { right: 34px; }

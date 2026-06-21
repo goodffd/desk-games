@@ -75,6 +75,7 @@ function onlineMount(root: HTMLElement): () => void {
   function showLobby(): void {
     clearScreen();
     mySeat = null; isHost = false;
+    session.clearRoom(); // 在大厅=不在任何房；清重连凭据，避免下次刷新拿旧房号去 rejoin 死房
     lobbyH = renderLobby(root, {
       nick: session.nick, rooms: [],
       onCreate: () => session.send(c2s.create(false)),
@@ -131,7 +132,17 @@ function onlineMount(root: HTMLElement): () => void {
   session.on('peer-offline', (m) => toast(`${peerLabel((m as { seat: number }).seat)} 掉线，AI 接管`));
   session.on('peer-back', (m) => toast(`${peerLabel((m as { seat: number }).seat)} 回来了`));
   session.on('room-closed', () => { session.clearRoom(); toast('房间已解散'); showLobby(); });
-  session.on('error', (m) => { lobbyH?.setMatching(false); toast((m as { msg: string }).msg); });
+  session.on('error', (m) => {
+    const msg = (m as { msg: string }).msg;
+    lobbyH?.setMatching(false);
+    // 空屏=重连(rejoin)失败(常见于服务端重启后房间没了、或座位被收回)→ 清陈旧房况、回昵称页，不卡死
+    if (!nickH && !lobbyH && !roomH && !tableCleanup) {
+      session.clearRoom();
+      showNickname();
+    } else {
+      toast(msg);
+    }
+  });
 
   session.connect();
   return () => { clearScreen(); session.dispose(); };

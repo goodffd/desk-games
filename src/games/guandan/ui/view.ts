@@ -12,17 +12,12 @@ import './rank-font.css';
 import { navigate } from '../../../shell/nav';
 
 import type { Card, Seat, Combo, Rank } from '../engine/types';
-import { makeDeck, deal, sortHand, rankValue } from '../engine/cards';
-import { createDeal, play, pass, isDealOver, ranking } from '../engine/game';
-import type { DealState } from '../engine/game';
-import { isLegalPlay } from '../engine/legal';
-import { choosePlay } from '../ai/ai';
-import { cardEl, comboSpeech, rankName } from './render';
+import { sortHand, rankValue } from '../engine/cards';
+import { isDealOver, ranking } from '../engine/game';
+import { cardEl, rankName } from './render';
 import { VOICE_CLIPS } from './voice-clips';
-import {
-  startMatch, settleDeal, planTribute, autoReturn, applyTribute, dealLevel,
-  returnableCards, type MatchState, type TributePlan,
-} from '../engine/match';
+import { autoReturn, returnableCards, type TributePlan, type SettleResult } from '../engine/match';
+import { LocalDriver } from '../driver/local-driver';
 
 /** 级别(Rank 2..14) → 显示文字（打几）。 */
 function levelLabel(r: Rank): string {
@@ -49,15 +44,6 @@ const SEAT_LABELS: Record<Seat, string> = { 0: '你', 1: '下家', 2: '对家', 
 const SEAT_POS: Record<Seat, string> = { 0: 'bottom', 1: 'right', 2: 'top', 3: 'left' };
 
 type LastPlay = Combo | 'pass' | null;
-
-function randomShuffle(n: number): number[] {
-  const arr = Array.from({ length: n }, (_, i) => i);
-  for (let i = n - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j]!, arr[i]!];
-  }
-  return arr;
-}
 
 /** 出牌展示排序：同点数聚一起，组越大越靠前（三带二=三同在前/对子在后；连对/钢板/顺子自然成组） */
 function sortComboCards(cards: Card[], level: Rank): Card[] {
@@ -145,14 +131,6 @@ function speak(text: string): void {
   speakTTS(text);
 }
 
-/** 发一局：按级牌 level 发牌+排序+定首攻（首局随机首攻；后续局由调用方传 hands/firstLeader）。 */
-function startNewDeal(level: Rank, hands?: Card[][], firstLeader?: Seat): DealState {
-  const dealt = hands ?? deal(makeDeck(), randomShuffle);
-  const sortedHands = dealt.map(h => sortHand(h, level));
-  const leader = firstLeader ?? (Math.floor(Math.random() * 4) as Seat);
-  return createDeal(sortedHands, leader, level);
-}
-
 /** 头像：圆形 + 简笔人像，按队伍(座%2)配色 */
 function avatarEl(seat: Seat): HTMLElement {
   const av = document.createElement('div');
@@ -166,15 +144,19 @@ function avatarEl(seat: Seat): HTMLElement {
 }
 
 export function mount(root: HTMLElement): () => void {
-  let match: MatchState = startMatch();          // 整盘状态（两队级别/庄家/打A过A）
-  let state = startNewDeal(dealLevel(match));     // 当前这一局
-  let started = false;    // 点「开始游戏」后才置 true：之前不显示「思考中」等状态文字
-  let selectedIds = new Set<number>();
+  // 本地（调试）模式：牌局逻辑/AI/进贡全在 LocalDriver；view 只读快照渲染、调动作、订阅事件。
+  // 注入 speechBusyMs：AI 等本句报牌（gdSpeakEndAt）播完再出下一手，driver 自身保持 DOM-free。
+  const driver = new LocalDriver({ speechBusyMs: () => Math.max(0, gdSpeakEndAt - performance.now()) });
+  // 渲染镜像：onChange 把 driver.snapshot() 拷进这些变量后 renderAll（渲染函数体原样不改）。
+  const snap0 = driver.snapshot();
+  let state = snap0.state;            // 当前这一局引擎态
+  let match = snap0.match;            // 整盘状态（两队级别/庄家/打A过A）
+  let started = snap0.started;        // 点「开始游戏」后才 true（由 driver 同步）
+  let lastPlays: Record<Seat, LastPlay> = snap0.lastPlays;
+  let lastActor: Seat | null = snap0.lastActor; // 最近出牌/不要者：其出牌区浮到手牌区之上
+  const selectedIds = new Set<number>();
   let dragging = false;   // 滑动选牌进行中
   let dragMode = true;    // 本次划动目标态：true=选中 / false=取消
-  let lastPlays: Record<Seat, LastPlay> = { 0: null, 1: null, 2: null, 3: null };
-  let lastActor: Seat | null = null; // 最近出牌/不要的人：其出牌区浮到手牌区之上，其余沉到手牌区之下
-  const timers: number[] = [];
   let timedSeat: Seat | null = null; // 当前在倒计时的座位
   let turnStartedAt = 0;             // 本回合开始时间戳
   let turnTick: number | null = null;
@@ -337,7 +319,7 @@ export function mount(root: HTMLElement): () => void {
       cardsDiv.className = 'gd-play__cards';
       for (const c of sortComboCards(lp.cards, state.level).slice(0, 14)) cardsDiv.appendChild(cardEl(c, state.level, true));
       elx.appendChild(cardsDiv);
-      // 牌型不再用文字说明，改用语音播报（见 applyPlay → speak）
+      // 牌型不再用文字说明，改用语音播报（driver.onSpeak → speak）
     }
   }
 
@@ -471,35 +453,9 @@ export function mount(root: HTMLElement): () => void {
     handEl.classList.toggle('gd-hand--dim', !myTurn && started && !isDealOver(state) && latestPlayCoversHand());
   }
 
-  // ── 出牌（视图层同时维护 lastPlays） ────────────────────────
-  function applyPlay(seat: Seat, cards: Card[]): void {
-    const wasLead = state.current === null;
-    state = play(state, seat, cards);
-    if (wasLead) lastPlays = { 0: null, 1: null, 2: null, 3: null }; // 新一圈：清掉上圈
-    lastPlays[seat] = state.current ? state.current.combo : null;
-    lastActor = seat; // 这家刚出牌：其出牌区浮到手牌之上，下一家出牌时再沉下去
-    if (state.current) speak(comboSpeech(state.current.combo, state.level)); // 语音：牌型/具体点数(见 comboSpeech)
-  }
-  function applyPass(seat: Seat): void {
-    state = pass(state, seat);
-    lastPlays[seat] = 'pass';
-    lastActor = seat;
-    speak('不要');
-    // 不在此清桌面：一圈结束(其余全过)时若立刻清，会把刚喊「不要」收尾这圈的那家「不要」瞬间抹掉
-    // ——声音响了却没显示，牌局尾声(剩牌少、频繁全过收圈)尤其常见。改为留到赢家领新圈时由
-    // applyPlay 的 wasLead 统一清；赢家是我时手牌已 z8 浮在最上盖住桌面旧牌，不会挡选牌。
-  }
-
+  // ── 出牌（牌局推进在 LocalDriver；view 只取选中牌、转 driver） ──
   function getSelectedCards(): Card[] {
     return state.hands[HUMAN_SEAT]!.filter(c => selectedIds.has(c.id));
-  }
-
-  function afterAction(): void {
-    selectedIds.clear();
-    showHint('', 'info');
-    renderAll();
-    if (isDealOver(state)) showResult();
-    else if (state.turn !== HUMAN_SEAT) scheduleAi();
   }
 
   // ── 回合倒计时（替代「思考中」）：超时自动出牌 ──────────────────
@@ -532,108 +488,23 @@ export function mount(root: HTMLElement): () => void {
     if (remain <= 0) {
       const seat = timedSeat;
       if (turnTick !== null) { window.clearInterval(turnTick); turnTick = null; }
-      autoPlayTimeout(seat);
+      driver.timeoutSeat(seat); // 超时托管：driver 用 choosePlay 替该座出一手
     }
-  }
-  /** 回合超时：自动出一手（AI 策略兜底，保证合法）。 */
-  function autoPlayTimeout(seat: Seat): void {
-    if (!started || isDealOver(state) || state.turn !== seat) return;
-    try {
-      const decision = choosePlay(state, seat);
-      if (decision === null) applyPass(seat);
-      else applyPlay(seat, decision);
-    } catch (e) {
-      console.error('autoPlay error', e);
-      if (state.current !== null) applyPass(seat); else return;
-    }
-    afterAction();
   }
 
   function handlePlay(): void {
     const cards = getSelectedCards();
     if (cards.length === 0) { showHint('请先选择要出的牌', 'error'); return; }
-    if (!isLegalPlay(cards, state.current?.combo ?? null, state.hands[HUMAN_SEAT]!, state.level)) {
-      showHint('所选牌不合法，请重新选择', 'error'); return;
-    }
-    applyPlay(HUMAN_SEAT, cards);
-    afterAction();
+    if (!driver.play(cards)) { showHint('所选牌不合法，请重新选择', 'error'); return; }
+    selectedIds.clear();
+    showHint('', 'info');
   }
 
   function handlePass(): void {
-    if (state.current === null) return;
-    applyPass(HUMAN_SEAT);
-    afterAction();
+    driver.pass(); // 领出(current=null)时 driver 返回 false，等价原 early-return
   }
 
-  // ── AI 自动推进 ────────────────────────────────────────────
-  function scheduleAi(): void {
-    if (isDealOver(state) || state.turn === HUMAN_SEAT) return;
-    const act = (): void => {
-      if (isDealOver(state) || state.turn === HUMAN_SEAT) return;
-      // 上一手报牌还在播就再等，等播完再出，语音不被下一手打断截断
-      const left = gdSpeakEndAt - performance.now();
-      if (left > 0) { timers.push(window.setTimeout(act, Math.min(left + 50, 1600))); return; }
-      const seat = state.turn;
-      const decision = choosePlay(state, seat);
-      try {
-        if (decision === null) applyPass(seat);
-        else applyPlay(seat, decision);
-      } catch (e) {
-        console.error('AI step error', e);
-        return;
-      }
-      renderAll();
-      if (isDealOver(state)) showResult();
-      else if (state.turn !== HUMAN_SEAT) scheduleAi();
-    };
-    timers.push(window.setTimeout(act, 1200 + Math.floor(Math.random() * 1300))); // 思考 1.2~2.5s(让倒计时可见)+ 等上句报牌播完
-  }
-
-  // ── 局终 / 整盘编排 ─────────────────────────────────────────
-  /** 重置整盘从打 2 开打（再来一盘）。 */
-  function freshMatch(): void {
-    match = startMatch();
-    state = startNewDeal(dealLevel(match));
-    selectedIds.clear();
-    lastPlays = { 0: null, 1: null, 2: null, 3: null };
-    lastActor = null;
-    renderLevels();
-    clearHint();
-    renderAll();
-    if (state.turn !== HUMAN_SEAT) scheduleAi();
-  }
-
-  /** 进贡结束后真正开新局（清状态、渲染、AI 接手）。 */
-  function startDealAfterTribute(level: Rank, tributed: Card[][], firstLeader: Seat): void {
-    state = startNewDeal(level, tributed, firstLeader);
-    selectedIds.clear();
-    lastPlays = { 0: null, 1: null, 2: null, 3: null };
-    lastActor = null;
-    renderAll();
-    if (state.turn !== HUMAN_SEAT) scheduleAi();
-  }
-
-  /** 进下一局：按新级牌发牌 → 进贡/还贡(人类收贡手选、AI 自动) → 定首攻开局。 */
-  function nextDeal(): void {
-    const finished = ranking(state);     // 上一局名次（settle 已用，进贡再用）
-    const level = dealLevel(match);      // 新级牌 = 上局赢家队级别
-    const dealt = deal(makeDeck(), randomShuffle);
-    const plan = planTribute(finished, dealt, level);
-    if (plan.resist) {
-      startDealAfterTribute(level, dealt, plan.firstLeader);
-      showHint('对方持两张大王，抗贡！本局免进贡', 'info');
-      return;
-    }
-    // 进贡阶段（含进贡动画 + 人类还贡手选）
-    showTribute(dealt, plan, level, (returns) => {
-      const tributed = applyTribute(dealt, plan, returns);
-      startDealAfterTribute(level, tributed, plan.firstLeader);
-      const parts = plan.exchanges.map(ex =>
-        `${SEAT_LABELS[ex.giver]}进贡${cardBrief(ex.tribute, level)}给${SEAT_LABELS[ex.receiver]}`);
-      showHint(parts.join('；'), 'info');
-    });
-  }
-
+  // ── 局终 / 整盘编排（弹层在 view；牌局推进/结算/进贡决策在 LocalDriver） ──
   /**
    * 进贡阶段弹层：展示进贡(动画滑入) + 人类收贡时手选 ≤10 还贡。点「确定」回调 returns 开局。
    * 人类为收贡方时须手选；AI 收贡 autoReturn；人类仅为进贡方时无需选(进贡牌自动取最大)。
@@ -699,18 +570,21 @@ export function mount(root: HTMLElement): () => void {
     confirmBtn.textContent = '确定，开局';
     confirmBtn.addEventListener('click', () => {
       overlay.remove();
-      onDone(returns);
+      selectedIds.clear();
+      onDone(returns); // driver: applyTribute + 开新局 + onChange（镜像渲染）
+      // 进贡结果提示（展示层文案，driver 不构建）：X 进贡♥给 Y
+      const parts = plan.exchanges.map(ex =>
+        `${SEAT_LABELS[ex.giver]}进贡${cardBrief(ex.tribute, level)}给${SEAT_LABELS[ex.receiver]}`);
+      showHint(parts.join('；'), 'info');
     });
     box.appendChild(confirmBtn);
     overlay.appendChild(box);
     gameEl.appendChild(overlay);
   }
 
-  function showResult(): void {
+  function showResult(settle: SettleResult): void {
     const ranks = ranking(state);
-    const settle = settleDeal(match, ranks);
-    match = settle.match;            // 升级 / 打A过A 已结算
-    renderLevels();
+    // settle 由 driver 结算并经 onResult 载荷传入；match 已结算同步进镜像、renderLevels 已在 onResult handler 调。
 
     const overlay = document.createElement('div');
     overlay.className = 'gd-overlay';
@@ -762,8 +636,10 @@ export function mount(root: HTMLElement): () => void {
     btn.textContent = settle.match.over ? '再来一盘' : '下一局';
     btn.addEventListener('click', () => {
       overlay.remove();
-      if (settle.match.over) freshMatch();
-      else nextDeal();
+      selectedIds.clear();
+      clearHint();
+      if (settle.match.over) driver.freshMatch();   // 再来一盘
+      else driver.nextDealOrResult();               // 下一局 → 进贡/抗贡（driver 发 onTribute/onHint）
     });
     box.appendChild(btn);
     overlay.appendChild(box);
@@ -780,6 +656,18 @@ export function mount(root: HTMLElement): () => void {
   // ── 绑定 + 初次渲染 ────────────────────────────────────────
   playBtn.addEventListener('click', handlePlay);
   passBtn.addEventListener('click', handlePass);
+
+  // ── LocalDriver 事件 → view 渲染/弹层/语音/提示 ──────────────
+  // onChange：拷快照进镜像变量 + 顶栏级别 + 整屏渲染（renderAll 等渲染函数体不变）。
+  function syncFromDriver(): void {
+    const s = driver.snapshot();
+    state = s.state; match = s.match; lastPlays = s.lastPlays; lastActor = s.lastActor; started = s.started;
+  }
+  driver.onChange(() => { syncFromDriver(); renderLevels(); renderAll(); });
+  driver.onSpeak((text) => speak(text));                                              // 报牌/不要语音
+  driver.onHint((text, kind) => showHint(text, kind === 'warn' ? 'error' : 'info'));  // 抗贡等提示
+  driver.onResult((settle) => { syncFromDriver(); renderLevels(); showResult(settle); }); // 局终结算弹层
+  driver.onTribute((p) => showTribute(p.dealt, p.plan, p.level, p.resolve));          // 进贡/还贡弹层
 
   // 滑动选牌：手牌区内 pointermove 经过的牌切到同一目标态；任意处松手结束
   const onHandPointerMove = (e: PointerEvent): void => {
@@ -824,15 +712,12 @@ export function mount(root: HTMLElement): () => void {
   startBtn.addEventListener('click', () => {
     primeAudio();
     startOverlay.remove();
-    started = true;
-    renderAll(); // 开始后才显示状态/思考中浮标
-    if (state.turn !== HUMAN_SEAT) scheduleAi();
+    driver.start(); // started=true + onChange(整屏渲染) + 非我回合起 AI
   });
   gameEl.appendChild(startOverlay);
 
   return () => {
-    for (const t of timers) clearTimeout(t);
-    timers.length = 0;
+    driver.dispose(); // 清 driver 的 AI 定时器
     if (turnTick !== null) { window.clearInterval(turnTick); turnTick = null; }
     window.removeEventListener('pointerup', onPointerUp);
     window.removeEventListener('resize', onResize);

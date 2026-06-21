@@ -181,3 +181,39 @@ describe('RoomRegistry — 大厅 + 观战', () => {
     expect(v.sent.length).toBe(before); // 无响应
   });
 });
+
+describe('RoomRegistry — 掉线', () => {
+  const drv = (room: any) => ({ start: () => [], setAI: (seat: number, on: boolean) => [{ to: 'all', msg: { t: 'state', aiSeat: seat, ai: on } }] });
+  let reg: any;
+  beforeEach(() => { reg = new RoomRegistry(() => 'ABC123', drv); });
+  const hello = (c: any, n: string) => reg.handle(c, { t: 'hello', nick: n });
+  function playing() {
+    const cs = [fakeClient(), fakeClient(), fakeClient(), fakeClient()];
+    cs.forEach((c, i) => hello(c, 'p' + i));
+    reg.handle(cs[0], { t: 'create' });
+    for (let i = 1; i < 4; i++) { reg.handle(cs[i], { t: 'join', code: 'ABC123' }); reg.handle(cs[i], { t: 'take-seat', seat: i }); }
+    reg.handle(cs[0], { t: 'start' });
+    return cs;
+  }
+
+  it('waiting 房房主离开 → 删房', () => {
+    const a = fakeClient(); hello(a, '甲'); reg.handle(a, { t: 'create' });
+    reg.leave(a);
+    expect(reg.rooms.has('ABC123')).toBe(false);
+  });
+
+  it('playing 中一人掉线 → 座位 offline+ai，其余收 peer-offline，房保留', () => {
+    const cs = playing();
+    reg.leave(cs[2]);
+    const room = reg.rooms.get('ABC123');
+    expect(room).toBeTruthy();
+    expect(room.seats[2]).toMatchObject({ online: false, ai: true, nick: 'p2' }); // 保留昵称作凭据
+    expect(cs[0].sent).toContainEqual({ t: 'peer-offline', seat: 2 });
+  });
+
+  it('playing 中 4 真人全掉线 → 删房', () => {
+    const cs = playing();
+    cs.forEach(c => reg.leave(c));
+    expect(reg.rooms.has('ABC123')).toBe(false);
+  });
+});

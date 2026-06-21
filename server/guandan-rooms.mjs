@@ -118,6 +118,7 @@ export class RoomRegistry {
     this.lobby.delete(client);
     const qi = this.queue.indexOf(client);
     if (qi >= 0) this.queue.splice(qi, 1);
+    this._leaveRoom(client);
   }
   _newCode() { let c = this.codeGen(); while (this.rooms.has(c)) c = this.codeGen(); return c; }
   _seat(room, client, i) {
@@ -138,7 +139,36 @@ export class RoomRegistry {
     ];
     for (const c of targets) c.send({ t: 'room', code: room.code, status: room.status, seats, you: c._seat ?? null });
   }
-  _leaveRoom(client) { /* Task 7 完整实现；此处先占位空函数 */ if (client) { client._room = client._room || null; } }
+  _leaveRoom(client) {
+    const code = client._room;
+    if (!code) return;
+    const seatRole = client._seat;
+    client._room = null; client._seat = null;
+    const room = this.rooms.get(code);
+    if (!room) return;
+    room.pendingSync.delete(client);
+    if (seatRole === 'spectator') { room.spectators.delete(client); if (!room.isPrivate) this._broadcastLobby(); return; }
+    const idx = room.seats.findIndex(s => s && s.client === client);
+    if (idx === -1) return;             // 进房未落座
+    if (room.status === 'waiting') {
+      room.seats[idx] = null;
+      if (room.host === client) {       // 房主走：删房
+        for (const sp of room.spectators) sp.send({ t: 'room-closed' });
+        this.rooms.delete(code); if (!room.isPrivate) this._broadcastLobby();
+      } else { this._sendRoom(room); }
+      return;
+    }
+    // playing：标记座位掉线 + AI 接管，保留昵称作重连凭据
+    room.seats[idx].online = false; room.seats[idx].ai = true; room.seats[idx].client = null;
+    for (const s of room.seats) if (s && s.client && s.online) s.client.send({ t: 'peer-offline', seat: idx });
+    for (const sp of room.spectators) sp.send({ t: 'peer-offline', seat: idx });
+    if (room.driver && room.driver.setAI) this._dispatch(room, room.driver.setAI(idx, true));
+    const anyHuman = room.seats.some(s => s && s.online);
+    if (!anyHuman) {                    // 4 真人全掉线 → 删房
+      for (const sp of room.spectators) sp.send({ t: 'room-closed' });
+      this.rooms.delete(code); if (!room.isPrivate) this._broadcastLobby();
+    }
+  }
   _dispatch(room, outbound) {
     if (!outbound) return;
     for (const o of outbound) {

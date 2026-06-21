@@ -183,10 +183,10 @@
 .gd-play:not(.has-play) { display: none; }
 /* 四家出牌区围绕牌桌中心摆菱形（相对 gameEl 全高），各朝自家方向偏，不压头像/手牌 */
 /* 出牌区与头像都用 %（头像 left/right:6%），出牌区在其内侧 14%，屏幕再宽也不会被头像追上重叠 */
-.gd-play--top    { top: 14%; left: 50%; transform: translateX(-50%); }
+.gd-play--top    { top: 19%; left: 50%; transform: translateX(-50%); }  /* 下移，不压对家头像下文字 */
 .gd-play--left   { left: 14%; top: 50%; transform: translateY(-50%); }
 .gd-play--right  { right: 14%; top: 50%; transform: translateY(-50%); }
-.gd-play--bottom { top: 50%; left: 50%; transform: translateX(-50%); }  /* 在手牌上方，我打出的牌可见 */
+.gd-play--bottom { top: 45%; left: 50%; transform: translateX(-50%); }  /* 上移，与对家出牌对称、在手牌上方可见 */
 .gd-play__cards { display: flex; flex-wrap: nowrap; }
 .gd-play__cards .gd-card { margin: 0 -10px; }
 .gd-play__type { font-size: 0.95rem; font-weight: 600; color: var(--gold); margin-top: 3px; }
@@ -195,8 +195,9 @@
   background: rgba(0,0,0,0.4); padding: 4px 16px; border-radius: 13px;
 }
 
-/* 中央轮次提示 */
+/* 中央轮次提示：桌面/手机都不显示——轮到谁由头像高亮 + 出牌/不要按钮指示，桌布中央不放文字 */
 .gd-turn-status {
+  display: none;
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   z-index: 3; font-size: 1.25rem; font-weight: 600; color: var(--text-light); text-align: center;
 }
@@ -553,13 +554,14 @@
   .gd-turn-status { display: none; }
   .gd-play__type { font-size: 0.66rem; margin-top: 1px; }
   .gd-play__cards .gd-card { margin: 0 -9px; }
-  /* 手机端左右两家只调横向贴边量；上下(对家/你)与竖向居中由可玩区基础值统一管 */
-  .gd-seat--left  { left: 12px; }
-  .gd-seat--right { right: 12px; }
+  .gd-card--small .gd-card__suit--wild { font-size: 0.46rem; } /* 出牌区「配」字缩小，不压大花色 */
+  /* 上家右移、下家左移：剩≤10张时名字旁加张数徽标变宽，贴边居中会被屏幕边缘裁掉左/右侧 */
+  .gd-seat--left  { left: 34px; }
+  .gd-seat--right { right: 34px; }
   .gd-bottom-area { padding-bottom: 70px; } /* 手机让位量(头像+名 ~52px + 小边距) */
   /* 矮牌桌：4 家出牌区收成紧凑菱形，互不相叠 */
-  .gd-play--top    { top: 12%; }
-  .gd-play--bottom { top: 56%; bottom: auto; }  /* 在手牌上方可见 */
+  .gd-play--top    { top: 16%; }                /* 下移，不压对家头像下文字 */
+  .gd-play--bottom { top: 52%; bottom: auto; }  /* 上移，与对家出牌对称、在手牌上方可见 */
   .gd-play--left   { left: 68px; top: 50%; }
   .gd-play--right  { right: 68px; top: 50%; }
 }

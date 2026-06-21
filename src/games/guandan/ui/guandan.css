@@ -452,13 +452,14 @@
 }
 .gd-btn--play:not(:disabled):hover { filter: brightness(0.92); transform: scale(1.02); }
 
-/* 不要：实底（原 transparent 会透出底下的牌），无边框、金字。桌面端这个深绿在毡面上看得清，保留 */
+/* 不要：跟桌面展示的「不要」标签(.gd-play__pass)同款——深底 #14210e + 浅米字，视觉统一，
+   实底一眼是块按钮，不糊进绿毡（桌面+手机一致） */
 .gd-btn--pass {
-  background: #1f3320;
+  background: #14210e;
   border: none;
-  color: var(--gold);
+  color: var(--text-light);
 }
-.gd-btn--pass:not(:disabled):hover { background: #2a4329; }
+.gd-btn--pass:not(:disabled):hover { background: #1f3318; }
 
 /* --- 提示信息 --- */
 .gd-hint {
@@ -615,9 +616,6 @@
   .gd-topbar__title { font-size: 0.85rem; }
   .gd-topbar__levels { font-size: 0.74rem; gap: 4px; }
   .gd-btn { padding: 0.3rem 1.1rem; font-size: 0.85rem; }
-  /* 手机端「不要」按钮：深绿在手机这个位置跟毡面同色糊成一片像透明，换暖石灰实底+深字看得清(桌面不变) */
-  .gd-btn--pass { background: #9a917f; color: #1f1a12; }
-  .gd-btn--pass:not(:disabled):hover { background: #aaa28f; }
   /* 手机牌桌矮：藏中央状态文字(头像高亮+按钮已足够指示)，腾空间防各家出牌区相叠 */
   .gd-turn-status { display: none; }
   .gd-play__type { font-size: 0.66rem; margin-top: 1px; }

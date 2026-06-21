@@ -439,9 +439,10 @@ export function mount(root: HTMLElement): () => void {
     renderStatus();
     renderButtons();
     syncTurnTimer();
-    // 我刚出牌、还没人盖过(lastActor 仍是我)时，手牌整体调半透明，让刚打出的那手牌突出；下家一出牌(lastActor 变)即恢复不透明
+    // 我刚出牌/不要、还没人盖过(lastActor 仍是我)时，手牌整体调半透明，让浮在最上的「这手牌 / 不要」凸显出来
+    // （尤其牌多时手牌密集，不透明的「不要」标签会淹没在牌堆里，手牌淡下去才看得清）；下家一动(lastActor 变)即恢复不透明
     const myPlayed = lastPlays[HUMAN_SEAT];
-    handEl.classList.toggle('gd-hand--dim', lastActor === HUMAN_SEAT && myPlayed !== null && myPlayed !== 'pass');
+    handEl.classList.toggle('gd-hand--dim', lastActor === HUMAN_SEAT && myPlayed !== null);
   }
 
   // ── 出牌（视图层同时维护 lastPlays） ────────────────────────

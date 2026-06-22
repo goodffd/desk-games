@@ -182,11 +182,14 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
   let started = snap0.started;        // 点「开始游戏」后才 true（由 driver 同步）
   let lastPlays: Record<Seat, LastPlay> = snap0.lastPlays;
   let lastActor: Seat | null = snap0.lastActor; // 最近出牌/不要者：其出牌区浮到手牌区之上
+  let snapTurnRemainMs: number | undefined = snap0.turnRemainMs; // 联机服务端权威「本回合剩余毫秒」
   const selectedIds = new Set<number>();
   let dragging = false;   // 滑动选牌进行中
   let dragMode = true;    // 本次划动目标态：true=选中 / false=取消
   let timedSeat: Seat | null = null; // 当前在倒计时的座位
   let turnStartedAt = 0;             // 本回合开始时间戳
+  let turnTotalSec = TURN_SECONDS;   // 本回合倒计时总秒数：联机=服务端权威剩余(turnRemainMs)，本地=TURN_SECONDS
+  let turnSeeded = false;            // 本回合是否已用服务端 turnRemainMs 播种（mountTable 初始空快照会先锁座，需补播种一次）
   let turnTick: number | null = null;
   // 弹层引用：onChange 时按 phase 收（本地按钮点击也会直接收，二者幂等；联机无按钮场景靠 phase 收）
   let tributeOverlay: HTMLElement | null = null;
@@ -494,7 +497,14 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
   /** 在 renderAll 后调用：检测回合切换 → 重置计时；启停 tick。 */
   function syncTurnTimer(): void {
     const active = (started && !isDealOver(state)) ? state.turn : null;
-    if (active !== timedSeat) { timedSeat = active; turnStartedAt = performance.now(); }
+    const haveServer = active !== null && snapTurnRemainMs != null;
+    // 播种时机：回合切换，或「同一回合首次拿到服务端剩余」——挂台初始用空快照(turn=0)会先锁座，
+    // 第一个带 turnRemainMs 的真实 state 回合号没变，需在此补播种一次，否则倒计时一直停在 TURN_SECONDS。
+    if (active !== timedSeat || (haveServer && !turnSeeded)) {
+      timedSeat = active; turnStartedAt = performance.now();
+      turnTotalSec = haveServer ? snapTurnRemainMs! / 1000 : TURN_SECONDS; // 联机=服务端权威剩余，本地→TURN_SECONDS
+      turnSeeded = haveServer;
+    }
     if (active === null) {
       if (turnTick !== null) { window.clearInterval(turnTick); turnTick = null; }
       return;
@@ -504,7 +514,7 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
   }
   function paintTurnTimer(): void {
     if (timedSeat === null) return;
-    const remain = Math.max(0, TURN_SECONDS - (performance.now() - turnStartedAt) / 1000);
+    const remain = Math.max(0, turnTotalSec - (performance.now() - turnStartedAt) / 1000);
     const sec = seatEls[timedSeat]!.querySelector('.gd-seat__timer-sec');
     if (sec) sec.textContent = String(Math.ceil(remain));
     const t = seatEls[timedSeat]!.querySelector('.gd-seat__timer');
@@ -515,12 +525,12 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
       if (turnTick !== null) { window.clearInterval(turnTick); turnTick = null; }
       return;
     }
-    const remain = TURN_SECONDS - (performance.now() - turnStartedAt) / 1000;
+    const remain = turnTotalSec - (performance.now() - turnStartedAt) / 1000;
     paintTurnTimer();
     if (remain <= 0) {
       const seat = timedSeat;
       if (turnTick !== null) { window.clearInterval(turnTick); turnTick = null; }
-      driver.timeoutSeat(seat); // 超时托管：driver 用 choosePlay 替该座出一手
+      driver.timeoutSeat(seat); // 超时托管：本地 driver 用 choosePlay 替该座出一手；联机为 no-op(服务端到点即托管)
     }
   }
 
@@ -728,6 +738,7 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
   function syncFromDriver(): void {
     const s = driver.snapshot();
     state = s.state; match = s.match; lastPlays = s.lastPlays; lastActor = s.lastActor; started = s.started;
+    snapTurnRemainMs = s.turnRemainMs; // 联机服务端权威剩余，syncTurnTimer 回合切换时据此播种
   }
   driver.onChange(() => {
     syncFromDriver();

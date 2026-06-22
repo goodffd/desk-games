@@ -26,6 +26,9 @@ export class MatchDriver {
   lastPlays: ({ cards: Card[] } | 'pass' | null)[] = [null, null, null, null];
   lastActor: Seat | null = null;
   phase: 'playing' | 'dealResult' | 'tribute' | 'matchOver' = 'playing';
+  /** 单调递增的「行棋数」：每次真出牌/不要 +1。房间据它区分「真有进展(回合变了)」与「纯重广播(观战/重连 sync)」，
+   *  避免观众进场把当前真人的回合计时刷新。AI/托管出牌也算进展。 */
+  ply = 0;
   pendingResult: PendingResult | null = null;
   pendingDeal: PendingDeal | null = null;
   tributeReturns: Map<Seat, Card> = new Map();
@@ -195,12 +198,14 @@ export class MatchDriver {
     if (wasLead) this.lastPlays = [null, null, null, null];
     this.lastPlays[seat] = { cards };
     this.lastActor = seat;
+    this.ply++;
   }
 
   private applyPass(seat: Seat): void {
     this.state = pass(this.state, seat);
     this.lastPlays[seat] = 'pass';
     this.lastActor = seat;
+    this.ply++;
   }
 
   // ── AI 接管 ───────────────────────────────────────────────────────────────

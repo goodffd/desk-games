@@ -31,6 +31,9 @@ export interface GameSnapshot {
   started: boolean;
   /** 当前阶段。view 据 phase 收弹层（playing↔tribute↔dealResult/matchOver）。 */
   phase: GamePhase;
+  /** 联机：服务端权威「本回合剩余托管毫秒」，view 据此校准倒计时（观战/重连中途进入也能对上真实剩余）；
+   *  本地为 undefined，view 退回 TURN_SECONDS 自计时。 */
+  turnRemainMs?: number;
 }
 
 /** 一局结算结果（onResult 载荷）。settle 来自引擎；leftover 是末游剩牌（本地=该座手牌；联机=服务端 lastHand）。 */

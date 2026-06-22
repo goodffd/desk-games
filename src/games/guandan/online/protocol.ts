@@ -41,6 +41,9 @@ export interface PublicState {
   levels: [Rank, Rank];
   trumpTeam: Team;
   dealNo: number;
+  /** 服务端权威：本回合剩余托管毫秒（phase==='playing' 且有在线真人计时时由房间注入）。客户端据此显示倒计时，
+   *  观战/重连中途进入也能对上真实剩余时间，而非各自从满倒计。 */
+  turnRemainMs?: number;
   /** phase==='tribute' 时存在。 */
   tribute?: { exchanges: TributeExchangeWire[]; resist: boolean; doubleDown: boolean; pending: Seat[] };
   /** phase==='dealResult' | 'matchOver' 时存在。 */

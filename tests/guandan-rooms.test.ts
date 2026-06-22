@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 // @ts-ignore
 import { RoomRegistry } from '../server/guandan-rooms.mjs';
 
@@ -357,5 +357,56 @@ describe('RoomRegistry — 再来一盘(restart)', () => {
     reg.handle(cs[0], { t: 'restart' });
     expect(last(cs[0]).t).toBe('error');
     expect(made.length).toBe(1);
+  });
+});
+
+describe('RoomRegistry — 回合超时 + 观战不刷计时', () => {
+  // 带回合态的假 driver：phase/state.turn/ply/forceAutoPlay 齐全，供 _armTurnTimeout 判定。
+  function timedDriver() {
+    return {
+      phase: 'playing', ply: 0, state: { turn: 0 }, autoCalls: 0,
+      start() { return [{ to: 'all', msg: { t: 'state', phase: 'playing', turn: 0 } }]; },
+      spectatorSync() { return [{ to: 'all', msg: { t: 'state', phase: 'playing', turn: this.state.turn } }]; },
+      syncSeat(seat: number) { return [{ to: 'seat', seat, msg: { t: 'state', phase: 'playing', turn: this.state.turn } }]; },
+      setAI() { return []; },
+      handlePlay(seat: number) { this.ply++; this.state = { turn: (seat + 1) % 4 }; return [{ to: 'all', msg: { t: 'state', phase: 'playing', turn: this.state.turn } }]; },
+      forceAutoPlay() { this.autoCalls++; this.ply++; this.state = { turn: (this.state.turn + 1) % 4 }; return [{ to: 'all', msg: { t: 'state', phase: 'playing', turn: this.state.turn } }]; },
+    };
+  }
+  let reg: any; let drv: any; let cs: any[];
+  beforeEach(() => {
+    vi.useFakeTimers();
+    drv = timedDriver();
+    reg = new RoomRegistry(() => 'ABC123', () => drv, 0, 5000); // turnTimeoutMs=5000
+    cs = [fakeClient(), fakeClient(), fakeClient(), fakeClient()];
+    cs.forEach((c, i) => reg.handle(c, { t: 'hello', nick: 'p' + i }));
+    reg.handle(cs[0], { t: 'create' });
+    for (let i = 1; i < 4; i++) { reg.handle(cs[i], { t: 'join', code: 'ABC123' }); reg.handle(cs[i], { t: 'take-seat', seat: i }); }
+    reg.handle(cs[0], { t: 'start' }); // t=0 起，给座 0 armed 5000ms
+  });
+  afterEach(() => { vi.useRealTimers(); });
+  const lastState = (c: any) => [...c.sent].reverse().find((m: any) => m.t === 'state');
+
+  it('观战中途进入不重置真人回合计时：到点照常托管，不被推后', () => {
+    vi.advanceTimersByTime(2000);                 // t=2000
+    const v = fakeClient(); reg.handle(v, { t: 'hello', nick: '观' });
+    reg.handle(v, { t: 'spectate', code: 'ABC123' }); // 观众进场 → 不应重置座 0 的计时
+    vi.advanceTimersByTime(2500);                 // t=4500，原计时 t=5000 未到
+    expect(drv.autoCalls).toBe(0);
+    vi.advanceTimersByTime(1000);                 // t=5500，原计时 t=5000 应已触发
+    expect(drv.autoCalls).toBe(1);                // 准点托管，没被观众进场推后
+  });
+
+  it('观战者收到的 state 带真实剩余 turnRemainMs（非各自从满倒计）', () => {
+    vi.advanceTimersByTime(2000);                 // 座 0 计时已走 2000ms
+    const v = fakeClient(); reg.handle(v, { t: 'hello', nick: '观' });
+    reg.handle(v, { t: 'spectate', code: 'ABC123' });
+    expect(lastState(v).turnRemainMs).toBe(3000); // 5000 - 2000，看到真实剩余
+  });
+
+  it('真人出牌（回合真变）才重置计时', () => {
+    vi.advanceTimersByTime(2000);
+    reg.handle(cs[0], { t: 'play', cardIds: [1] }); // 座 0 出牌 → turn=1、ply+1 → 给座 1 重置 5000
+    expect(lastState(cs[1]).turnRemainMs).toBe(5000); // 新回合满计时
   });
 });

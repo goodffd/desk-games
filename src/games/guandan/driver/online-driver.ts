@@ -135,6 +135,7 @@ export class OnlineDriver implements GameDriver {
       lastActor: st.lastActor === null ? null : this.v(st.lastActor),
       started: true,
       phase: st.phase as GamePhase,
+      turnRemainMs: st.turnRemainMs, // 服务端权威剩余，view 据此校准倒计时（含观战/重连）
     };
   }
 

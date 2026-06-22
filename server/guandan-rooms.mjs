@@ -217,7 +217,14 @@ export class RoomRegistry {
   }
   _dispatch(room, outbound) {
     if (!outbound) return;
+    // 先按「当前牌局态」更新回合计时——只在回合真的变了时重置。观战/重连/他人掉线的纯重广播不重置计时，
+    // 否则观众一进场就把当前真人的倒计时刷回满：真人明明到点了，却被迫等观众那份新计时到 0 才托管出牌。
+    this._armTurnTimeout(room);
+    // 注入服务端权威「本回合剩余毫秒」：客户端（尤其观战/重连，本地不知回合何时开始）据此显示一致的倒计时。
+    const remain = (this.turnTimeoutMs && room._turnTimerSeat != null && room._turnStartedAt)
+      ? Math.max(0, this.turnTimeoutMs - (Date.now() - room._turnStartedAt)) : null;
     for (const o of outbound) {
+      if (remain != null && o.msg && o.msg.t === 'state' && o.msg.phase === 'playing') o.msg.turnRemainMs = remain;
       if (o.to === 'seat') {
         const s = room.seats[o.seat];
         if (s && s.client && s.online) s.client.send(o.msg);
@@ -239,19 +246,22 @@ export class RoomRegistry {
         }
       });
     }
-    this._armTurnTimeout(room, outbound);
   }
-  /** 回合超时：轮到「在线真人」座位发呆 turnTimeoutMs 未动 → 服务端 forceAutoPlay 代打(同 AI 接管)。
-   *  每次有新出牌广播都重置(下家行动重计时)；AI 座由 driveAI 即时驱动、不计时。 */
-  _armTurnTimeout(room, out) {
+  /** 回合超时：轮到「在线真人」座发呆 turnTimeoutMs 未动 → 服务端 forceAutoPlay 代打(同 AI 接管)。
+   *  关键：只在「该计时的座位变了 或 出现新行棋(driver.ply 变=真有人出/不要)」时才重置计时；同座同 ply 的纯重广播
+   *  （观战 sync / 重连 sync / 他人掉线广播）保持原计时不动——这就是修「观众进场刷新真人倒计时」。 */
+  _armTurnTimeout(room) {
+    const d = room.driver;
+    const playing = !!(d && d.phase === 'playing');
+    const turn = playing && d.state ? d.state.turn : null;
+    const seat = (typeof turn === 'number') ? room.seats[turn] : null;
+    const armSeat = (seat && seat.online) ? turn : null;   // 该计时的在线真人座；否则 null
+    const ply = (d && typeof d.ply === 'number') ? d.ply : 0;
+    if (armSeat === room._turnTimerSeat && ply === room._turnTimerPly && room._turnTimer) return; // 无真实进展→不动
     if (room._turnTimer) { clearTimeout(room._turnTimer); room._turnTimer = null; }
-    if (!this.turnTimeoutMs || !room.driver || typeof room.driver.forceAutoPlay !== 'function') return;
-    const playing = (out || []).some(o => o.msg && o.msg.t === 'state' && o.msg.phase === 'playing');
-    if (!playing) return;
-    const turn = room.driver.state && room.driver.state.turn;
-    if (typeof turn !== 'number') return;
-    const s = room.seats[turn];
-    if (!s || !s.online) return; // 只给在线真人座计时；掉线/AI 座 driveAI 已即时处理
+    room._turnTimerSeat = armSeat; room._turnTimerPly = ply;
+    if (!this.turnTimeoutMs || armSeat == null || !d || typeof d.forceAutoPlay !== 'function') { room._turnStartedAt = 0; return; }
+    room._turnStartedAt = Date.now();
     room._turnTimer = setTimeout(() => {
       room._turnTimer = null;
       if (room.driver && typeof room.driver.forceAutoPlay === 'function') {

@@ -6,11 +6,13 @@ function defaultCode() {
 }
 
 export class RoomRegistry {
-  constructor(codeGen = defaultCode, makeDriver = null, tributeTimeoutMs = 0, turnTimeoutMs = 0) {
+  constructor(codeGen = defaultCode, makeDriver = null, tributeTimeoutMs = 0, turnTimeoutMs = 0, disconnectGraceMs = 0, disconnectGraceMisses = 2) {
     this.codeGen = codeGen;
     this.makeDriver = makeDriver;       // (room) => MatchDriver；Task 9 接入
     this.tributeTimeoutMs = tributeTimeoutMs;
     this.turnTimeoutMs = turnTimeoutMs; // 回合超时(在线真人座发呆)→ 服务端 choosePlay 代打
+    this.disconnectGraceMs = disconnectGraceMs;         // 掉线宽限：单次回合超时(0=不启用,掉线即转全速AI=旧行为)
+    this.disconnectGraceMisses = disconnectGraceMisses; // 掉线宽限座连续被超时代打几手仍没回来 → 转全速AI
     this.rooms = new Map();             // code -> room
     this.nicks = new Map();             // client -> nick(原样)
     this.byNick = new Set();            // nickKey 占用集
@@ -119,6 +121,7 @@ export class RoomRegistry {
       if (idx === -1) { client.send({ t: 'error', msg: '无法重连：房间不存在或座位已占' }); return; }
       this._leaveRoom(client);
       room.seats[idx].client = client; room.seats[idx].online = true; room.seats[idx].ai = false;
+      room.seats[idx].disconnected = false; room.seats[idx].graceMisses = 0; // 回来即收座、宽限计数清零
       client._room = room.code; client._seat = idx;
       this.nicks.set(client, msg.nick); this.byNick.add(this._nickKey(msg.nick)); // 重登昵称维持判重一致
       client.send({ t: 'rejoined', seat: idx });
@@ -204,13 +207,27 @@ export class RoomRegistry {
       } else { this._sendRoom(room); }
       return;
     }
-    // playing：标记座位掉线 + AI 接管，保留昵称作重连凭据
-    room.seats[idx].online = false; room.seats[idx].ai = true; room.seats[idx].client = null;
+    // playing：掉线 → 进入「掉线宽限」(不立刻全速AI)，靠回合超时(disconnectGraceMs)代打、连续 N 手没回来才转
+    // 全速AI；任意时刻 rejoin 收座清零。保留昵称作重连凭据。disconnectGraceMs=0 时退回旧行为(掉线即全速AI)。
+    const grace = this.disconnectGraceMs > 0 && room.driver && typeof room.driver.forceAutoPlay === 'function';
+    room.seats[idx].online = false; room.seats[idx].client = null;
+    if (grace) { room.seats[idx].disconnected = true; room.seats[idx].ai = false; room.seats[idx].graceMisses = 0; }
+    else { room.seats[idx].disconnected = false; room.seats[idx].ai = true; }
     for (const s of room.seats) if (s && s.client && s.online) s.client.send({ t: 'peer-offline', seat: idx });
     for (const sp of room.spectators) sp.send({ t: 'peer-offline', seat: idx });
-    if (room.driver && room.driver.setAI) this._dispatch(room, room.driver.setAI(idx, true));
+    if (!grace) {
+      if (room.driver && room.driver.setAI) this._dispatch(room, room.driver.setAI(idx, true)); // 旧行为：立刻全速AI
+    } else if (room.driver.state && room.driver.state.turn === idx) {
+      // 断线座正是当前回合：把截止压到 min(原, now+宽限)——断线不续命(已走的算数)，但最多再等宽限(10s)。
+      room._turnTimerSeat = idx;
+      if (!room._turnStartedAt) room._turnStartedAt = Date.now();
+      const cap = Date.now() + this.disconnectGraceMs;
+      room._turnDeadline = room._turnDeadline ? Math.min(room._turnDeadline, cap) : cap;
+      this._scheduleTurnTimer(room);
+    } // 断线座非当前回合：等轮到它时 _armTurnTimeout 自会按掉线宽限给计时，这里无需动当前计时
     const anyHuman = room.seats.some(s => s && s.online);
-    if (!anyHuman) {                    // 4 真人全掉线 → 删房
+    if (!anyHuman) {                    // 全部掉线 → 删房（清回合计时，避免对死房代打）
+      if (room._turnTimer) { clearTimeout(room._turnTimer); room._turnTimer = null; }
       for (const sp of room.spectators) sp.send({ t: 'room-closed' });
       this.rooms.delete(code); if (!room.isPrivate) this._broadcastLobby();
     }
@@ -220,9 +237,9 @@ export class RoomRegistry {
     // 先按「当前牌局态」更新回合计时——只在回合真的变了时重置。观战/重连/他人掉线的纯重广播不重置计时，
     // 否则观众一进场就把当前真人的倒计时刷回满：真人明明到点了，却被迫等观众那份新计时到 0 才托管出牌。
     this._armTurnTimeout(room);
-    // 注入服务端权威「本回合剩余毫秒」：客户端（尤其观战/重连，本地不知回合何时开始）据此显示一致的倒计时。
-    const remain = (this.turnTimeoutMs && room._turnTimerSeat != null && room._turnStartedAt)
-      ? Math.max(0, this.turnTimeoutMs - (Date.now() - room._turnStartedAt)) : null;
+    // 注入服务端权威「本回合剩余毫秒」（到截止时间，含掉线宽限座的较短截止）：客户端据此显示一致倒计时。
+    const remain = (room._turnTimerSeat != null && room._turnDeadline)
+      ? Math.max(0, room._turnDeadline - Date.now()) : null;
     for (const o of outbound) {
       if (remain != null && o.msg && o.msg.t === 'state' && o.msg.phase === 'playing') o.msg.turnRemainMs = remain;
       if (o.to === 'seat') {
@@ -247,29 +264,51 @@ export class RoomRegistry {
       });
     }
   }
-  /** 回合超时：轮到「在线真人」座发呆 turnTimeoutMs 未动 → 服务端 forceAutoPlay 代打(同 AI 接管)。
-   *  关键：只在「该计时的座位变了 或 出现新行棋(driver.ply 变=真有人出/不要)」时才重置计时；同座同 ply 的纯重广播
-   *  （观战 sync / 重连 sync / 他人掉线广播）保持原计时不动——这就是修「观众进场刷新真人倒计时」。 */
+  /** 回合超时计时：在线真人座(turnTimeoutMs) 或 掉线宽限座(disconnectGraceMs) 发呆到点 → forceAutoPlay 代打。
+   *  只在「该计时座位变(armSeat) 或 出现新行棋(driver.ply 变)」时才重置；同座同 ply 的纯重广播（观战/重连/
+   *  他人掉线）保持原计时不动（修「观众进场刷新真人倒计时」）。全速AI座(setAI 过)不计时——driveAI 即时代打。 */
   _armTurnTimeout(room) {
     const d = room.driver;
     const playing = !!(d && d.phase === 'playing');
     const turn = playing && d.state ? d.state.turn : null;
     const seat = (typeof turn === 'number') ? room.seats[turn] : null;
-    const armSeat = (seat && seat.online) ? turn : null;   // 该计时的在线真人座；否则 null
+    // 在线真人 或 掉线宽限座 都计时；全速AI座(online=false && !disconnected)不计时
+    const armSeat = (seat && (seat.online || seat.disconnected)) ? turn : null;
     const ply = (d && typeof d.ply === 'number') ? d.ply : 0;
     if (armSeat === room._turnTimerSeat && ply === room._turnTimerPly && room._turnTimer) return; // 无真实进展→不动
     if (room._turnTimer) { clearTimeout(room._turnTimer); room._turnTimer = null; }
     room._turnTimerSeat = armSeat; room._turnTimerPly = ply;
-    if (!this.turnTimeoutMs || armSeat == null || !d || typeof d.forceAutoPlay !== 'function') { room._turnStartedAt = 0; return; }
+    const dur = !seat ? 0 : (seat.disconnected ? this.disconnectGraceMs : this.turnTimeoutMs);
+    if (!dur || armSeat == null || !d || typeof d.forceAutoPlay !== 'function') { room._turnStartedAt = 0; room._turnDeadline = 0; return; }
     room._turnStartedAt = Date.now();
-    room._turnTimer = setTimeout(() => {
-      room._turnTimer = null;
-      if (room.driver && typeof room.driver.forceAutoPlay === 'function') {
-        const o = room.driver.forceAutoPlay();
-        this._dispatch(room, o);
+    room._turnDeadline = room._turnStartedAt + dur;
+    this._scheduleTurnTimer(room);
+  }
+  /** 按当前 room._turnDeadline 起/重起计时器（掉线把截止压短后也调它）。 */
+  _scheduleTurnTimer(room) {
+    if (room._turnTimer) { clearTimeout(room._turnTimer); room._turnTimer = null; }
+    if (!room._turnDeadline) return;
+    room._turnTimer = setTimeout(() => { room._turnTimer = null; this._fireTurnTimeout(room); }, Math.max(0, room._turnDeadline - Date.now()));
+  }
+  /** 到点托管：forceAutoPlay 代打一手。掉线宽限座累计 graceMisses，连续 disconnectGraceMisses 手仍没回 → 转全速AI。 */
+  _fireTurnTimeout(room) {
+    const d = room.driver;
+    if (!d || typeof d.forceAutoPlay !== 'function') return;
+    const idx = room._turnTimerSeat;
+    const s = (typeof idx === 'number') ? room.seats[idx] : null;
+    const o = d.forceAutoPlay();                          // 替当前回合座代打一手
+    if (s && s.disconnected) {
+      s.graceMisses = (s.graceMisses || 0) + 1;
+      if (s.graceMisses >= this.disconnectGraceMisses) {  // 连续没回来 → 转全速AI(此后 driveAI 即时代打、不再计时)
+        s.disconnected = false; s.ai = true;
+        const ai = (d.setAI ? d.setAI(idx, true) : []);
+        this._dispatch(room, [...o, ...ai]);
         this._armTributeTimeout(room, o);
+        return;
       }
-    }, this.turnTimeoutMs);
+    }
+    this._dispatch(room, o);
+    this._armTributeTimeout(room, o);
   }
   _armTributeTimeout(room, out) {
     const needsTribute = (out || []).some(o => o.msg && o.msg.t === 'need-tribute');

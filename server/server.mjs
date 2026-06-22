@@ -47,7 +47,9 @@ wss.on('connection', (ws) => {
 // 掼蛋联机：独立 RoomRegistry + /ws-guandan，与象棋 /ws 并存（owner: 跟象棋隔离）
 const TRIBUTE_TIMEOUT = Number(process.env.GD_TRIBUTE_TIMEOUT) || 30000;
 const TURN_TIMEOUT = Number(process.env.GD_TURN_TIMEOUT) || 20000; // 回合超时 20s：客户端倒计时由服务端 turnRemainMs 播种,显示到 0 ≈ 服务端到点托管(无 3s 空等);可 env 覆写便于冒烟
-const gReg = new GuandanRooms(undefined, () => new MatchDriver({}), TRIBUTE_TIMEOUT, TURN_TIMEOUT);
+const DISCONNECT_GRACE = Number(process.env.GD_DISCONNECT_GRACE) || 10000; // 掉线宽限单次 10s：掉线不立刻全速AI,靠回合超时代打,给重连窗口
+const DISCONNECT_MISSES = Number(process.env.GD_DISCONNECT_MISSES) || 2;   // 连续 2 手没回来才转全速AI；重连随时收座清零
+const gReg = new GuandanRooms(undefined, () => new MatchDriver({}), TRIBUTE_TIMEOUT, TURN_TIMEOUT, DISCONNECT_GRACE, DISCONNECT_MISSES);
 const gwss = new WebSocketServer({ noServer: true, maxPayload: 1 << 20 });
 gwss.on('connection', (ws) => {
   const client = { send: (m) => { try { ws.send(JSON.stringify(m)); } catch {} } };

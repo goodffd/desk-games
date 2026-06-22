@@ -132,7 +132,7 @@ function onlineMount(root: HTMLElement): () => void {
   session.on('rejoined', (m) => { mySeat = (m as { seat: Seat }).seat; applySeatNames(); ensureTable(); });
   session.on('started', () => ensureTable());
   session.on('state', () => { if (mySeat !== null) ensureTable(); }); // 观战/重连首个 state 兜底挂台
-  session.on('peer-offline', (m) => toast(`${peerLabel((m as { seat: number }).seat)} 掉线，AI 接管`));
+  session.on('peer-offline', (m) => toast(`${peerLabel((m as { seat: number }).seat)} 掉线了`)); // 先宽限等重连，连续没回才转AI
   session.on('peer-back', (m) => toast(`${peerLabel((m as { seat: number }).seat)} 回来了`));
   session.on('room-closed', () => { session.clearRoom(); toast('房间已解散'); showLobby(); });
   session.on('error', (m) => {

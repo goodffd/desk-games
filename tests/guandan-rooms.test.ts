@@ -410,3 +410,81 @@ describe('RoomRegistry — 回合超时 + 观战不刷计时', () => {
     expect(lastState(cs[1]).turnRemainMs).toBe(5000); // 新回合满计时
   });
 });
+
+describe('RoomRegistry — 掉线宽限接管', () => {
+  function graceDriver() {
+    return {
+      phase: 'playing', ply: 0, state: { turn: 0 },
+      online: [true, true, true, true], autoCalls: [] as number[], setAICalls: [] as any[],
+      start() { return [{ to: 'all', msg: { t: 'state', phase: 'playing', turn: 0 } }]; },
+      setAI(seat: number, on: boolean) { this.online[seat] = !on; this.setAICalls.push({ seat, on }); return [{ to: 'all', msg: { t: 'state', setAI: seat, on } }]; },
+      forceAutoPlay() { this.autoCalls.push(this.state.turn); this.ply++; this.state = { turn: (this.state.turn + 1) % 4 }; return [{ to: 'all', msg: { t: 'state', phase: 'playing', turn: this.state.turn } }]; },
+      handlePlay(seat: number) { this.ply++; this.state = { turn: (seat + 1) % 4 }; return [{ to: 'all', msg: { t: 'state', phase: 'playing', turn: this.state.turn } }]; },
+      syncSeat(seat: number) { return [{ to: 'seat', seat, msg: { t: 'state', phase: 'playing', turn: this.state.turn } }]; },
+    };
+  }
+  let reg: any; let drv: any; let cs: any[];
+  const GRACE = 10000, TURN = 20000;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    drv = graceDriver();
+    reg = new RoomRegistry(() => 'ABC123', () => drv, 0, TURN, GRACE, 2); // turn 20s, grace 10s, 连续2手转AI
+    cs = [fakeClient(), fakeClient(), fakeClient(), fakeClient()];
+    cs.forEach((c, i) => reg.handle(c, { t: 'hello', nick: 'p' + i }));
+    reg.handle(cs[0], { t: 'create' });
+    for (let i = 1; i < 4; i++) { reg.handle(cs[i], { t: 'join', code: 'ABC123' }); reg.handle(cs[i], { t: 'take-seat', seat: i }); }
+    reg.handle(cs[0], { t: 'start' }); // T 起，座0 arm 20s
+  });
+  afterEach(() => { vi.useRealTimers(); });
+  const room = () => reg.rooms.get('ABC123');
+  // 模拟「出了一手，现在轮到座 t」：ply 变 → _armTurnTimeout 会按 t 的座位状态重置计时
+  const turnTo = (t: number) => { drv.state = { turn: t }; drv.ply++; reg._dispatch(room(), [{ to: 'all', msg: { t: 'state', phase: 'playing', turn: t } }]); };
+
+  it('掉线 → 进宽限，不立刻全速AI（座位 disconnected、未 setAI）', () => {
+    reg.leave(cs[1]); // 座1掉线（非当前回合）
+    expect(room().seats[1]).toMatchObject({ online: false, disconnected: true, ai: false });
+    expect(drv.setAICalls.find((c: any) => c.seat === 1 && c.on === true)).toBeUndefined(); // 没立刻全速AI
+    expect(drv.online[1]).toBe(true); // driver 仍当它在（不全速代打）
+  });
+
+  it('掉线宽限座轮到 → 等宽限(10s)才代打一手，连续2手没回来才转全速AI', () => {
+    reg.leave(cs[1]);
+    turnTo(1);                                   // 轮到座1（宽限）→ arm 10s
+    vi.advanceTimersByTime(9999); expect(drv.autoCalls).not.toContain(1); // 没到点不代打
+    vi.advanceTimersByTime(1);                   // 10s 到点 → 代打第1手
+    expect(drv.autoCalls).toContain(1);
+    expect(room().seats[1].graceMisses).toBe(1);
+    expect(room().seats[1].disconnected).toBe(true); // 才1手，还没转AI
+    turnTo(1);                                   // 再轮到座1 → arm 10s
+    vi.advanceTimersByTime(10000);               // 第2手到点
+    expect(room().seats[1].graceMisses).toBe(2);
+    expect(drv.setAICalls.find((c: any) => c.seat === 1 && c.on === true)).toBeTruthy(); // 转全速AI
+    expect(room().seats[1]).toMatchObject({ ai: true, disconnected: false });
+    expect(drv.online[1]).toBe(false);
+  });
+
+  it('宽限/已接管中重连 → 收回座位、计数清零、变回人打', () => {
+    reg.leave(cs[1]);
+    turnTo(1); vi.advanceTimersByTime(10000);    // 被代打1手，graceMisses=1
+    const re = fakeClient();
+    reg.handle(re, { t: 'rejoin', code: 'ABC123', nick: 'p1' });
+    expect(re.sent).toContainEqual({ t: 'rejoined', seat: 1 });
+    expect(room().seats[1]).toMatchObject({ online: true, disconnected: false, graceMisses: 0, ai: false });
+  });
+
+  it('断线正当回合：截止压到 min(剩余,宽限)，断线不续命', () => {
+    vi.advanceTimersByTime(15000); // 座0 已走15s（在线20s，剩5s）
+    reg.leave(cs[0]);              // 座0掉线，正是当前回合 → 压到 min(剩5s, 宽限10s)=5s（不续命成10s）
+    vi.advanceTimersByTime(4999); expect(drv.autoCalls).not.toContain(0); // 剩~5s，没到点
+    vi.advanceTimersByTime(1);    // 再5s 到点（不是10s）
+    expect(drv.autoCalls).toContain(0);
+  });
+
+  it('刚轮到就断线：截止压到宽限(10s)上限', () => {
+    vi.advanceTimersByTime(2000);  // 座0 才走2s（剩18s）
+    reg.leave(cs[0]);              // 掉线 → min(剩18s, 宽限10s)=10s
+    vi.advanceTimersByTime(9999); expect(drv.autoCalls).not.toContain(0);
+    vi.advanceTimersByTime(1);     // 10s 到点（封顶，不等满18s）
+    expect(drv.autoCalls).toContain(0);
+  });
+});

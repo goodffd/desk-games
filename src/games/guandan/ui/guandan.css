@@ -635,8 +635,8 @@
   /* 矮牌桌：出牌区随头像内移同步外推，不压头像/张数文字(剩≤10张文字变宽) */
   .gd-play--top    { top: 22%; }                /* 下移，不压对家头像下文字 */
   .gd-play--bottom { top: 64%; bottom: auto; }  /* 与对家出牌区上下对称 */
-  .gd-play--left   { left: 92px; top: 50%; }
-  .gd-play--right  { right: 92px; top: 50%; }
+  .gd-play--left   { left: 116px; top: 46%; }   /* 再往中心推 + 略上移，不压上家头像下的名字/闹钟那行 */
+  .gd-play--right  { right: 116px; top: 46%; }  /* 同上，下家对称 */
 }
 
 /* --- 手机竖屏自动转横屏：掼蛋牌桌需要横向空间，竖握时整页旋转 90° 显示为横屏 ---

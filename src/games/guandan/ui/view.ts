@@ -183,6 +183,7 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
   let lastPlays: Record<Seat, LastPlay> = snap0.lastPlays;
   let lastActor: Seat | null = snap0.lastActor; // 最近出牌/不要者：其出牌区浮到手牌区之上
   let snapTurnRemainMs: number | undefined = snap0.turnRemainMs; // 联机服务端权威「本回合剩余毫秒」
+  let snapSeatStatus: ('online' | 'disconnected' | 'ai')[] | undefined = snap0.seatStatus; // 各座连接态（头像显示掉线/AI接管）
   const selectedIds = new Set<number>();
   let dragging = false;   // 滑动选牌进行中
   let dragMode = true;    // 本次划动目标态：true=选中 / false=取消
@@ -300,7 +301,16 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     const active = started && state.turn === seat && !isDealOver(state);
     elx.classList.toggle('is-active', active);
 
-    elx.appendChild(avatarEl(seat));
+    const av = avatarEl(seat);
+    const conn = snapSeatStatus?.[seat] ?? 'online';
+    if (conn !== 'online') { // 掉线宽限 / AI接管：灰化头像 + 头像上方持续显示标记（不再用一闪而过的顶部 toast）
+      av.classList.add('gd-avatar--offline');
+      const badge = document.createElement('div');
+      badge.className = 'gd-seat__badge' + (conn === 'ai' ? ' gd-seat__badge--ai' : '');
+      badge.textContent = conn === 'ai' ? 'AI接管中' : '掉线了';
+      av.appendChild(badge);
+    }
+    elx.appendChild(av);
 
     const info = document.createElement('div');
     info.className = 'gd-seat__info';
@@ -739,6 +749,7 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     const s = driver.snapshot();
     state = s.state; match = s.match; lastPlays = s.lastPlays; lastActor = s.lastActor; started = s.started;
     snapTurnRemainMs = s.turnRemainMs; // 联机服务端权威剩余，syncTurnTimer 回合切换时据此播种
+    snapSeatStatus = s.seatStatus;     // 各座连接态，renderSeatInfo 据此显示掉线/AI接管
   }
   driver.onChange(() => {
     syncFromDriver();

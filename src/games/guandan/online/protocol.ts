@@ -24,6 +24,8 @@ export interface SeatPublic {
   finishRank: 1 | 2 | 3 | 4 | null;
   online: boolean;
   ai: boolean;
+  /** 掉线宽限中（真人掉线、等重连，尚未转全速AI）。房间层在广播时按真实连接态覆盖。 */
+  disconnected?: boolean;
 }
 
 /** 进贡一项（公开态 tribute.exchanges[i]）。 */

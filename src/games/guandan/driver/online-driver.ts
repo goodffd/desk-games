@@ -130,12 +130,19 @@ export class OnlineDriver implements GameDriver {
       over: st.phase === 'matchOver',
       winner: st.winner != null ? this.vTeam(st.winner) : null,
     };
+    // 各座连接态（旋转到 view 座）：online / disconnected(掉线宽限) / ai(全速接管)
+    const seatStatus: ('online' | 'disconnected' | 'ai')[] = ['online', 'online', 'online', 'online'];
+    for (const vSeat of VS) {
+      const rs = st.seats[this.s(vSeat)]!;
+      seatStatus[vSeat] = rs.online ? 'online' : (rs.disconnected ? 'disconnected' : (rs.ai ? 'ai' : 'online'));
+    }
     this.snap = {
       state, match, lastPlays,
       lastActor: st.lastActor === null ? null : this.v(st.lastActor),
       started: true,
       phase: st.phase as GamePhase,
       turnRemainMs: st.turnRemainMs, // 服务端权威剩余，view 据此校准倒计时（含观战/重连）
+      seatStatus,                    // 头像显示「掉线了/AI接管中」
     };
   }
 

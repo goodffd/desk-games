@@ -217,14 +217,18 @@ export class RoomRegistry {
     for (const sp of room.spectators) sp.send({ t: 'peer-offline', seat: idx });
     if (!grace) {
       if (room.driver && room.driver.setAI) this._dispatch(room, room.driver.setAI(idx, true)); // 旧行为：立刻全速AI
-    } else if (room.driver.state && room.driver.state.turn === idx) {
-      // 断线座正是当前回合：把截止压到 min(原, now+宽限)——断线不续命(已走的算数)，但最多再等宽限(10s)。
-      room._turnTimerSeat = idx;
-      if (!room._turnStartedAt) room._turnStartedAt = Date.now();
-      const cap = Date.now() + this.disconnectGraceMs;
-      room._turnDeadline = room._turnDeadline ? Math.min(room._turnDeadline, cap) : cap;
-      this._scheduleTurnTimer(room);
-    } // 断线座非当前回合：等轮到它时 _armTurnTimeout 自会按掉线宽限给计时，这里无需动当前计时
+    } else {
+      if (room.driver.state && room.driver.state.turn === idx) {
+        // 断线座正是当前回合：把截止压到 min(原, now+宽限)——断线不续命(已走的算数)，但最多再等宽限(10s)。
+        room._turnTimerSeat = idx;
+        if (!room._turnStartedAt) room._turnStartedAt = Date.now();
+        const cap = Date.now() + this.disconnectGraceMs;
+        room._turnDeadline = room._turnDeadline ? Math.min(room._turnDeadline, cap) : cap;
+        this._scheduleTurnTimer(room);
+      } // 非当前回合：等轮到它时 _armTurnTimeout 自会按宽限计时
+      // 即时广播一次当前态：其他客户端头像上立刻显示「掉线了」，不用等到下个 state
+      if (room.driver && room.driver.broadcastState) this._dispatch(room, [room.driver.broadcastState()]);
+    }
     const anyHuman = room.seats.some(s => s && s.online);
     if (!anyHuman) {                    // 全部掉线 → 删房（清回合计时，避免对死房代打）
       if (room._turnTimer) { clearTimeout(room._turnTimer); room._turnTimer = null; }
@@ -242,6 +246,14 @@ export class RoomRegistry {
       ? Math.max(0, room._turnDeadline - Date.now()) : null;
     for (const o of outbound) {
       if (remain != null && o.msg && o.msg.t === 'state' && o.msg.phase === 'playing') o.msg.turnRemainMs = remain;
+      // 用房间层真实连接态覆盖座位状态（driver.online 是「driveAI 视角」，掉线宽限座那里仍是 true）：
+      // online=真人在线 / disconnected=掉线宽限中 / ai=已转全速AI接管。客户端据此在头像上显示「掉线了/AI接管中」。
+      if (o.msg && o.msg.t === 'state' && Array.isArray(o.msg.seats)) {
+        for (const sp of o.msg.seats) {
+          const rs = room.seats[sp.seat];
+          sp.online = !!(rs && rs.online); sp.disconnected = !!(rs && rs.disconnected); sp.ai = !!(rs && rs.ai);
+        }
+      }
       if (o.to === 'seat') {
         const s = room.seats[o.seat];
         if (s && s.client && s.online) s.client.send(o.msg);

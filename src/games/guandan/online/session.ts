@@ -2,8 +2,9 @@
  * session.ts — 掼蛋联机 WS 客户端会话（Plan 3 Task 3）。
  *
  * 纯传输层：连 `/ws-guandan`、收发 `{t,...}`、按 msg.t 分发、断线自动重连（重连后自动 rejoin）。
- * 昵称 + 房况(房号+座位，重连凭据)均存 localStorage——必须跨标签页/重开浏览器存活，否则手机杀后台
- * 后重开只能观战、收不回座位。控制器在离房/解散/重连失败时主动 clearRoom 清陈旧房况。
+ * 重连凭据(房号+座位+昵称)双写：sessionStorage 为主(每标签页独立，刷新/断线重连守住各自座位——
+ * 一台电脑开多标签页测试时不会互相覆盖)，localStorage 为兜底(手机杀后台/重开浏览器后 session 没了，
+ * 仍能捞回最近一次座位)。昵称随凭据存——共享的 gd_nick 会被最后一个标签覆盖，rejoin 必须用本座真昵称。
  * **不懂牌、不懂房**——牌局解释在 OnlineDriver、房间编排在控制器。WebSocket/storage/定时全可注入。
  */
 
@@ -29,7 +30,8 @@ export interface StorageLike {
 
 export interface OnlineSessionOpts {
   WebSocketCtor?: WebSocketCtor;
-  local?: StorageLike;    // 昵称 + 房况（持久，跨标签页/重开存活）
+  local?: StorageLike;    // 昵称 + 房况兜底（跨重开持久，所有标签页共享）
+  session?: StorageLike;  // 房况主存（每标签页独立，多标签互不覆盖）
   schedule?: (fn: () => void, ms: number) => number; // 重连退避定时
   reconnectMs?: number;
 }
@@ -44,6 +46,7 @@ export class OnlineSession {
   private readonly url: string;
   private readonly WS: WebSocketCtor;
   private readonly local: StorageLike;
+  private readonly session: StorageLike;
   private readonly schedule: (fn: () => void, ms: number) => number;
   private readonly reconnectMs: number;
   private readonly listeners = new Map<string, Set<Listener>>();
@@ -56,25 +59,35 @@ export class OnlineSession {
     this.url = url;
     this.WS = opts.WebSocketCtor ?? (window.WebSocket as unknown as WebSocketCtor);
     this.local = opts.local ?? window.localStorage;
+    this.session = opts.session ?? window.sessionStorage;
     this.schedule = opts.schedule ?? ((fn, ms) => window.setTimeout(fn, ms));
     this.reconnectMs = opts.reconnectMs ?? 1500;
   }
 
-  // ── 昵称（localStorage）──
+  // ── 昵称（localStorage，仅作昵称输入框默认值；多标签共享，会被最后一个标签覆盖）──
   get nick(): string { return this.local.getItem(NICK_KEY) ?? ''; }
   setNick(n: string): void { this.local.setItem(NICK_KEY, n); }
 
-  // ── 房况（localStorage，重连凭据；跨标签页/重开存活，手机杀后台后仍能收回座位）──
-  savedRoom(): { code: string; seat: number } | null {
-    const raw = this.local.getItem(ROOM_KEY);
+  // ── 房况（重连凭据 {房号,座位,昵称}）──
+  private _readCred(store: StorageLike): { code: string; seat: number; nick: string } | null {
+    const raw = store.getItem(ROOM_KEY);
     if (!raw) return null;
     try {
-      const o = JSON.parse(raw) as { code?: unknown; seat?: unknown };
-      return typeof o.code === 'string' && typeof o.seat === 'number' ? { code: o.code, seat: o.seat } : null;
+      const o = JSON.parse(raw) as { code?: unknown; seat?: unknown; nick?: unknown };
+      if (typeof o.code !== 'string' || typeof o.seat !== 'number') return null;
+      return { code: o.code, seat: o.seat, nick: typeof o.nick === 'string' ? o.nick : this.nick };
     } catch { return null; }
   }
-  saveRoom(code: string, seat: number): void { this.local.setItem(ROOM_KEY, JSON.stringify({ code, seat })); }
-  clearRoom(): void { this.local.removeItem(ROOM_KEY); }
+  /** 本标签页(session)优先 → 其次跨重开兜底(local)。多标签下各守各座，手机杀后台仍能捞回。 */
+  savedRoom(): { code: string; seat: number; nick: string } | null {
+    return this._readCred(this.session) ?? this._readCred(this.local);
+  }
+  saveRoom(code: string, seat: number, nick: string): void {
+    const cred = JSON.stringify({ code, seat, nick });
+    this.session.setItem(ROOM_KEY, cred); // 本标签页（主，多标签互不覆盖）
+    this.local.setItem(ROOM_KEY, cred);   // 跨重开兜底（手机杀后台/重开浏览器）
+  }
+  clearRoom(): void { this.session.removeItem(ROOM_KEY); this.local.removeItem(ROOM_KEY); }
 
   // ── 连接 ──
   connect(): void {
@@ -83,9 +96,9 @@ export class OnlineSession {
     this.ws = ws;
     ws.onopen = (): void => {
       this.reconnecting = false;
-      // 断线重连：有房况则自动收回座位
+      // 断线重连：有房况则自动收回座位（用凭据里的本座昵称，不用共享 gd_nick——多标签会被覆盖）
       const room = this.savedRoom();
-      if (room && this.nick) this.rawSend(c2s.rejoin(room.code, this.nick));
+      if (room && room.nick) this.rawSend(c2s.rejoin(room.code, room.nick));
       this.openCbs.forEach((cb) => cb());
     };
     ws.onmessage = (ev: { data: unknown }): void => {

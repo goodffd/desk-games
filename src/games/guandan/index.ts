@@ -43,6 +43,7 @@ function onlineMount(root: HTMLElement): () => void {
       return (typeof mySeat === 'number' && ss === mySeat && nick) ? `${nick}（你）` : nick;
     });
     setSeatNames(names);
+    if (onTable && driver) driver.requestRender(); // rejoin 后 'room' 晚于挂台，补刷一帧让名字就位
   }
 
   function clearScreen(): void {
@@ -119,7 +120,8 @@ function onlineMount(root: HTMLElement): () => void {
     const r = m as { code: string; status: 'waiting' | 'playing'; seats: (SeatInfo | null)[]; you: Seat | 'spectator' | null };
     mySeat = r.you;
     roomSeats = r.seats; applySeatNames(); // 牌桌昵称（联机中 room 不再来，故这里抓住）
-    if (typeof r.you === 'number') session.saveRoom(r.code, r.you); // 重连凭据
+    // 重连凭据：带本座真实昵称（服务端座位昵称，非共享 gd_nick——多标签会被覆盖致 rejoin 拿错座）
+    if (typeof r.you === 'number') session.saveRoom(r.code, r.you, r.seats[r.you]?.nick ?? session.nick);
     if (r.status === 'waiting') showRoom(r.code, r.seats, r.you);
   });
   session.on('spectating', (m) => {

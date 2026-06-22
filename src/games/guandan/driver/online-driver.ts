@@ -214,6 +214,9 @@ export class OnlineDriver implements GameDriver {
   onSpeak(cb: (text: string) => void): void { this.speakCb = cb; }
   onHint(cb: (text: string, kind: 'info' | 'warn') => void): void { this.hintCb = cb; }
 
+  /** 控制器更新座位昵称后强制重渲：rejoin 后 'room'(带昵称)晚于挂台，名字需补刷一帧。 */
+  requestRender(): void { this.fireChange(); }
+
   private fireChange(): void { this.changeCb?.(); }
   private fireSpeak(text: string): void { this.speakCb?.(text); }
   /** 联机抗贡/提示文案当前由服务端态体现，保留接口（暂未主动 fire）。 */

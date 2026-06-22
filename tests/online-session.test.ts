@@ -27,14 +27,14 @@ function memStorage(): StorageLike {
 
 function makeSession(extra: Partial<OnlineSessionOpts> = {}) {
   MockWS.instances = [];
-  const local = memStorage();
+  const local = memStorage(); const session = memStorage();
   const s = new OnlineSession('ws://x/ws-guandan', {
     WebSocketCtor: MockWS,
-    local,
+    local, session,
     schedule: (fn) => { fn(); return 0; }, // 即时重连
     ...extra,
   });
-  return { s, local };
+  return { s, local, session };
 }
 const lastWS = () => MockWS.instances[MockWS.instances.length - 1]!;
 const sentMsgs = (ws: MockWS) => ws.sent.map((x) => JSON.parse(x));
@@ -73,15 +73,15 @@ describe('OnlineSession', () => {
     expect(opened).toBe(1);
   });
 
-  it('断线 + 有房况 → 自动重连并 rejoin', () => {
+  it('断线 + 有房况 → 自动重连并 rejoin（用凭据里的本座昵称）', () => {
     const { s } = makeSession();
-    s.setNick('阿东');
-    s.saveRoom('ABC123', 2);
+    s.setNick('别的名');                       // 共享 gd_nick 被别的标签覆盖
+    s.saveRoom('ABC123', 2, '阿东');           // 凭据里是本座真实昵称
     s.connect(); lastWS()._open();
     const before = MockWS.instances.length;
     lastWS().close();                         // 断线 → 即时 schedule → 重连 connect()
     expect(MockWS.instances.length).toBe(before + 1); // 新建了一条连接
-    lastWS()._open();                         // 重连 open → 自动发 rejoin
+    lastWS()._open();                         // 重连 open → 自动发 rejoin（用凭据 nick，不用 gd_nick）
     expect(sentMsgs(lastWS())).toContainEqual({ t: 'rejoin', code: 'ABC123', nick: '阿东' });
   });
 
@@ -95,25 +95,36 @@ describe('OnlineSession', () => {
 
   it('昵称持久化到 localStorage，跨 session 读回', () => {
     const local = memStorage();
-    const s1 = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local });
+    const s1 = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local, session: memStorage() });
     s1.setNick('阿东');
-    const s2 = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local });
+    const s2 = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local, session: memStorage() });
     expect(s2.nick).toBe('阿东');
   });
 
-  it('房况持久化到 localStorage，跨重开读回（手机杀后台后仍能 rejoin）', () => {
+  it('手机杀后台：session 没了，从 localStorage 兜底捞回座位（仍能 rejoin）', () => {
     const local = memStorage();
-    const s1 = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local });
-    s1.saveRoom('ABC123', 2);
-    const s2 = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local });
-    expect(s2.savedRoom()).toEqual({ code: 'ABC123', seat: 2 });
+    const s1 = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local, session: memStorage() });
+    s1.saveRoom('ABC123', 2, '阿东');
+    // 新标签页/重开：session 是新的(空)，local 共享 → savedRoom 走 local 兜底
+    const s2 = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local, session: memStorage() });
+    expect(s2.savedRoom()).toEqual({ code: 'ABC123', seat: 2, nick: '阿东' });
+  });
+
+  it('一台电脑多标签：各 session 独立，各守各座不互相覆盖（共享 local）', () => {
+    const local = memStorage(); // 浏览器级共享
+    const tabA = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local, session: memStorage() });
+    const tabB = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local, session: memStorage() });
+    tabA.saveRoom('ROOM01', 0, '甲');
+    tabB.saveRoom('ROOM01', 3, '丁'); // 共享 local 被丁覆盖，但各自 session 守住自己的座
+    expect(tabA.savedRoom()).toEqual({ code: 'ROOM01', seat: 0, nick: '甲' }); // 甲仍是座0
+    expect(tabB.savedRoom()).toEqual({ code: 'ROOM01', seat: 3, nick: '丁' }); // 丁仍是座3
   });
 
   it('savedRoom/saveRoom/clearRoom 往返', () => {
     const { s } = makeSession();
     expect(s.savedRoom()).toBeNull();
-    s.saveRoom('XYZ789', 1);
-    expect(s.savedRoom()).toEqual({ code: 'XYZ789', seat: 1 });
+    s.saveRoom('XYZ789', 1, '阿东');
+    expect(s.savedRoom()).toEqual({ code: 'XYZ789', seat: 1, nick: '阿东' });
     s.clearRoom();
     expect(s.savedRoom()).toBeNull();
   });

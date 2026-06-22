@@ -12,7 +12,7 @@ import { OnlineDriver } from './driver/online-driver';
 import { OnlineSession } from './online/session';
 import { c2s, type LobbyRoom, type SeatInfo } from './online/protocol';
 import './online/ui/lobby.css';
-import { mountTable, speechBusyMs, primeAudio, setTableHost, setSeatNames } from './ui/view';
+import { mountTable, speechBusyMs, primeAudio, setTableHost, setSeatNames, setSpectator } from './ui/view';
 import { renderNickname, type NicknameHandle } from './online/ui/nickname';
 import { renderLobby, type LobbyHandle } from './online/ui/lobby';
 import { renderRoom, type RoomHandle, type RoomState } from './online/ui/room';
@@ -102,6 +102,7 @@ function onlineMount(root: HTMLElement): () => void {
     clearScreen();
     onTable = true;
     setTableHost(isHost);
+    setSpectator(mySeat === 'spectator'); // 观战：底部不渲染手牌、不显示出牌按钮
     applySeatNames(); // 牌桌渲染前确保各座昵称就位
     driver = new OnlineDriver(session, mySeat);
     tableCleanup = mountTable(root, driver);
@@ -151,6 +152,7 @@ function onlineMount(root: HTMLElement): () => void {
 function mount(root: HTMLElement): () => void {
   if (new URLSearchParams(location.search).has('debug')) {
     setSeatNames(null); // 本地用 你/下家/对家/上家
+    setSpectator(false); // 本地恒为玩家
     return mountTable(root, new LocalDriver({ speechBusyMs }));
   }
   return onlineMount(root);

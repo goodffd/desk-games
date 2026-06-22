@@ -45,8 +45,9 @@ wss.on('connection', (ws) => {
 });
 
 // 掼蛋联机：独立 RoomRegistry + /ws-guandan，与象棋 /ws 并存（owner: 跟象棋隔离）
-const TRIBUTE_TIMEOUT = 30000;
-const gReg = new GuandanRooms(undefined, () => new MatchDriver({}), TRIBUTE_TIMEOUT);
+const TRIBUTE_TIMEOUT = Number(process.env.GD_TRIBUTE_TIMEOUT) || 30000;
+const TURN_TIMEOUT = Number(process.env.GD_TURN_TIMEOUT) || 23000; // 回合超时：在线真人座发呆 23s(客户端 20s 倒计时 + 3s 宽限) → 服务端代打(可 env 覆写便于冒烟)
+const gReg = new GuandanRooms(undefined, () => new MatchDriver({}), TRIBUTE_TIMEOUT, TURN_TIMEOUT);
 const gwss = new WebSocketServer({ noServer: true, maxPayload: 1 << 20 });
 gwss.on('connection', (ws) => {
   const client = { send: (m) => { try { ws.send(JSON.stringify(m)); } catch {} } };

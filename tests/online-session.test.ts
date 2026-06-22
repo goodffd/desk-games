@@ -27,14 +27,14 @@ function memStorage(): StorageLike {
 
 function makeSession(extra: Partial<OnlineSessionOpts> = {}) {
   MockWS.instances = [];
-  const local = memStorage(); const session = memStorage();
+  const local = memStorage();
   const s = new OnlineSession('ws://x/ws-guandan', {
     WebSocketCtor: MockWS,
-    local, session,
+    local,
     schedule: (fn) => { fn(); return 0; }, // 即时重连
     ...extra,
   });
-  return { s, local, session };
+  return { s, local };
 }
 const lastWS = () => MockWS.instances[MockWS.instances.length - 1]!;
 const sentMsgs = (ws: MockWS) => ws.sent.map((x) => JSON.parse(x));
@@ -95,10 +95,18 @@ describe('OnlineSession', () => {
 
   it('昵称持久化到 localStorage，跨 session 读回', () => {
     const local = memStorage();
-    const s1 = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local, session: memStorage() });
+    const s1 = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local });
     s1.setNick('阿东');
-    const s2 = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local, session: memStorage() });
+    const s2 = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local });
     expect(s2.nick).toBe('阿东');
+  });
+
+  it('房况持久化到 localStorage，跨重开读回（手机杀后台后仍能 rejoin）', () => {
+    const local = memStorage();
+    const s1 = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local });
+    s1.saveRoom('ABC123', 2);
+    const s2 = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local });
+    expect(s2.savedRoom()).toEqual({ code: 'ABC123', seat: 2 });
   });
 
   it('savedRoom/saveRoom/clearRoom 往返', () => {

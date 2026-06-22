@@ -2,8 +2,9 @@
  * session.ts — 掼蛋联机 WS 客户端会话（Plan 3 Task 3）。
  *
  * 纯传输层：连 `/ws-guandan`、收发 `{t,...}`、按 msg.t 分发、断线自动重连（重连后自动 rejoin）。
- * 昵称存 localStorage、房况(房号+座位)存 sessionStorage（重连凭据）。**不懂牌、不懂房**——
- * 牌局解释在 OnlineDriver、房间编排在控制器。WebSocket/storage/定时全可注入，单测用 mock。
+ * 昵称 + 房况(房号+座位，重连凭据)均存 localStorage——必须跨标签页/重开浏览器存活，否则手机杀后台
+ * 后重开只能观战、收不回座位。控制器在离房/解散/重连失败时主动 clearRoom 清陈旧房况。
+ * **不懂牌、不懂房**——牌局解释在 OnlineDriver、房间编排在控制器。WebSocket/storage/定时全可注入。
  */
 
 import type { C2SMessage, S2CType } from './protocol';
@@ -28,8 +29,7 @@ export interface StorageLike {
 
 export interface OnlineSessionOpts {
   WebSocketCtor?: WebSocketCtor;
-  local?: StorageLike;    // 昵称
-  session?: StorageLike;  // 房况（重连凭据）
+  local?: StorageLike;    // 昵称 + 房况（持久，跨标签页/重开存活）
   schedule?: (fn: () => void, ms: number) => number; // 重连退避定时
   reconnectMs?: number;
 }
@@ -44,7 +44,6 @@ export class OnlineSession {
   private readonly url: string;
   private readonly WS: WebSocketCtor;
   private readonly local: StorageLike;
-  private readonly session: StorageLike;
   private readonly schedule: (fn: () => void, ms: number) => number;
   private readonly reconnectMs: number;
   private readonly listeners = new Map<string, Set<Listener>>();
@@ -57,7 +56,6 @@ export class OnlineSession {
     this.url = url;
     this.WS = opts.WebSocketCtor ?? (window.WebSocket as unknown as WebSocketCtor);
     this.local = opts.local ?? window.localStorage;
-    this.session = opts.session ?? window.sessionStorage;
     this.schedule = opts.schedule ?? ((fn, ms) => window.setTimeout(fn, ms));
     this.reconnectMs = opts.reconnectMs ?? 1500;
   }
@@ -66,17 +64,17 @@ export class OnlineSession {
   get nick(): string { return this.local.getItem(NICK_KEY) ?? ''; }
   setNick(n: string): void { this.local.setItem(NICK_KEY, n); }
 
-  // ── 房况（sessionStorage，重连凭据）──
+  // ── 房况（localStorage，重连凭据；跨标签页/重开存活，手机杀后台后仍能收回座位）──
   savedRoom(): { code: string; seat: number } | null {
-    const raw = this.session.getItem(ROOM_KEY);
+    const raw = this.local.getItem(ROOM_KEY);
     if (!raw) return null;
     try {
       const o = JSON.parse(raw) as { code?: unknown; seat?: unknown };
       return typeof o.code === 'string' && typeof o.seat === 'number' ? { code: o.code, seat: o.seat } : null;
     } catch { return null; }
   }
-  saveRoom(code: string, seat: number): void { this.session.setItem(ROOM_KEY, JSON.stringify({ code, seat })); }
-  clearRoom(): void { this.session.removeItem(ROOM_KEY); }
+  saveRoom(code: string, seat: number): void { this.local.setItem(ROOM_KEY, JSON.stringify({ code, seat })); }
+  clearRoom(): void { this.local.removeItem(ROOM_KEY); }
 
   // ── 连接 ──
   connect(): void {

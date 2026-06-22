@@ -6,10 +6,11 @@ function defaultCode() {
 }
 
 export class RoomRegistry {
-  constructor(codeGen = defaultCode, makeDriver = null, tributeTimeoutMs = 0) {
+  constructor(codeGen = defaultCode, makeDriver = null, tributeTimeoutMs = 0, turnTimeoutMs = 0) {
     this.codeGen = codeGen;
     this.makeDriver = makeDriver;       // (room) => MatchDriver；Task 9 接入
     this.tributeTimeoutMs = tributeTimeoutMs;
+    this.turnTimeoutMs = turnTimeoutMs; // 回合超时(在线真人座发呆)→ 服务端 choosePlay 代打
     this.rooms = new Map();             // code -> room
     this.nicks = new Map();             // client -> nick(原样)
     this.byNick = new Set();            // nickKey 占用集
@@ -238,6 +239,27 @@ export class RoomRegistry {
         }
       });
     }
+    this._armTurnTimeout(room, outbound);
+  }
+  /** 回合超时：轮到「在线真人」座位发呆 turnTimeoutMs 未动 → 服务端 forceAutoPlay 代打(同 AI 接管)。
+   *  每次有新出牌广播都重置(下家行动重计时)；AI 座由 driveAI 即时驱动、不计时。 */
+  _armTurnTimeout(room, out) {
+    if (room._turnTimer) { clearTimeout(room._turnTimer); room._turnTimer = null; }
+    if (!this.turnTimeoutMs || !room.driver || typeof room.driver.forceAutoPlay !== 'function') return;
+    const playing = (out || []).some(o => o.msg && o.msg.t === 'state' && o.msg.phase === 'playing');
+    if (!playing) return;
+    const turn = room.driver.state && room.driver.state.turn;
+    if (typeof turn !== 'number') return;
+    const s = room.seats[turn];
+    if (!s || !s.online) return; // 只给在线真人座计时；掉线/AI 座 driveAI 已即时处理
+    room._turnTimer = setTimeout(() => {
+      room._turnTimer = null;
+      if (room.driver && typeof room.driver.forceAutoPlay === 'function') {
+        const o = room.driver.forceAutoPlay();
+        this._dispatch(room, o);
+        this._armTributeTimeout(room, o);
+      }
+    }, this.turnTimeoutMs);
   }
   _armTributeTimeout(room, out) {
     const needsTribute = (out || []).some(o => o.msg && o.msg.t === 'need-tribute');

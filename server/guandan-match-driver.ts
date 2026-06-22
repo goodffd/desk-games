@@ -179,6 +179,15 @@ export class MatchDriver {
     return [...this.afterAction(seat), ...this.driveAI()];
   }
 
+  /** 回合超时托管：替当前轮到的座位（在线真人发呆时）用 choosePlay 自动出一手，同 AI 接管。 */
+  forceAutoPlay(): Outbound[] {
+    if (this.phase !== 'playing' || isDealOver(this.state)) return [];
+    const seat = this.state.turn;
+    const decision = choosePlay(this.state, seat);
+    if (decision === null) this.applyPass(seat); else this.applyPlay(seat, decision);
+    return [...this.afterAction(seat), ...this.driveAI()];
+  }
+
   // ── PRIVATE: state-advancing core (no driveAI) ────────────────────────────
   private applyPlay(seat: Seat, cards: Card[]): void {
     const wasLead = this.state.current === null;

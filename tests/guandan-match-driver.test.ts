@@ -111,6 +111,35 @@ describe('MatchDriver — AI 接管', () => {
     // setAI 链式驱动后，本局应已结束（finished 满 4 或 deal over）
     expect(d.state.finished.length).toBeGreaterThanOrEqual(3);
   });
+
+  it('forceAutoPlay：替当前轮到座位代打一手，turn 前移（在线真人发呆托管）', () => {
+    const d = new MatchDriver({ shuffle: noShuffle }); d.start(); // 轮到座位0，全座在线(真人)
+    const turn0 = d.state.turn;
+    const out = d.forceAutoPlay();
+    expect(out.some((o: any) => o.msg.t === 'state')).toBe(true);
+    expect(d.state.turn).not.toBe(turn0); // 代打后 turn 前移（不停在原座）
+  });
+
+  it('forceAutoPlay：3 座 AI + 1 在线真人，反复托管→该真人回合不断回来、不卡死', () => {
+    const d = new MatchDriver({ shuffle: defaultShuffleSeeded() }); d.start();
+    const human = 1;
+    for (const s of [0, 2, 3]) d.setAI(s as any, true); // 其余 3 座 AI（=掉线接管）
+    // 真人 human 全程发呆：每轮都靠 forceAutoPlay 托管。验证：能一路把整盘推完，不会卡在 human 座。
+    let guard = 0;
+    while (!d.match.over && guard++ < 400) {
+      if (d.phase === 'playing' && d.state.turn === human && d.state.finished.indexOf(human as any) === -1) {
+        d.forceAutoPlay(); // 真人发呆 → 服务端代打
+      } else if (d.phase === 'tribute') {
+        d.forceAutoReturn();
+      } else if (d.phase === 'dealResult') {
+        d.nextDeal();
+      } else {
+        // 轮到 AI 座但 driveAI 未推进（理论不应发生）→ 防御性兜底
+        break;
+      }
+    }
+    expect(d.match.over).toBe(true); // 整盘能打完，真人座不会永久卡住
+  });
 });
 
 describe('MatchDriver — 进贡/还贡', () => {

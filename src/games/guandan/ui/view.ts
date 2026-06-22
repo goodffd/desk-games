@@ -141,6 +141,11 @@ export function setTableHost(v: boolean): void { tableIsHost = v; }
 let seatNames: (string | null)[] | null = null;
 export function setSeatNames(names: (string | null)[] | null): void { seatNames = names; }
 
+/** 观战：观众没有自己的手牌（服务端只下发公开态，底部手牌全是占位牌）——底部不渲染大手牌、不显示
+ *  出牌按钮，只看四家公开信息(头像/名/张数)与桌面出牌。控制器挂牌桌前 setSpectator(mySeat==='spectator')。 */
+let spectator = false;
+export function setSpectator(v: boolean): void { spectator = v; }
+
 /** iOS：音频要用户手势解锁。首次点击时静音预热一下，之后 AI/对家出牌语音也能响。
  *  本地由「开始游戏」遮罩调；联机由前置 UI 的点击手势调。 */
 export function primeAudio(): void {
@@ -381,6 +386,7 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
   /** 玩家手牌：桌面=重叠扇形；手机=途游式同点数堆成一列省横向空间 */
   function renderHand(): void {
     handEl.innerHTML = '';
+    if (spectator) return; // 观战无自己的手牌（底部占位牌不渲染，避免显示「一对黑桃2」占位牌）
     // 展示顺序：左→右 大→小。级牌仅次于大小王由 rankValue/sortHand 保证
     const cards = [...sortedHand(HUMAN_SEAT)].reverse();
     // 桌面与手机统一：同点数堆成一列向上叠、列间重叠（途游式，省横向空间且角标花色不跨叠）
@@ -439,7 +445,7 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
   }
 
   function renderButtons(): void {
-    const isHumanTurn = started && state.turn === HUMAN_SEAT && !isDealOver(state);
+    const isHumanTurn = !spectator && started && state.turn === HUMAN_SEAT && !isDealOver(state);
     actionsEl.style.display = isHumanTurn ? 'flex' : 'none'; // 途游式：仅轮到我时显示按钮
     playBtn.disabled = !isHumanTurn;
     passBtn.disabled = !isHumanTurn || state.current === null; // 自己领出时不能"不要"

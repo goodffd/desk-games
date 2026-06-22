@@ -161,15 +161,34 @@ export function primeAudio(): void {
   } catch { /* ignore */ }
 }
 
-/** 头像：圆形 + 简笔人像，按队伍(座%2)配色 */
-function avatarEl(seat: Seat): HTMLElement {
+// 三种头像图案：在线=简笔人像；掉线=灰人像+右下断线角标(橙)；AI接管=机器人头
+const PERSON_SVG =                                                // 人像：头+肩，整体在圆内垂直居中
+  '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+  '<circle cx="12" cy="8" r="4.2" fill="currentColor"/>' +
+  '<path d="M3.5 20 C3.5 13.8 8 12 12 12 C16 12 20.5 13.8 20.5 20 Z" fill="currentColor"/>' +
+  '</svg>';
+const OFFLINE_SVG =
+  '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+  '<circle cx="11" cy="8.5" r="4" fill="currentColor"/>' +
+  '<path d="M3 20.5 C3 14.6 7 12.8 11 12.8 C12.5 12.8 14 13.05 15.3 13.7 L15.3 20.5 Z" fill="currentColor"/>' +
+  '<circle cx="18" cy="17.6" r="5" fill="#c8612a"/>' +          /* 断线角标：橙圆 */
+  '<path d="M15.7 19.9 L20.3 15.3" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/>' + /* 斜杠 */
+  '</svg>';
+const AI_SVG =                                                    // 方头机器人：头+天线队伍色(深背景可见)、眼/嘴深色挖空；天线+头整体在圆内垂直居中
+  '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+  '<line x1="12" y1="5.6" x2="12" y2="9" stroke="currentColor" stroke-width="1.7"/>' +   /* 天线杆 */
+  '<circle cx="12" cy="5.2" r="1.5" fill="currentColor"/>' +                             /* 天线顶 */
+  '<rect x="5" y="8.8" width="14" height="11" rx="3" fill="currentColor"/>' +            /* 方头(队伍色) */
+  '<circle cx="9.5" cy="13.8" r="1.6" fill="#1d242e"/>' +                                /* 眼 */
+  '<circle cx="14.5" cy="13.8" r="1.6" fill="#1d242e"/>' +
+  '<rect x="9" y="16.8" width="6" height="1.5" rx="0.7" fill="#1d242e"/>' +              /* 嘴 */
+  '</svg>';
+/** 头像：圆形，按状态出图案——在线人像(队伍配色)/掉线灰人像+断线标/AI机器人头 */
+function avatarEl(seat: Seat, status: 'online' | 'disconnected' | 'ai' = 'online'): HTMLElement {
   const av = document.createElement('div');
-  av.className = `gd-avatar gd-avatar--team${seat % 2}`;
-  av.innerHTML =
-    '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-    '<circle cx="12" cy="9" r="4.2" fill="currentColor"/>' +
-    '<path d="M3.5 21 C3.5 14.8 8 13 12 13 C16 13 20.5 14.8 20.5 21 Z" fill="currentColor"/>' +
-    '</svg>';
+  if (status === 'ai') { av.className = `gd-avatar gd-avatar--team${seat % 2}`; av.innerHTML = AI_SVG; }       // 机器人，头用该座队伍色(同人像)
+  else if (status === 'disconnected') { av.className = 'gd-avatar gd-avatar--offline'; av.innerHTML = OFFLINE_SVG; }
+  else { av.className = `gd-avatar gd-avatar--team${seat % 2}`; av.innerHTML = PERSON_SVG; }
   return av;
 }
 
@@ -301,16 +320,9 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     const active = started && state.turn === seat && !isDealOver(state);
     elx.classList.toggle('is-active', active);
 
-    const av = avatarEl(seat);
+    // 掉线/AI接管直接换头像图案（不再用外挂文字标记，免位置/叠手牌问题）
     const conn = snapSeatStatus?.[seat] ?? 'online';
-    if (conn !== 'online') { // 掉线宽限 / AI接管：灰化头像 + 头像上方持续显示标记（不再用一闪而过的顶部 toast）
-      av.classList.add('gd-avatar--offline');
-      const badge = document.createElement('div');
-      badge.className = 'gd-seat__badge' + (conn === 'ai' ? ' gd-seat__badge--ai' : '');
-      badge.textContent = conn === 'ai' ? 'AI接管中' : '掉线了';
-      av.appendChild(badge);
-    }
-    elx.appendChild(av);
+    elx.appendChild(avatarEl(seat, conn));
 
     const info = document.createElement('div');
     info.className = 'gd-seat__info';

@@ -155,26 +155,15 @@
 .gd-avatar svg { width: 30px; height: 30px; color: var(--av-color); }
 .gd-avatar--team0 { --av-color: #e0b84c; }
 .gd-avatar--team1 { --av-color: #5b9bd5; }
-/* 掉线/AI接管：头像变灰、暗背景、虚线圈，一眼看出这个真人不在。
-   不用 filter/opacity（会连带把子元素「掉线了」标记一起灰掉），改用颜色变灰。 */
+/* 状态直接体现在头像图案上（不用外挂文字标记）：
+   掉线=灰人像+虚线圈(橙断线角标在 SVG 里)；AI接管=蓝机器人头 */
 .gd-avatar--offline {
-  --av-color: #8f949b;
-  background: rgba(0,0,0,0.62);
+  --av-color: #9aa0a8;        /* 人像 + 边框变灰 */
   border-style: dashed;
   box-shadow: none;
 }
-.gd-seat.is-active .gd-avatar--offline { box-shadow: none; border-color: #8f949b; } /* 掉线座即使轮到也不高亮发光 */
-/* 头像上方持续标记：「掉线了」(橙) / 「AI接管中」(蓝)，不随时间消失 */
-.gd-seat__badge {
-  position: absolute; bottom: calc(100% + 7px); left: 50%; transform: translateX(-50%);
-  padding: 2px 9px; border-radius: 11px; white-space: nowrap;   /* 胶囊跟人像下面那行(.gd-seat__info)一致 */
-  font-size: 0.62rem; font-weight: 700; line-height: 1.5;
-  background: rgba(0,0,0,0.4); color: #ef9a5a;   /* 底色同 .gd-seat__info；两态用文字色区分：掉线了=橙字 */
-  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
-  filter: none; opacity: 1;                      /* 不被头像灰化影响 */
-  pointer-events: none; z-index: 12;
-}
-.gd-seat__badge--ai { color: #6ab0e8; }          /* AI接管中=蓝字 */
+/* AI 机器人头用该座队伍色(gd-avatar--team0/1)，无需独立配色；轮到时跟人像一样的白色高亮(沿用 .is-active 默认) */
+.gd-seat.is-active .gd-avatar--offline { box-shadow: none; border-color: #9aa0a8; }      /* 掉线座即使轮到也不发光 */
 /* 我的头像跟其它玩家一致大小（不再小一圈） */
 /* 当前出牌方头像高亮 */
 .gd-seat.is-active .gd-avatar {

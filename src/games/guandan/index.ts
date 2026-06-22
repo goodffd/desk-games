@@ -17,8 +17,6 @@ import { renderNickname, type NicknameHandle } from './online/ui/nickname';
 import { renderLobby, type LobbyHandle } from './online/ui/lobby';
 import { renderRoom, type RoomHandle, type RoomState } from './online/ui/room';
 
-const SEAT_LABELS: Record<number, string> = { 0: '你', 1: '下家', 2: '对家', 3: '上家' };
-
 function onlineMount(root: HTMLElement): () => void {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const session = new OnlineSession(`${proto}://${location.host}/ws-guandan`);
@@ -60,10 +58,6 @@ function onlineMount(root: HTMLElement): () => void {
     t.textContent = text;
     root.appendChild(t);
     window.setTimeout(() => t.remove(), 3800);
-  }
-  function peerLabel(serverSeat: number): string {
-    const base = typeof mySeat === 'number' ? mySeat : 0;
-    return SEAT_LABELS[(serverSeat - base + 4) % 4] ?? '某家';
   }
 
   function showNickname(): void {
@@ -132,8 +126,7 @@ function onlineMount(root: HTMLElement): () => void {
   session.on('rejoined', (m) => { mySeat = (m as { seat: Seat }).seat; applySeatNames(); ensureTable(); });
   session.on('started', () => ensureTable());
   session.on('state', () => { if (mySeat !== null) ensureTable(); }); // 观战/重连首个 state 兜底挂台
-  // 掉线不再弹一闪而过的 toast：掉线/AI接管状态由座位头像上的持续标记显示（state 带 seatStatus）。
-  session.on('peer-back', (m) => toast(`${peerLabel((m as { seat: number }).seat)} 回来了`));
+  // 掉线/AI接管/回来 全靠座位头像图案显示(state 带 seatStatus)，不再弹一闪而过的顶部 toast。
   session.on('room-closed', () => { session.clearRoom(); toast('房间已解散'); showLobby(); });
   session.on('error', (m) => {
     const msg = (m as { msg: string }).msg;

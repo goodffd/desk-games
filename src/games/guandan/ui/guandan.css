@@ -119,17 +119,27 @@
   z-index: 9;            /* 头像始终可见：在手牌(6)/出牌区(3~7)之上 */
   flex-direction: column-reverse; align-items: center; gap: 4px;
 }
-/* 左右家：只锚定头像竖向居中；名/张数绝对排到头像下方，残局张数角标变大也不顶动头像 */
+/* 左右家：只锚定头像竖向居中；名/张数绝对排到头像下方，残局张数角标变大也不顶动头像。
+   贴屏幕边缘，故限宽 + 换行：昵称占一行，张数/闹钟放不下就换到下一行，整体不超出屏幕左右边缘 */
 .gd-seat--left .gd-seat__info,
 .gd-seat--right .gd-seat__info {
   position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
   margin-top: 3px;
+  flex-wrap: wrap; justify-content: center; max-width: 92px;
 }
+/* 昵称独占第一行，张数+闹钟(包成 gd-seat__meta 小组)并排到第二行(共两行，不是三行)；超长昵称省略号兜底 */
+.gd-seat--left .gd-seat__name,
+.gd-seat--right .gd-seat__name {
+  flex-basis: 100%; text-align: center;
+  max-width: 86px; overflow: hidden; text-overflow: ellipsis;
+}
+/* 张数+闹钟小组：横排不换行(整组一起落到第二行，内部并排) */
+.gd-seat__meta { display: inline-flex; align-items: center; gap: 5px; }
 /* 对手轮到时：头像上方「思考中」浮标（替代中央状态文字） */
 /* 回合倒计时（闹钟动画）：在头像信息下方，替代原「思考中」 */
 .gd-seat__timer {
   display: flex; align-items: center; justify-content: center; gap: 2px;
-  margin-top: 2px; white-space: nowrap;
+  white-space: nowrap;                 /* 去掉原 margin-top：让闹钟跟昵称/张数居中对齐(单行三者一线、双行与张数一线) */
   font-size: 0.72rem; font-weight: 700; color: var(--gold);
   pointer-events: none;
 }

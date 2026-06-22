@@ -331,28 +331,32 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     name.textContent = seatNames?.[seat] || SEAT_LABELS[seat]; // 联机用昵称，本地用 你/下家/对家/上家
     info.appendChild(name);
 
+    // 张数/名次 + 闹钟 包成一个不换行小组：左右家(贴屏幕边)昵称占一行、这组整体落到第二行内部并排，不各自换行
+    const meta = document.createElement('div');
+    meta.className = 'gd-seat__meta';
     const finishIdx = state.finished.indexOf(seat);
     if (finishIdx >= 0) {
       const badge = document.createElement('span');
       badge.className = 'gd-seat__rank';
       badge.textContent = rankName(finishIdx);
-      info.appendChild(badge);
+      meta.appendChild(badge);
     } else {
       const len = state.hands[seat]!.length;
       if (len <= 10) { // 仅剩 10 张及以下才显示张数，并光晕醒目提醒
         const count = document.createElement('span');
         count.className = 'gd-seat__count gd-seat__count--alert';
         count.textContent = `${len}`;
-        info.appendChild(count);
+        meta.appendChild(count);
       }
     }
-    // 轮到该家：信息下方放倒计时（闹钟动画），替代原「思考中」；超时自动出牌
+    // 轮到该家：放倒计时（闹钟动画），替代原「思考中」；超时自动出牌
     if (active) {
       const timer = document.createElement('div');
       timer.className = 'gd-seat__timer';
       timer.innerHTML = '<span class="gd-seat__clock">⏰</span><span class="gd-seat__timer-sec">' + TURN_SECONDS + '</span>';
-      info.appendChild(timer);
+      meta.appendChild(timer);
     }
+    if (meta.childNodes.length) info.appendChild(meta);
     elx.appendChild(info);
   }
 

@@ -869,6 +869,10 @@ export function mountXiangqi(root: HTMLElement): () => void {
   }
 
   const cleanup = () => {
+    intentionalClose = true;     // 关 WS 前置 true → 关闭触发的 onState('closed') 命中主动退出分支，不调度重连
+    online?.close();             // 关闭联机 WebSocket
+    online = null;
+    clearOnlineSession();        // 清 sessionStorage 重连凭据：离开象棋=主动退出当前在线会话(零残留)
     stopClockTimer();
     if (aiTimer !== null) { clearTimeout(aiTimer); aiTimer = null; }
     if (reconnectTimer !== null) { clearTimeout(reconnectTimer); reconnectTimer = null; }
@@ -877,5 +881,5 @@ export function mountXiangqi(root: HTMLElement): () => void {
     listeners.forEach(({ t, type, fn }) => t.removeEventListener(type, fn));
     host.remove();
   };
-  return cleanup;   // 5d 再补 ws/联机清理
+  return cleanup;
 }

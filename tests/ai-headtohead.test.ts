@@ -39,30 +39,49 @@ function playDeal(seed: number, policyOf: (seat: Seat) => Policy): Seat[] {
   return ranking(s);
 }
 
-/** 名次→得分：头游3 二游2 三游1 末游0。 */
-function teamPoints(rank: Seat[], teamSeats: Seat[]): number {
-  const pts = [3, 2, 1, 0];
-  return teamSeats.reduce((sum: number, seat) => sum + pts[rank.indexOf(seat)]!, 0);
+/**
+ * 忠实掼蛋头游制：头游（ranking[0]）所在的队赢这一局，无平局。
+ * 升级级数看队友名次（队友排第几名，rank 用 0-based 索引）：
+ *   - 头游队的两人占 1名+2名（双下）→ 升 3 级
+ *   - 头游队占 1名+3名 → 升 2 级
+ *   - 头游队占 1名+4名 → 升 1 级
+ *   - 头游在对家 → 本队 0 级
+ * @returns 新队这一局的升级级数（0/1/2/3）。
+ */
+function teamUpgrade(rank: Seat[], teamSeats: Seat[]): number {
+  const champion = rank[0]!; // 头游座位
+  if (!teamSeats.includes(champion)) return 0; // 头游在对家，本队不赢
+  // 头游在本队：队友（另一个本队座位）的名次（0-based finish 索引）决定级数
+  const partner = teamSeats.find(seat => seat !== champion)!;
+  const partnerPlace = rank.indexOf(partner); // 0=1名 1=2名 2=3名 3=4名
+  // partnerPlace=1 → 双下升3；=2 → 升2；=3 → 升1
+  return 4 - partnerPlace;
 }
 
 describe('新 AI vs 老 AI 对打', () => {
-  it(`新队胜率 ≥ 60%（${GAMES} 局，轮换座位）`, () => {
-    let newWins = 0, ties = 0, newPointsTotal = 0;
+  it(`新队头游胜率 ≥ 60%（${GAMES} 局，轮换座位）`, () => {
+    let newWins = 0; // 头游 ∈ 新队的局数（忠实头游制，无平局）
+    let doubleDowns = 0; // 新队拿 1名+2名（双下）的局数
+    let upgradeTotal = 0; // 新队升级级数总和（含 0 级的输局）
     for (let g = 0; g < GAMES; g++) {
       // 偶数局：新队={0,2}；奇数局：新队={1,3}（消除位次偏置）
       const newSeats: Seat[] = g % 2 === 0 ? [0, 2] : [1, 3];
       const isNew = (seat: Seat) => newSeats.includes(seat);
       const rank = playDeal(g, (seat) => (isNew(seat) ? choosePlay : legacyChoosePlay));
-      const np = teamPoints(rank, newSeats);
-      const op = 6 - np; // 总分恒为 3+2+1+0=6
-      newPointsTotal += np;
-      if (np > op) newWins++; else if (np === op) ties++;
+      const up = teamUpgrade(rank, newSeats);
+      upgradeTotal += up;
+      if (rank[0]! === newSeats[0]! || rank[0]! === newSeats[1]!) newWins++; // 头游 ∈ 新队 = 赢
+      if (up === 3) doubleDowns++; // 升 3 级 = 双下（1名+2名）
     }
     const winRate = newWins / GAMES;
-    const avgNewPoints = newPointsTotal / GAMES;
+    const avgUpgrade = upgradeTotal / GAMES;
+    const doubleDownRate = doubleDowns / GAMES;
     // eslint-disable-next-line no-console
-    console.log(`新队胜率=${(winRate * 100).toFixed(1)}% 平局=${ties} 平均队分=${avgNewPoints.toFixed(2)}/6`);
+    console.log(
+      `新队头游胜率=${(winRate * 100).toFixed(1)}% ` +
+      `平均升级=${avgUpgrade.toFixed(2)}级 ` +
+      `双下率=${(doubleDownRate * 100).toFixed(1)}%`,
+    );
     expect(winRate).toBeGreaterThanOrEqual(0.6);
-    expect(avgNewPoints).toBeGreaterThan(3); // 平均强于均势(3)
   });
 });

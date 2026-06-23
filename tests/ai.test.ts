@@ -407,6 +407,24 @@ describe('choosePlay 跟牌', () => {
     expect(out).toBeNull();
   });
 
+  it('spare(damage=0) 与结构内牌(damage>0)都能压 → 选 spare 不拆顺子【真 RED：覆盖 damage 主路径】', () => {
+    // 探针实测确认拆解结构（decompose([8S,9H,10C,11D,12S,14C], L3)）：
+    //   handCount=2 → straight 8-12 + single A(14)。A 是结构外 spare、8-12 是顺子。
+    //   A(14) 接不进 8-12 顺子 → decompose 必然把 A 留作单张，无歧义。
+    // 对手出单张10 → 合法跟牌只有 J(11)、Q(12)、散A(14)（探针：follows vs single-10）。
+    //   J(11)、Q(12) 都在顺子内：拆掉 → handCount 2→6，damage=(1+5)-2=4 (>0)。
+    //   散A(14) 是 spare：拿掉 → handCount 2→1，damage=(1+1)-2=0。
+    // 真 RED 论证：老 FOLLOW 取 nonBombs 最低 key → J(key=11) < Q(12) < A(14)，
+    //   会错误地拆顺子出 J。新 AI 按 (damage, key) 排序 → A 的 damage=0 最优，选散A。
+    const hand = [n(8, 'S'), n(9, 'H'), n(10, 'C'), n(11, 'D'), n(12, 'S'), n(14, 'C')];
+    const out = choosePlay(followState(hand, [n(10, 'D')]), 0 as Seat);
+    expect(out).not.toBeNull();
+    expect(out!.length).toBe(1);
+    const played = out![0]!;
+    // 应是结构外的 spare 散A(14)，不是顺子里的 J(11)/Q(12)
+    expect(played.kind === 'normal' && played.rank).toBe(14);
+  });
+
   it('队友领先 → 默认不要', () => {
     // 老 FOLLOW 对 partner 也是直接 return null，新旧行为一致；
     // 此条作为"配合逻辑不退化"防回归守卫。

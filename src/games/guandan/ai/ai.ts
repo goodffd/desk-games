@@ -55,6 +55,9 @@ export function choosePlay(s: DealState, seat: Seat): Card[] | null {
 /** 残局：自己或任一对手手牌很少（≤ 阈值）→ 放宽出牌、敢拆敢炸。 */
 const ENDGAME_CARDS = 6;
 
+/** 对手手牌 ≤ 此张数即视为"即将走完"，此时放宽跟牌（敢拆敢炸阻挡）。 */
+const OPP_ABOUT_TO_WIN_CARDS = 2;
+
 /** 出 cards 对剩余手牌计划的"结构损伤"：0=计划内的一手；>0=多花了手数。 */
 function damage(hand: Card[], cards: Card[], level: Rank): number {
   const ids = new Set(cards.map(c => c.id));
@@ -83,10 +86,10 @@ function chooseFollow(s: DealState, seat: Seat): Card[] | null {
   const bombs = follows.filter(c => isBomb(c));
 
   // 各家公开张数：残局 / 对手即将走完
-  const myLen = hand.length;
   const oppAboutToWin = ([0, 1, 2, 3] as Seat[])
-    .some(o => o !== seat && o !== partner && s.hands[o]!.length <= 2 && s.hands[o]!.length > 0);
-  const endgame = myLen <= ENDGAME_CARDS || oppAboutToWin;
+    .some(o => o !== seat && o !== partner
+      && s.hands[o]!.length <= OPP_ABOUT_TO_WIN_CARDS && s.hands[o]!.length > 0);
+  const endgame = hand.length <= ENDGAME_CARDS || oppAboutToWin;
 
   // 非炸弹候选按 (损伤 delta, key, 长度) 排序，取最优
   if (nonBombs.length > 0) {

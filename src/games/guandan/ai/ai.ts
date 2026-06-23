@@ -1,116 +1,62 @@
 /**
- * Guandan AI — Task 7 (一期：基础合规).
- *
- * Pure function; NEVER imports DOM.
- *
- * Strategy summary:
- *  - Lead (current==null): pick from enumerateLeads, prefer small singles/pairs/straights,
- *    avoid bombs as first priority. Must return non-null when hand is non-empty.
- *  - Follow (current!=null): find smallest same-type combo that beats current (non-bomb
- *    first); if partner leads (current.by === (seat+2)%4), prefer to pass. If no
- *    non-bomb option exists and we're not deferring to partner, use smallest bomb.
- *    May return null (pass).
+ * Guandan AI — 拆牌规划诚实打法。
+ * Pure function; NEVER imports DOM. 诚实：只读自己手牌内容 + 各家手牌张数(公开)。
  */
-
-import type { Card, Combo, Seat } from '../engine/types';
+import type { Card, Combo, Seat, Rank } from '../engine/types';
 import type { DealState } from '../engine/game';
-import { enumerateLeads, enumerateFollows, isLegalPlay } from '../engine/legal';
+import { enumerateFollows, isWild } from '../engine/legal';
+import { decompose } from './decompose';
 
-// Bomb-class types (power > 0)
 const BOMB_TYPES = new Set(['bomb', 'straightFlush', 'kingBomb']);
-
-function isBomb(c: Combo): boolean {
-  return BOMB_TYPES.has(c.type);
+function isBomb(c: Combo): boolean { return BOMB_TYPES.has(c.type); }
+function wildCount(combo: Combo, level: Rank): number {
+  return combo.cards.reduce((n, c) => n + (isWild(c, level) ? 1 : 0), 0);
 }
 
-/**
- * A heuristic "cost" for a lead combo — lower is better to play first.
- *
- * Priority (ascending cost = play sooner):
- *   1. Non-bomb combos by: smaller key first, then by length (longer = more cards burned = good)
- *   2. Bombs — always deferred: penalise heavily, then sort by power ascending (weakest first)
- */
-function leadCost(combo: Combo, level: number): number {
-  if (!isBomb(combo)) {
-    // scale key and subtract length bonus so longer (same-key) combos are slightly cheaper
-    return combo.key * 100 - combo.length;
-  }
-  // Bombs: base offset 1e9 so they always rank after non-bombs; within bombs, weakest first
-  return 1_000_000_000 + combo.power;
+/** 控制牌：炸弹类，或 key ≥ A 的高张牌型（A=14；大牌留着管节奏，不先甩）。 */
+const CONTROL_KEY = 14; // A
+function isControl(combo: Combo, _level: Rank): boolean {
+  return isBomb(combo) || combo.key >= CONTROL_KEY;
 }
 
-/** Sort combos by leadCost ascending (in-place mutation of the provided copy). */
-function sortByLeadCost(combos: Combo[], level: number): Combo[] {
-  return [...combos].sort((a, b) => leadCost(a, level) - leadCost(b, level));
+/** 自由领牌：拆解驱动。 */
+function chooseLead(hand: Card[], level: Rank): Card[] {
+  const { combos } = decompose(hand, level);
+  if (combos.length === 0) return [hand[0]!];
+  if (combos.length === 1) return combos[0]!.cards;
+
+  // 优先甩非控制牌型；都为控制牌则退而求其次全集
+  const nonControl = combos.filter(c => !isControl(c, level));
+  const pool = nonControl.length > 0 ? nonControl : combos;
+
+  // 选最低 key；tie：长度更长（多甩牌）优先；再 tie：少用红心2
+  const pick = pool.reduce((best, c) => {
+    if (c.key !== best.key) return c.key < best.key ? c : best;
+    if (c.cards.length !== best.cards.length) return c.cards.length > best.cards.length ? c : best;
+    return wildCount(c, level) < wildCount(best, level) ? c : best;
+  });
+  return pick.cards;
 }
 
-/**
- * Among follow combos, pick the "cheapest" one to play:
- *   - prefer non-bombs (cost = power ~ key ~ length)
- *   - among non-bombs: smallest key, then shortest
- *   - among bombs: smallest power (weakest bomb first)
- */
-function pickCheapestFollow(combos: Combo[]): Combo {
-  const nonBombs = combos.filter(c => !isBomb(c));
-  const bombs = combos.filter(c => isBomb(c));
-
-  if (nonBombs.length > 0) {
-    // smallest key, tie-break by length ascending (use fewest cards)
-    return nonBombs.reduce((best, c) =>
-      c.key < best.key || (c.key === best.key && c.length < best.length) ? c : best
-    );
-  }
-  // only bombs remain
-  return bombs.reduce((best, c) => (c.power < best.power ? c : best));
-}
-
-/**
- * Main AI entry point.
- *
- * @param s   The current DealState.
- * @param seat The seat whose turn it is (must equal s.turn in normal play, but AI doesn't
- *             enforce this — caller's responsibility).
- * @returns   Cards to play (non-empty array, always legal), or null to pass.
- *            null is ONLY returned when following (s.current != null).
- */
 export function choosePlay(s: DealState, seat: Seat): Card[] | null {
   const hand = s.hands[seat]!;
   const level = s.level;
 
-  // ---- LEAD (free play) --------------------------------------------------------
+  // ---- LEAD ----
   if (s.current === null) {
-    // Must play something when hand is non-empty (guaranteed by the caller, but guard anyway).
     if (hand.length === 0) return null;
-
-    const leads = enumerateLeads(hand, level);
-    if (leads.length === 0) {
-      // Shouldn't happen with a non-empty hand, but be safe.
-      return [hand[0]!];
-    }
-
-    const sorted = sortByLeadCost(leads, level);
-    return sorted[0]!.cards;
+    return chooseLead(hand, level);
   }
 
-  // ---- FOLLOW ------------------------------------------------------------------
+  // ---- FOLLOW（本任务暂用基础逻辑，Task 4 替换）----
   const partner = ((seat + 2) % 4) as Seat;
-  const partnerLeads = s.current.by === partner;
-
-  if (partnerLeads) {
-    // Partner is winning this trick. Strongly prefer to pass and let partner take it.
-    // Only override if we have nothing else meaningful to do — in the basic AI, always pass
-    // when partner leads (we never "help" by pressing). This satisfies the TDD weak assertion.
-    return null;
-  }
-
+  if (s.current.by === partner) return null;
   const follows = enumerateFollows(hand, s.current.combo, level);
-
-  if (follows.length === 0) {
-    // Nothing can beat current — must pass.
-    return null;
+  if (follows.length === 0) return null;
+  const nonBombs = follows.filter(c => !isBomb(c));
+  if (nonBombs.length > 0) {
+    return nonBombs.reduce((b, c) =>
+      c.key < b.key || (c.key === b.key && c.cards.length < b.cards.length) ? c : b).cards;
   }
-
-  // Opponent leads — try to beat them.
-  const best = pickCheapestFollow(follows);
-  return best.cards;
+  return follows.reduce((b, c) => (c.power < b.power ? c : b)).cards;
 }

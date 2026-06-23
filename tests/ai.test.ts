@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { Seat } from '../src/games/guandan/engine/types';
+import type { Card, Rank, Seat, Suit } from '../src/games/guandan/engine/types';
 import type { DealState } from '../src/games/guandan/engine/game';
 import { makeDeck, deal } from '../src/games/guandan/engine/cards';
 import { isLegalPlay } from '../src/games/guandan/engine/legal';
@@ -277,5 +277,68 @@ describe('choosePlay — tendency assertions (weak / statistical)', () => {
       ratio,
       `only ${(ratio * 100).toFixed(1)}% pass when partner leads (want ≥70%)`
     ).toBeGreaterThanOrEqual(0.7);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 3 — 领牌策略（拆解驱动）行为断言
+//
+// Card 类型说明：
+//   普通牌：{ kind: 'normal', suit: Suit, rank: Rank, id: number }
+//   大王：  { kind: 'joker', big: true,  id: number }
+//   小王：  { kind: 'joker', big: false, id: number }
+//   逢人配（红心2 at level 2）：{ kind: 'normal', suit: 'H', rank: 2, id: number }
+// ---------------------------------------------------------------------------
+
+const L3: Rank = 2; // 固定打2
+let _nid3 = 2000;   // id 段与其余测试隔离
+function n(rank: number, suit: Suit): Card {
+  return { kind: 'normal', id: _nid3++, rank: rank as Rank, suit };
+}
+function bigJoker(): Card { return { kind: 'joker', big: true,  id: _nid3++ }; }
+
+/** 构造"自由领牌"DealState：seat0 手牌=hand，其余各持1张废牌，current=null, turn=0。 */
+function leadState3(hand: Card[]): DealState {
+  return {
+    hands: [hand, [n(14, 'S')], [n(14, 'H')], [n(14, 'C')]],
+    current: null, turn: 0 as Seat, passesInRow: 0, finished: [], level: L3,
+  };
+}
+
+describe('choosePlay 领牌（拆解驱动）', () => {
+  it('手里是一条顺子 → 一手领完（不拆单张）', () => {
+    // [3♠,4♥,5♣,6♦,7♠] 构成唯一顺子；新 AI decompose 识别到 1 手，应直接领完。
+    // 老 AI leadCost 选最低 key=single-3(cost=299) < straight(cost=695)，会拆单张 → FAIL。
+    const hand: Card[] = [n(3, 'S'), n(4, 'H'), n(5, 'C'), n(6, 'D'), n(7, 'S')];
+    const out = choosePlay(leadState3(hand), 0 as Seat);
+    expect(out).not.toBeNull();
+    expect(out!.length).toBe(5);
+    expect(isLegalPlay(out!, null, hand, L3)).toBe(true);
+  });
+
+  it('有小对子和大王 → 领小对，不先领大王', () => {
+    // [3♠,3♥,bigJoker,2♠(level-non-wild)] 手牌结构：3对 + 大王单 + 2♠单(level非wild)。
+    // 新 AI：decompose 拆为 pair-3 + single-bigJoker + single-2♠，nonControl 优先领 pair-3。
+    // 老 AI：pair-3 cost=298 < joker cost≈1699，也会选 pair-3——此测试已是绿。
+    // 真正需要验证：领出的不应包含大王（kind='joker',big=true）。
+    const bj = bigJoker();
+    const hand: Card[] = [n(3, 'S'), n(3, 'H'), bj, n(2, 'S')];
+    const out = choosePlay(leadState3(hand), 0 as Seat);
+    expect(out).not.toBeNull();
+    // 领出的牌不应包含大王
+    expect(out!.some(x => x.kind === 'joker' && x.big)).toBe(false);
+  });
+
+  it('有自然对时不消耗逢人配（红心2）', () => {
+    // [3♠,3♣,2♥(wild),5♦]：自然对3 + 红心2(逢人配) + 5单张。
+    // decompose 拆为 pair-3自然 + single-5 + single-wild（3手），nonControl 最低 key=pair-3，直接领。
+    // 老 AI 枚举所有 leads 后 sort；pair-3自然 与 pair-3-wild 的 leadCost 相同(=298)，
+    // sort 不稳定，可能选含 wild 的 pair → 测试有机会 FAIL 验证了 RED。
+    // 新 AI 通过 wildCount tie-break 保证选不含 wild 的 pair-3自然 → GREEN。
+    const hand: Card[] = [n(3, 'S'), n(3, 'C'), n(2, 'H'), n(5, 'D')];
+    const out = choosePlay(leadState3(hand), 0 as Seat);
+    expect(out).not.toBeNull();
+    // 领出的不应包含红心2（逢人配）
+    expect(out!.some(x => x.kind === 'normal' && x.rank === 2 && x.suit === 'H')).toBe(false);
   });
 });

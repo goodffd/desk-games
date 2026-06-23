@@ -17,6 +17,7 @@
 - **零残留**是硬验收：离开象棋回大厅，WebSocket 断、所有定时器停、全局事件解绑、sessionStorage 重连凭据清、`root` 子树清空。
 - 联机连 `/ws`（同源，http→ws / https→wss），服务端 `server/rooms.mjs` 不动。
 - 部署到生产是红线，须 owner 单独授权（计划末任务标明）。
+- **类型检查严格度（执行时决定，owner 已认可）**：desk-games 根 `tsconfig.json` 开了 `noUncheckedIndexedAccess`（比象棋源工程严），象棋代码**原样**迁入会报 ~131+ 类型警告（非 bug，是严格度差异）。**决策：不改象棋一行源码（保持"原样不变"），给象棋单独放宽**——新建 `tsconfig.xiangqi.json`（`extends "./tsconfig.json"`、`compilerOptions.noUncheckedIndexedAccess:false`、`include ["src/games/xiangqi","tests/xiangqi"]`）；根 `tsconfig.json` 加 `exclude ["src/games/xiangqi","tests/xiangqi"]`；`package.json` 的 `typecheck` 改 `tsc --noEmit && tsc --noEmit -p tsconfig.xiangqi.json`、`build` 改 `tsc --noEmit && tsc --noEmit -p tsconfig.xiangqi.json && vite build`。掼蛋保持严格不受影响。这一步在 Task 1 里、迁完 engine 后、typecheck 前完成。
 - 每个任务结束跑 `npm run typecheck` + `npm test` 必须绿。
 
 **源工程**：`$HOME/code/projects/xiangqi-game`（待迁移，迁完归档）。

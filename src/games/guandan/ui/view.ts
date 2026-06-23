@@ -575,7 +575,7 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
   // ── 局终 / 整盘编排（弹层在 view；牌局推进/结算/进贡决策在 LocalDriver） ──
   /**
    * 进贡阶段弹层：展示进贡(动画滑入) + 人类收贡时手选 ≤10 还贡。点「确定」回调 returns 开局。
-   * 人类为收贡方时须手选；AI 收贡 autoReturn；人类仅为进贡方时无需选(进贡牌自动取最大)。
+   * 人类为收贡方时须手选；AI 收贡走 chooseReturn(智能还贡)；人类仅为进贡方时无需选(进贡牌自动取最大)。
    */
   function showTribute(p: TributePrompt): void {
     const { exchanges, myReturnOptions, level } = p;
@@ -642,7 +642,7 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
       confirmBtn.addEventListener('click', () => { p.resolve(pickedId); closeAndHint(); });
       box.appendChild(confirmBtn);
     } else if (!driver.autoAdvance) {
-      // 本地非收贡方：确定继续（driver 全 autoReturn 后开新局）
+      // 本地非收贡方：确定继续（driver AI 收贡走 chooseReturn 后开新局）
       const confirmBtn = document.createElement('button');
       confirmBtn.className = 'gd-btn gd-btn--restart';
       confirmBtn.textContent = '确定，开局';

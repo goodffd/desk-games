@@ -157,6 +157,9 @@ export function mountXiangqi(root: HTMLElement): () => void {
 
   let aiThinking = false;
   let animating = false;
+  let aiTimer: number | null = null;
+  let reconnectTimer: number | null = null;
+  let rafId: number | null = null;
 
   let online: OnlineSession | null = null;
   let onlineColor: Color | null = null;
@@ -331,13 +334,13 @@ export function mountXiangqi(root: HTMLElement): () => void {
         y: lerp(fromY, toY, t),
       }, theme, bookHints);
       if (elapsed < ANIM_MS) {
-        requestAnimationFrame(frame);
+        rafId = requestAnimationFrame(frame);
       } else {
         animating = false;
         onDone();
       }
     };
-    requestAnimationFrame(frame);
+    rafId = requestAnimationFrame(frame);
   }
 
   function renderBrowse() {
@@ -443,7 +446,7 @@ export function mountXiangqi(root: HTMLElement): () => void {
     statusEl.className = 'seal turn-' + controller.turn;
     sealChopEl.textContent = chopChar(controller.turn === 'red');
     turnTextEl.textContent = '电脑思考中…';
-    setTimeout(() => {
+    aiTimer = window.setTimeout(() => {
       const m = controller.maybeAiMove();
       aiThinking = false;
       if (m) { onMovePlayed(); playMoveSound(); playMoveAnimation(m, refresh); }
@@ -483,7 +486,7 @@ export function mountXiangqi(root: HTMLElement): () => void {
     s.onState = (st) => {
       if (st !== 'closed') return;
       if (intentionalClose) { intentionalClose = false; return; }      // 主动退出，不重连
-      if (roomCode) { setTimeout(attemptReconnect, reconnectTries === 0 ? 400 : 1200); return; }  // 掉线 → 自动重连
+      if (roomCode) { reconnectTimer = window.setTimeout(attemptReconnect, reconnectTries === 0 ? 400 : 1200); return; }  // 掉线 → 自动重连
       if (isOnline()) {
         if (onlinePanel.hidden) finishOnlineGame('连接已断');   // 真在对局视图(面板让位棋盘)才按终局处理
         else { setOnlineView('waiting'); oWaitTitle.textContent = '连接已断，点「取消」返回大厅重试'; oWaitCode.hidden = true; } // 建房等待中掉线：留等待视图靠「取消」退出，不浮出对局操作条
@@ -866,8 +869,13 @@ export function mountXiangqi(root: HTMLElement): () => void {
   }
 
   const cleanup = () => {
+    stopClockTimer();
+    if (aiTimer !== null) { clearTimeout(aiTimer); aiTimer = null; }
+    if (reconnectTimer !== null) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
+    animating = false;
     listeners.forEach(({ t, type, fn }) => t.removeEventListener(type, fn));
     host.remove();
   };
-  return cleanup;   // 5c/5d 再补定时器/ws 清理
+  return cleanup;   // 5d 再补 ws/联机清理
 }

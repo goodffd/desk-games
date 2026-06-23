@@ -48,15 +48,60 @@ export function choosePlay(s: DealState, seat: Seat): Card[] | null {
     return chooseLead(hand, level);
   }
 
-  // ---- FOLLOW（本任务暂用基础逻辑，Task 4 替换）----
+  // ---- FOLLOW ----
+  return chooseFollow(s, seat);
+}
+
+/** 残局：自己或任一对手手牌很少（≤ 阈值）→ 放宽出牌、敢拆敢炸。 */
+const ENDGAME_CARDS = 6;
+
+/** 出 cards 对剩余手牌计划的"结构损伤"：0=计划内的一手；>0=多花了手数。 */
+function damage(hand: Card[], cards: Card[], level: Rank): number {
+  const ids = new Set(cards.map(c => c.id));
+  const rest = hand.filter(c => !ids.has(c.id));
+  const before = decompose(hand, level).handCount;
+  const after = decompose(rest, level).handCount;
+  return (1 + after) - before;
+}
+
+function chooseFollow(s: DealState, seat: Seat): Card[] | null {
+  const hand = s.hands[seat]!;
+  const level = s.level;
   const partner = ((seat + 2) % 4) as Seat;
-  if (s.current.by === partner) return null;
-  const follows = enumerateFollows(hand, s.current.combo, level);
-  if (follows.length === 0) return null;
-  const nonBombs = follows.filter(c => !isBomb(c));
-  if (nonBombs.length > 0) {
-    return nonBombs.reduce((b, c) =>
-      c.key < b.key || (c.key === b.key && c.cards.length < b.cards.length) ? c : b).cards;
+
+  // 队友领先：默认不要；但本手能直接走完(出完=hand 全清)则出
+  if (s.current!.by === partner) {
+    const all = enumerateFollows(hand, s.current!.combo, level)
+      .find(c => c.cards.length === hand.length);
+    return all ? all.cards : null;
   }
-  return follows.reduce((b, c) => (c.power < b.power ? c : b)).cards;
+
+  const follows = enumerateFollows(hand, s.current!.combo, level);
+  if (follows.length === 0) return null;
+
+  const nonBombs = follows.filter(c => !isBomb(c));
+  const bombs = follows.filter(c => isBomb(c));
+
+  // 各家公开张数：残局 / 对手即将走完
+  const myLen = hand.length;
+  const oppAboutToWin = ([0, 1, 2, 3] as Seat[])
+    .some(o => o !== seat && o !== partner && s.hands[o]!.length <= 2 && s.hands[o]!.length > 0);
+  const endgame = myLen <= ENDGAME_CARDS || oppAboutToWin;
+
+  // 非炸弹候选按 (损伤 delta, key, 长度) 排序，取最优
+  if (nonBombs.length > 0) {
+    const scored = nonBombs.map(c => ({ c, d: damage(hand, c.cards, level) }));
+    scored.sort((a, b) =>
+      a.d - b.d || a.c.key - b.c.key || a.c.cards.length - b.c.cards.length);
+    const best = scored[0]!;
+    // 全部候选都损伤结构(>0) 且非残局/对手没要走完 → 战略不要，保牌
+    if (best.d > 0 && !endgame) return null;
+    return best.c.cards;
+  }
+
+  // 只剩炸弹能压：仅在残局 / 对手要走完 / 自己也快走完时才炸；用最弱够用炸弹
+  if (endgame) {
+    return bombs.reduce((b, c) => (c.power < b.power ? c : b)).cards;
+  }
+  return null; // 否则忍住炸弹，pass
 }

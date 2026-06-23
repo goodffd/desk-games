@@ -18,6 +18,7 @@ import { isLegalPlay } from '../src/games/guandan/engine/legal';
 import { enumerateLeads } from '../src/games/guandan/engine/legal';
 import { createDeal, play as gamePlay, pass as gamePass } from '../src/games/guandan/engine/game';
 import { choosePlay } from '../src/games/guandan/ai/ai';
+import { identify } from '../src/games/guandan/engine/combos';
 
 // ---- deterministic shuffle ------------------------------------------------
 
@@ -359,5 +360,59 @@ describe('choosePlay 领牌（拆解驱动）', () => {
     expect(out).not.toBeNull();
     // 领出的不应包含红心2（逢人配）
     expect(out!.some(x => x.kind === 'normal' && x.rank === 2 && x.suit === 'H')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 4 — 跟牌策略（保结构 + 战略不要 + 炸弹时机 + 配合）
+//
+// followState 构造跟牌局面：seat0 手牌=hand，台面 current=由 byCards 识别的牌型、by=seat1（对手）。
+// hands[2] / hands[3] 各持 1 张废牌（公开张数 > 0，保证 oppAboutToWin 不意外触发）。
+// ---------------------------------------------------------------------------
+
+/** 构造跟牌局面：seat0 手牌=hand，台面 current 由 byCards 识别、by=seat1（对手）。
+ *  seats 1/2/3 各持 3 张废牌（>2 张，保证 oppAboutToWin 不意外触发）。 */
+function followState(hand: Card[], byCards: Card[]): DealState {
+  const combo = identify(byCards, L3)!;
+  return {
+    hands: [hand, [n(14, 'D'), n(13, 'D'), n(12, 'D')], [n(14, 'H'), n(13, 'H'), n(12, 'H')], [n(14, 'C'), n(13, 'C'), n(12, 'C')]],
+    current: { combo, by: 1 as Seat },
+    turn: 0 as Seat,
+    passesInRow: 0,
+    finished: [],
+    level: L3,
+  };
+}
+
+describe('choosePlay 跟牌', () => {
+  it('对手出小单张：用零散单张压，不拆顺子', () => {
+    // 手里一条顺子3-7 + 一张散K；对手出一张10 → 应用散K压，不拆顺子
+    // 老 FOLLOW：取 nonBombs 里最低 key（散K key=13 > 顺子内最低单张 key=3），
+    // 老 AI 若枚举到拆顺子里单张3-7（key 更低），会错误选它们而非散K。
+    // 新 AI damage 度量：拆顺子中单张 damage>0（破坏结构），散K damage=0 → 选散K。
+    const hand = [n(3, 'S'), n(4, 'H'), n(5, 'C'), n(6, 'D'), n(7, 'S'), n(13, 'C')];
+    const out = choosePlay(followState(hand, [n(10, 'D')]), 0 as Seat);
+    expect(out).not.toBeNull();
+    expect(out!.length).toBe(1);
+    const played = out![0]!;
+    expect(played.kind === 'normal' && played.rank).toBe(13); // 散K，不是顺子里的牌
+  });
+
+  it('唯一能压的牌会拆掉关键结构、且非残局 → 战略不要(pass)', () => {
+    // 手里只有一对8(成对) + 一条顺子；对手出单张7，能压的最小是拆一张8，
+    // 但拆8会破坏对子结构（damage > 0）且非残局 → 期望 pass。
+    // 老 FOLLOW：nonBombs 取最低 key 直接出，会错误地拆对出单8。
+    const hand = [n(8, 'S'), n(8, 'H'), n(9, 'C'), n(10, 'D'), n(11, 'S'), n(12, 'C'), n(13, 'D')];
+    const out = choosePlay(followState(hand, [n(7, 'D')]), 0 as Seat);
+    expect(out).toBeNull();
+  });
+
+  it('队友领先 → 默认不要', () => {
+    // 老 FOLLOW 对 partner 也是直接 return null，新旧行为一致；
+    // 此条作为"配合逻辑不退化"防回归守卫。
+    const hand = [n(5, 'S'), n(6, 'H')];
+    const st = followState(hand, [n(4, 'D')]);
+    st.current!.by = 2 as Seat; // 改为队友领先
+    expect(choosePlay(st, 0 as Seat)).toBeNull();
   });
 });

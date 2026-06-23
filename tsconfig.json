@@ -10,5 +10,6 @@
     "lib": ["ES2020", "DOM"],
     "types": ["vite/client"]
   },
-  "include": ["src", "tests", "vite.config.ts"]
+  "include": ["src", "tests", "vite.config.ts"],
+  "exclude": ["src/games/xiangqi", "tests/xiangqi"]
 }

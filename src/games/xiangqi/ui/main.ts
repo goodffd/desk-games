@@ -28,6 +28,9 @@ export function mountXiangqi(root: HTMLElement): () => void {
   root.appendChild(host);
   const $ = <T extends HTMLElement = HTMLElement>(sel: string): T => host.querySelector(sel) as T;
 
+  const listeners: Array<{ t: EventTarget; type: string; fn: EventListenerOrEventListenerObject }> = [];
+  const on = (t: EventTarget, type: string, fn: EventListenerOrEventListenerObject) => { t.addEventListener(type, fn); listeners.push({ t, type, fn }); };
+
   const canvas = $('#board') as HTMLCanvasElement;
   const ctx = canvas.getContext('2d')!;
   const statusEl = $('#status') as HTMLDivElement;
@@ -668,14 +671,15 @@ export function mountXiangqi(root: HTMLElement): () => void {
     }
   }
 
-  canvas.addEventListener('click', (ev) => {
+  on(canvas, 'click', (ev: Event) => {
     if (browsing || inEndgame || isSpectating() || reconnecting || awaitingSync || (isOnline() && (onlineResult || controller.turn !== onlineColor))) return;
     if (timeoutLoser) return;
     if (busy() || aiTurnPending()) return; // 电脑回合/动画中不接受点击
     resumeAudio();
+    const mev = ev as MouseEvent;
     const rect = canvas.getBoundingClientRect();
-    const px = ((ev.clientX - rect.left) / rect.width) * BOARD_W;
-    const py = ((ev.clientY - rect.top) / rect.height) * BOARD_H;
+    const px = ((mev.clientX - rect.left) / rect.width) * BOARD_W;
+    const py = ((mev.clientY - rect.top) / rect.height) * BOARD_H;
     const sq = pixelToSquare(px, py);
     if (!sq) return;
     const moved = controller.click(sq);
@@ -692,7 +696,7 @@ export function mountXiangqi(root: HTMLElement): () => void {
     }
   });
 
-  modeBtn.addEventListener('click', () => {
+  on(modeBtn, 'click', () => {
     if (busy()) return;
     // 双人 ↔ 人机（电脑执黑），切换即重开
     controller.setAi(controller.aiColor ? null : 'black', currentLevel());
@@ -704,11 +708,11 @@ export function mountXiangqi(root: HTMLElement): () => void {
     maybeRunAi(); // 若将来支持电脑执红，开局即应着
   });
 
-  levelSel.addEventListener('change', () => {
+  on(levelSel, 'change', () => {
     controller.setLevel(currentLevel()); // 即时生效于电脑后续着法
   });
 
-  undoBtn.addEventListener('click', () => {
+  on(undoBtn, 'click', () => {
     if (busy()) return;
     controller.undo();
     if (clock && clockStack.length) clock = clockStack.pop()!;
@@ -721,7 +725,7 @@ export function mountXiangqi(root: HTMLElement): () => void {
     refresh();
   });
 
-  restartBtn.addEventListener('click', () => {
+  on(restartBtn, 'click', () => {
     if (busy()) return;
     controller.reset();
     resetClock();
@@ -732,7 +736,7 @@ export function mountXiangqi(root: HTMLElement): () => void {
   });
 
   // 导出棋谱：下载 .pgn 文件
-  exportBtn.addEventListener('click', () => {
+  on(exportBtn, 'click', () => {
     const text = gameToPgn(controller.getGame(), { date: today() });
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -744,8 +748,8 @@ export function mountXiangqi(root: HTMLElement): () => void {
   });
 
   // 导入棋谱：选文件 → 重放
-  importBtn.addEventListener('click', () => importFile.click());
-  importFile.addEventListener('change', async () => {
+  on(importBtn, 'click', () => importFile.click());
+  on(importFile, 'change', async () => {
     const f = importFile.files?.[0];
     if (!f) return;
     try {
@@ -764,44 +768,44 @@ export function mountXiangqi(root: HTMLElement): () => void {
   });
 
   // 主题切换：即时重绘 + 记住选择
-  themeSel.addEventListener('change', () => {
+  on(themeSel, 'change', () => {
     theme = themeByKey(themeSel.value);
     saveTheme(theme.key);
     refresh();
   });
 
-  clockModeSel.addEventListener('change', applyClockMode);
-  mainMinInput.addEventListener('change', () => { if (clockModeSel.value !== 'off') applyClockMode(); });
-  byoSecInput.addEventListener('change', () => { if (clockModeSel.value !== 'off') applyClockMode(); });
+  on(clockModeSel, 'change', applyClockMode);
+  on(mainMinInput, 'change', () => { if (clockModeSel.value !== 'off') applyClockMode(); });
+  on(byoSecInput, 'change', () => { if (clockModeSel.value !== 'off') applyClockMode(); });
 
-  muteBtn.addEventListener('click', () => {
+  on(muteBtn, 'click', () => {
     resumeAudio();
     setMuted(!isMuted());
     saveMuted(isMuted());
     syncMuteBtn();
   });
 
-  bookBtn.addEventListener('click', () => {
+  on(bookBtn, 'click', () => {
     bookHintOn = !bookHintOn;
     saveBookHint(bookHintOn);
     syncBookBtn();
     refresh();
   });
 
-  browseBtn.addEventListener('click', () => { if (busy()) return; if (browsing) exitBrowse(); else enterBrowse(); });
-  openSel.addEventListener('change', () => { if (!browsing) return; session = new BrowseSession(OPENINGS.find((o) => o.id === openSel.value)!); renderBrowse(); });
-  bNext.addEventListener('click', () => { if (!session) return; session.next(Number(varSel.value) || 0); renderBrowse(); });
-  bPrev.addEventListener('click', () => { if (!session) return; session.prev(); renderBrowse(); });
-  bExit.addEventListener('click', exitBrowse);
+  on(browseBtn, 'click', () => { if (busy()) return; if (browsing) exitBrowse(); else enterBrowse(); });
+  on(openSel, 'change', () => { if (!browsing) return; session = new BrowseSession(OPENINGS.find((o) => o.id === openSel.value)!); renderBrowse(); });
+  on(bNext, 'click', () => { if (!session) return; session.next(Number(varSel.value) || 0); renderBrowse(); });
+  on(bPrev, 'click', () => { if (!session) return; session.prev(); renderBrowse(); });
+  on(bExit, 'click', exitBrowse);
 
-  endgameBtn.addEventListener('click', () => { if (busy()) return; if (inEndgame) exitEndgame(); else enterEndgame(); });
-  egSel.addEventListener('change', () => { if (!inEndgame) return; egLine = null; renderEndgame(); });
-  egPlay.addEventListener('click', playEndgame);
-  egSolve.addEventListener('click', () => { egLine = new EndgameLine(curEg()); renderEndgame(); });
-  egPrev.addEventListener('click', () => { if (egLine) { egLine.prev(); renderEndgame(); } });
-  egNext.addEventListener('click', () => { if (egLine) { egLine.next(); renderEndgame(); } });
-  egExit.addEventListener('click', exitEndgame);
-  resetEgBtn.addEventListener('click', () => {
+  on(endgameBtn, 'click', () => { if (busy()) return; if (inEndgame) exitEndgame(); else enterEndgame(); });
+  on(egSel, 'change', () => { if (!inEndgame) return; egLine = null; renderEndgame(); });
+  on(egPlay, 'click', playEndgame);
+  on(egSolve, 'click', () => { egLine = new EndgameLine(curEg()); renderEndgame(); });
+  on(egPrev, 'click', () => { if (egLine) { egLine.prev(); renderEndgame(); } });
+  on(egNext, 'click', () => { if (egLine) { egLine.next(); renderEndgame(); } });
+  on(egExit, 'click', exitEndgame);
+  on(resetEgBtn, 'click', () => {
     if (!currentEgFen) return;
     const { board, turn } = fromFen(currentEgFen);
     controller.loadGame(Game.fromPosition(board, turn));
@@ -809,27 +813,27 @@ export function mountXiangqi(root: HTMLElement): () => void {
   });
 
   // 顶部「联机」按钮：未联机→进入；已在联机的任意状态(含对局,此时面板隐藏)→退出
-  onlineBtn.addEventListener('click', () => { if (online === null && busy()) return; if (!onlinePanel.hidden || online !== null) exitOnline(); else enterOnline(); });
-  oEnter.addEventListener('click', submitNick);
-  oNickInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitNick(); });
-  oRename.addEventListener('click', () => { const n = prompt('改昵称', myNick); const t = (n || '').trim(); if (!t) return; pendingRename = t; online?.rename(t); });
-  oCreate.addEventListener('click', () => { online?.createRoom(oPrivate.checked); });
-  oCodeSubmit.addEventListener('click', () => { const c = oCodeInput.value.trim().toUpperCase(); if (c) online?.joinRoom(c); });
-  oExit.addEventListener('click', exitOnline);
-  oCancel.addEventListener('click', backToLobby);
-  oSpectateExit.addEventListener('click', backToLobby);
-  oGameExit.addEventListener('click', backToLobby);
-  oWaitCopy.addEventListener('click', () => { try { navigator.clipboard?.writeText(oWaitCodeVal.textContent || ''); oWaitCopy.textContent = '已复制'; setTimeout(() => { oWaitCopy.textContent = '复制'; }, 1500); } catch { /* 降级：手动选取 */ } });
-  oResign.addEventListener('click', () => { if (!isOnline()) return; online!.send({ t: 'resign' }); finishOnlineGame('你已认输'); });
-  oDraw.addEventListener('click', () => { if (isOnline()) { online!.send({ t: 'draw-offer' }); oGameMsg.textContent = '已发出求和，等待对方'; } });
-  oUndo.addEventListener('click', () => { if (isOnline()) { online!.send({ t: 'undo-request' }); oGameMsg.textContent = '已请求悔棋，等待对方'; } });
-  oAccept.addEventListener('click', () => {
+  on(onlineBtn, 'click', () => { if (online === null && busy()) return; if (!onlinePanel.hidden || online !== null) exitOnline(); else enterOnline(); });
+  on(oEnter, 'click', submitNick);
+  on(oNickInput, 'keydown', (e) => { if ((e as KeyboardEvent).key === 'Enter') submitNick(); });
+  on(oRename, 'click', () => { const n = prompt('改昵称', myNick); const t = (n || '').trim(); if (!t) return; pendingRename = t; online?.rename(t); });
+  on(oCreate, 'click', () => { online?.createRoom(oPrivate.checked); });
+  on(oCodeSubmit, 'click', () => { const c = oCodeInput.value.trim().toUpperCase(); if (c) online?.joinRoom(c); });
+  on(oExit, 'click', exitOnline);
+  on(oCancel, 'click', backToLobby);
+  on(oSpectateExit, 'click', backToLobby);
+  on(oGameExit, 'click', backToLobby);
+  on(oWaitCopy, 'click', () => { try { navigator.clipboard?.writeText(oWaitCodeVal.textContent || ''); oWaitCopy.textContent = '已复制'; setTimeout(() => { oWaitCopy.textContent = '复制'; }, 1500); } catch { /* 降级：手动选取 */ } });
+  on(oResign, 'click', () => { if (!isOnline()) return; online!.send({ t: 'resign' }); finishOnlineGame('你已认输'); });
+  on(oDraw, 'click', () => { if (isOnline()) { online!.send({ t: 'draw-offer' }); oGameMsg.textContent = '已发出求和，等待对方'; } });
+  on(oUndo, 'click', () => { if (isOnline()) { online!.send({ t: 'undo-request' }); oGameMsg.textContent = '已请求悔棋，等待对方'; } });
+  on(oAccept, 'click', () => {
     onlineOffer.hidden = true;
     if (pendingOffer === 'draw') { online!.send({ t: 'draw-accept' }); finishOnlineGame('和棋'); }
     else if (pendingOffer === 'undo') { online!.send({ t: 'undo-accept' }); controller.undo(); controller.undo(); refresh(); }
     pendingOffer = null;
   });
-  oDecline.addEventListener('click', () => {
+  on(oDecline, 'click', () => {
     onlineOffer.hidden = true;
     if (pendingOffer === 'draw') online!.send({ t: 'draw-decline' });
     else if (pendingOffer === 'undo') online!.send({ t: 'undo-decline' });
@@ -841,7 +845,7 @@ export function mountXiangqi(root: HTMLElement): () => void {
   clearSaved();   // 刷新即重新开局：不再自动续局，并清掉旧版遗留的自动存档
 
   // 控件折叠组：点头部（箭头）展开/收起
-  host.querySelectorAll<HTMLElement>('.fold-head').forEach((h) => h.addEventListener('click', () => h.parentElement!.classList.toggle('open')));
+  host.querySelectorAll<HTMLElement>('.fold-head').forEach((h) => on(h, 'click', () => h.parentElement!.classList.toggle('open')));
 
   setupCanvas();
   refresh();
@@ -861,5 +865,9 @@ export function mountXiangqi(root: HTMLElement): () => void {
     attemptReconnect();
   }
 
-  return () => { host.remove(); };   // 占位 cleanup，5b-5d 再补 ws/定时器/事件清理
+  const cleanup = () => {
+    listeners.forEach(({ t, type, fn }) => t.removeEventListener(type, fn));
+    host.remove();
+  };
+  return cleanup;   // 5c/5d 再补定时器/ws 清理
 }

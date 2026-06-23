@@ -17,7 +17,7 @@ import { makeDeck, deal } from '../src/games/guandan/engine/cards';
 import { isLegalPlay } from '../src/games/guandan/engine/legal';
 import { enumerateLeads } from '../src/games/guandan/engine/legal';
 import { createDeal, play as gamePlay, pass as gamePass } from '../src/games/guandan/engine/game';
-import { choosePlay } from '../src/games/guandan/ai/ai';
+import { choosePlay, chooseReturn } from '../src/games/guandan/ai/ai';
 import { identify } from '../src/games/guandan/engine/combos';
 
 // ---- deterministic shuffle ------------------------------------------------
@@ -432,5 +432,24 @@ describe('choosePlay 跟牌', () => {
     const st = followState(hand, [n(4, 'D')]);
     st.current!.by = 2 as Seat; // 改为队友领先
     expect(choosePlay(st, 0 as Seat)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5 — chooseReturn 智能还贡
+// ---------------------------------------------------------------------------
+
+describe('chooseReturn 还贡', () => {
+  it('不拆对子：宁还落单的小牌，也不拆掉一对', () => {
+    // 一对3(最小) + 落单5、9、10；还贡应给落单5(最小可还牌)，不拆对3
+    const hand = [n(3, 'S'), n(3, 'H'), n(5, 'C'), n(9, 'D'), n(10, 'S')];
+    const ret = chooseReturn(hand, L3);
+    expect(ret.kind === 'normal' && ret.rank).toBe(5);
+  });
+
+  it('全是落单小牌 → 给点数最小的（≤10）', () => {
+    const hand = [n(4, 'S'), n(7, 'H'), n(10, 'C'), n(13, 'D')];
+    const ret = chooseReturn(hand, L3);
+    expect(ret.kind === 'normal' && ret.rank).toBe(4);
   });
 });

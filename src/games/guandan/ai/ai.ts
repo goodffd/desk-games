@@ -5,6 +5,8 @@
 import type { Card, Combo, Seat, Rank } from '../engine/types';
 import type { DealState } from '../engine/game';
 import { enumerateFollows, isWild } from '../engine/legal';
+import { rankValue } from '../engine/cards';
+import { returnableCards } from '../engine/match';
 import { decompose } from './decompose';
 
 const BOMB_TYPES = new Set(['bomb', 'straightFlush', 'kingBomb']);
@@ -107,4 +109,24 @@ function chooseFollow(s: DealState, seat: Seat): Card[] | null {
     return bombs.reduce((b, c) => (c.power < b.power ? c : b)).cards;
   }
   return null; // 否则忍住炸弹，pass
+}
+
+/**
+ * AI 还贡选牌：可还牌(≤10)中，移除后对剩余计划损伤最小、再取点数最低者。
+ * 损伤=移除该牌后 handCount 相对 (base−1) 的增量：0=本是落单单张；>0=拆了对子/结构。
+ */
+export function chooseReturn(hand: Card[], level: Rank): Card {
+  const cand = returnableCards(hand, level);
+  const pool = cand.length > 0 ? cand : hand;
+  const base = decompose(hand, level).handCount;
+  let best = pool[0]!;
+  let bestScore = Infinity;
+  for (const card of pool) {
+    const rest = hand.filter(c => c.id !== card.id);
+    const after = decompose(rest, level).handCount;
+    const delta = after - (base - 1);                  // 0=落单；>0=拆结构
+    const score = delta * 100 + rankValue(card, level); // 先少损伤，再低点数
+    if (score < bestScore) { bestScore = score; best = card; }
+  }
+  return best;
 }

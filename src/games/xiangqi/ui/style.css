@@ -1,0 +1,387 @@
+/* 嵌入字体：霞鹜文楷 Medium 的子集（约 50 字）。开源 OFL（见 fonts/LICENSE-LXGWWenKai-OFL.txt）。
+   构建时内联进单文件 → macOS/Windows/iOS/Android 四系统字形完全一致（iOS 无任何楷体，只能嵌入）。
+   覆盖：① canvas 棋子 + 楚河漢界；② --font-display 用到的固定 UI 文字（标题「象棋」、状态「红方走/将军/胜负/和棋/认输…」、棋钟红黑）。
+   ⚠️ 仅含这些固定字。**昵称等任意文本不能用 --font-display**（会掉字到系统楷体/serif、各平台不一致）——
+   昵称走 --font-ui（.turn-nick）。新增要用 --font-display 显示的固定汉字时，必须重跑子集化（/tmp/xqfont 的 pyftsubset）。 */
+@font-face {
+  font-family: "XiangqiKai";
+  src: url("./fonts/xiangqi-kai.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+/* ===== 朱砂水墨 设计 token ===== */
+.xq-root {
+  --ink: #1e1409; /* 徽墨：深暖场 */
+  --ink-2: #0f0803;
+  --ink-chop: #2a2218;
+  --stage-1: #392819; /* 舞台卡（更暖） */
+  --stage-2: #22160c;
+  --line: rgba(236, 200, 130, 0.24); /* 暖金描线 */
+  --paper: #e6dabd;
+  --paper-bright: #f3ead4;
+  --paper-dim: rgba(236, 226, 200, 0.6);
+  --cinnabar: #c0392b; /* 朱砂 */
+  --cinnabar-soft: #de7164;
+  --jade: #3f6b5e; /* 青玉 */
+  --gold: #d8b777;
+
+  --font-display: "XiangqiKai", "STKaiti", "KaiTi", "STSong", serif;
+  --font-ui: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+
+  font-family: var(--font-ui);
+
+  min-height: 100vh;
+  background: radial-gradient(135% 108% at 50% -22%, #54381f 0%, var(--ink) 50%, var(--ink-2) 100%);
+  color: var(--paper);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: clamp(16px, 4vw, 40px) 14px;
+}
+.xq-root, .xq-root * {
+  box-sizing: border-box;
+}
+
+/* ===== 舞台卡 ===== */
+.xq-root .stage {
+  background: linear-gradient(165deg, var(--stage-1), var(--stage-2));
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: clamp(18px, 3.5vw, 30px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 240, 210, 0.07);
+}
+
+/* ===== 报头 ===== */
+.xq-root .masthead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.xq-root .title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-shrink: 0;          /* 标题不被右侧状态挤压 */
+}
+.xq-root h1 {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 7vw, 40px);
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: 8px;
+  white-space: nowrap;     /* 「象棋」永不换行 */
+  color: var(--paper-bright);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+.xq-root .subtitle {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+
+/* 签名元素：钤印式轮次指示 */
+.xq-root .seal {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;            /* 允许收缩：长状态文字在此换行，而非挤压标题 */
+}
+.xq-root .seal-chop {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;          /* 印章保持正方，不被长状态文字挤成长方形 */
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  font-family: var(--font-display);
+  font-size: 23px;
+  font-weight: 700;
+  color: var(--paper-bright);
+  transform: rotate(-2deg);
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.45), inset 0 0 0 1.5px rgba(255, 255, 255, 0.2);
+}
+.xq-root .seal.turn-red .seal-chop {
+  background: var(--cinnabar);
+}
+.xq-root .seal.turn-black .seal-chop {
+  background: var(--ink-chop);
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.5), inset 0 0 0 1.5px rgba(236, 226, 200, 0.4);
+}
+.xq-root .seal .turn-text {
+  font-family: var(--font-display);   /* 固定状态词(红方走/将军/胜负/和棋/认输…)用嵌入楷体，子集已覆盖 */
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--paper-dim);
+}
+/* 昵称（任意字）走无衬线，避免用 --font-display 时掉字到各平台不一致的楷体/serif */
+.xq-root .seal .turn-text .turn-nick {
+  font-family: var(--font-ui);
+  font-weight: 400;
+  font-size: 0.82em;
+  letter-spacing: 0;
+}
+.xq-root .seal.check .turn-text {
+  color: var(--cinnabar-soft);
+}
+.xq-root .seal.over .seal-chop {
+  display: none;
+}
+.xq-root .seal.over .turn-text {
+  color: var(--gold);
+  font-size: 18px;
+}
+
+/* ===== 棋盘 ===== */
+.xq-root .board-wrap {
+  display: flex;
+  justify-content: center;
+}
+.xq-root #board {
+  width: min(520px, 82vw);
+  height: auto;
+  aspect-ratio: 540 / 600;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), 0 14px 36px rgba(0, 0, 0, 0.5);
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+/* ===== 控制按钮 ===== */
+.xq-root .controls {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.xq-root .controls[hidden] { display: none; } /* 压过 display:flex，让开局库浏览模式真隐藏对弈控件 */
+/* 按功能分组：对战 / 本局 / 棋库 / 设置，每组一个带标签的小框 */
+.xq-root .ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  background: var(--stage-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.xq-root .ctrl-group[hidden] { display: none; }   /* 压过上面的 display:flex，本局组未开局时真隐藏 */
+.xq-root .ctrl-label {
+  font-size: 12px;
+  color: var(--paper-dim);
+  letter-spacing: 2px;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+/* 可折叠组（对战/棋库/设置）：点头部箭头展开收起，带高度动画 */
+.xq-root .ctrl-fold {
+  background: var(--stage-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.xq-root .fold-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  color: var(--paper);
+  font-family: inherit;
+  font-size: 14px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  text-align: left;
+}
+.xq-root .fold-head:hover { color: var(--paper-bright); }
+.xq-root .fold-arrow {
+  color: var(--gold);
+  font-size: 12px;
+  display: inline-block;
+  transition: transform 0.22s ease;
+}
+.xq-root .ctrl-fold.open .fold-arrow { transform: rotate(90deg); }
+.xq-root .fold-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-height: 0;
+  padding: 0 12px;
+  overflow: hidden;
+  transition: max-height 0.25s ease, padding 0.25s ease;
+}
+.xq-root .ctrl-fold.open .fold-body { max-height: 340px; padding: 0 12px 12px; }
+/* 文字按钮等比撑满整行，消除换行后参差的右边；图标按钮(.btn-icon)保持小方块不撑 */
+.xq-root .fold-body > .btn,
+.xq-root .ctrl-group > .btn { flex: 1 1 auto; }
+/* 模式切换提示：占一整行的小灰字，提示模式按钮可点切换 */
+.xq-root .mode-hint { flex-basis: 100%; font-size: 12px; color: var(--paper-dim); margin-bottom: 2px; }
+.xq-root .btn {
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  padding: 8px 16px;
+  border-radius: 9px;
+  cursor: pointer;
+  background: rgba(236, 226, 200, 0.10);
+  border: none;            /* 去边框：按钮做成淡填充的"片"，避免框中框的凌乱 */
+  color: var(--paper);
+  transition: transform 0.05s ease, background 0.15s ease;
+}
+.xq-root .btn:hover {
+  background: rgba(236, 226, 200, 0.18);
+}
+.xq-root .btn:active {
+  transform: translateY(1px);
+}
+.xq-root .btn-primary {
+  background: linear-gradient(180deg, #c8402f, #ad3124);
+  border-color: #9c2c20;
+  color: #fdeee6;
+  box-shadow: 0 2px 6px rgba(120, 30, 20, 0.5);
+}
+.xq-root .btn-primary:hover {
+  background: linear-gradient(180deg, #d24634, #b8362a);
+  border-color: #9c2c20;
+}
+
+/* 棋力选择 */
+.xq-root .level-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.xq-root .level-field[hidden] {
+  display: none; /* 压过上面的 display:inline-flex，让双人模式真正隐藏 */
+}
+.xq-root .level-field label {
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--paper-dim);
+}
+.xq-root .select {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  padding: 9px 30px 9px 14px;   /* 右侧留位给自绘箭头 */
+  border-radius: 9px;
+  border: none;            /* 去边框，与无框按钮统一 */
+  color: var(--paper);
+  cursor: pointer;
+  text-align: center;
+  text-align-last: center;
+  appearance: none;
+  -webkit-appearance: none;
+  /* 去掉黑色原生箭头，换成与文字同色(--paper #e6dabd)的自绘箭头 */
+  background-color: rgba(236, 226, 200, 0.10);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4.5l4 4 4-4' fill='none' stroke='%23e6dabd' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+}
+.xq-root .select option {
+  text-align: center;
+}
+.xq-root .select:hover {
+  background-color: rgba(236, 226, 200, 0.18);
+}
+/* 去掉点选/聚焦后浏览器默认的蓝白聚焦框 */
+.xq-root .select:focus, .xq-root .btn:focus, .xq-root .fold-head:focus { outline: none; }
+
+/* ===== 棋钟 ===== */
+.xq-root .clocks { display: flex; justify-content: center; gap: 14px; margin-bottom: 12px; }
+.xq-root .clocks[hidden] { display: none; } /* 压过上面的 display:flex，让「不计时」真隐藏 */
+.xq-root .clock {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 14px; border-radius: 9px;
+  background: rgba(236, 226, 200, 0.06); border: 1px solid rgba(236, 226, 200, 0.22);
+  font-variant-numeric: tabular-nums; letter-spacing: 1px; color: var(--paper-dim);
+}
+.xq-root .clock b { font-family: var(--font-display); font-weight: 700; }
+.xq-root .clock .t { font-size: 16px; font-weight: 600; }
+.xq-root .clock.running { border-color: var(--gold); color: var(--paper-bright); background: rgba(216, 183, 119, 0.12); }
+.xq-root .num {
+  width: 54px; font-family: inherit; font-size: 14px; padding: 7px 8px; border-radius: 8px;
+  background: rgba(236, 226, 200, 0.06); border: 1px solid rgba(236, 226, 200, 0.28); color: var(--paper);
+}
+.xq-root .num-unit { font-size: 13px; color: var(--paper-dim); margin: 0 2px; }
+
+/* ===== 开局提示行 ===== */
+.xq-root .book-line { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; font-size: 13px; color: var(--paper-dim); }
+.xq-root .book-line[hidden] { display: none; }
+.xq-root .book-badge { background: var(--gold); color: #3a2a10; border-radius: 5px; padding: 2px 9px; font-weight: 600; }
+.xq-root .book-badge.off { background: #9c8d6e; color: #fff; }
+.xq-root .book-moves .k { color: var(--gold); font-weight: 600; }
+
+/* ===== 开局库浏览面板 ===== */
+.xq-root .browse-panel { margin-top: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.xq-root .browse-panel[hidden] { display: none; }
+.xq-root .browse-step { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+.xq-root .book-moves-list { background: rgba(236,226,200,0.06); border: 1px solid rgba(236,226,200,0.2); border-radius: 9px; padding: 10px 14px; max-width: 420px; line-height: 2; color: var(--paper-dim); }
+.xq-root .book-moves-list .m.on { background: var(--jade); color: #fff; padding: 0 5px; border-radius: 3px; }
+
+/* ===== 残局库面板 ===== */
+.xq-root .endgame-panel { margin-top: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.xq-root .endgame-panel[hidden] { display: none; }
+.xq-root .eg-goal { font-size: 13px; color: var(--gold); font-weight: 600; margin-left: 6px; }
+
+/* ===== 联机 ===== */
+.xq-root .online-panel { margin-top: 16px; width: 100%; max-width: 460px; margin-left: auto; margin-right: auto; }
+.xq-root .online-panel[hidden], .xq-root .online-actions[hidden], .xq-root .online-offer[hidden] { display: none; }
+.xq-root .o-view[hidden] { display: none; }
+
+/* 临时提示（连接中 / 错误 / 拒绝），切换状态即清空 */
+.xq-root .o-msg { min-height: 18px; font-size: 13px; color: var(--cinnabar-soft); text-align: center; margin-top: 6px; }
+
+/* ① 输名字关 */
+.xq-root #o-gate:not([hidden]) { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.xq-root .o-gate-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.xq-root #o-unavailable { font-size: 13px; color: var(--paper-dim); text-align: center; padding: 10px; }
+
+/* ② 大厅 */
+.xq-root .o-bar { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.xq-root .o-bar-spacer { flex: 1; }
+.xq-root .o-me { font-size: 14px; color: var(--paper-dim); }
+.xq-root .o-me b { color: var(--gold); }
+.xq-root .o-create-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
+.xq-root .o-private { font-size: 13px; color: var(--paper-dim); display: inline-flex; align-items: center; gap: 4px; }
+.xq-root .o-list-head { font-size: 12px; color: var(--paper-dim); letter-spacing: 1px; margin-bottom: 6px; }
+.xq-root .o-room-list { display: flex; flex-direction: column; gap: 8px; min-height: 48px; max-height: 260px; overflow-y: auto; }
+.xq-root .o-room-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; background: var(--stage-2); border: 1px solid var(--line); border-radius: 8px; font-size: 14px; }
+.xq-root .o-room-row .o-room-info { color: var(--paper); }
+.xq-root .o-room-row .o-room-sub { color: var(--paper-dim); font-size: 12px; margin-left: 4px; }
+.xq-root .o-room-empty { color: var(--paper-dim); font-size: 13px; text-align: center; padding: 14px; }
+.xq-root .o-bycode { margin-top: 12px; font-size: 13px; color: var(--paper-dim); }
+.xq-root .o-bycode summary { cursor: pointer; }
+.xq-root .o-bycode-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+
+/* ③ 我的房间·等待 */
+.xq-root #o-waiting:not([hidden]) { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px 0; }
+.xq-root .o-wait-title { font-size: 14px; color: var(--paper); text-align: center; }
+.xq-root .o-wait-code { font-size: 15px; color: var(--paper-dim); }
+.xq-root .o-wait-code b { font-family: monospace; font-size: 20px; letter-spacing: 3px; color: var(--gold); margin: 0 6px; }
+
+/* ⑤ 观战 */
+.xq-root #o-spectate:not([hidden]) { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px 0; }
+.xq-root .o-spectate-banner { color: var(--gold); font-size: 14px; text-align: center; }
+
+/* 对局操作条 + 弹框 */
+.xq-root .online-actions { margin-top: 12px; display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.xq-root .online-actions .o-msg { min-height: 0; margin-top: 0; }
+.xq-root .online-offer { margin-top: 10px; display: flex; gap: 10px; align-items: center; justify-content: center; font-size: 13px; color: var(--gold); }
+
+/* 小号次要按钮 */
+.xq-root .btn-mini { font-size: 12.5px; padding: 5px 10px; }

@@ -1,9 +1,8 @@
 // desk-games 游戏大厅 合并服务（一个进程 / 一个端口托管整个大厅）：
-//   /            → 游戏大厅(desk-games 单文件 SPA)
-//   /xiangqi/*   → 中国象棋(单文件 SPA)
+//   /            → 游戏大厅(desk-games 单文件 SPA)，/xiangqi 亦由前端路由 mount（象棋已内置）
 //   /ws          → 象棋联机 WebSocket（RoomRegistry，自 xiangqi-game vendored 而来）
+//   /ws-guandan  → 掼蛋联机 WebSocket
 // 纯 node + ws，零其它依赖。域名/端口绝不硬编：PORT、CERT_DIR 由 systemd 注入（脱敏，不入库）。
-// 注：rooms.mjs 当前自 xiangqi-game/server/rooms.mjs 复制而来；待象棋作为大厅内置模块完整接入后再统一。
 import { createServer as createHttpsServer } from 'node:https';
 import { createServer as createHttpServer } from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
@@ -15,8 +14,7 @@ import { RoomRegistry as GuandanRooms } from './guandan-rooms.mjs';
 import { MatchDriver } from './guandan-match-driver.bundle.mjs';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
-const HUB_INDEX = join(__dir, '..', 'dist', 'index.html');          // 游戏大厅(desk-games)
-const XQ_INDEX = join(__dir, '..', 'xiangqi-dist', 'index.html');   // 象棋
+const HUB_INDEX = join(__dir, '..', 'dist', 'index.html');          // 游戏大厅(desk-games)，象棋已内置
 const PORT = process.env.PORT || 8080;
 const CERT_DIR = process.env.CERT_DIR;
 const useTls = !!(CERT_DIR && existsSync(`${CERT_DIR}/fullchain.pem`) && existsSync(`${CERT_DIR}/privkey.pem`));
@@ -24,8 +22,8 @@ const useTls = !!(CERT_DIR && existsSync(`${CERT_DIR}/fullchain.pem`) && existsS
 const handler = (req, res) => {
   const path = (req.url || '/').split('?')[0];
   if (path === '/favicon.ico') { res.writeHead(204).end(); return; }
-  // 子路径路由：/xiangqi* → 象棋；其余 → 大厅。两者均 vite 单文件 SPA。
-  const file = (path === '/xiangqi' || path.startsWith('/xiangqi/')) ? XQ_INDEX : HUB_INDEX;
+  // 所有 HTTP 请求均返回大厅 SPA；/xiangqi 由前端路由 mount（象棋已内置大厅）
+  const file = HUB_INDEX;
   try {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
     res.end(readFileSync(file));
@@ -69,4 +67,4 @@ server.on('upgrade', (req, socket, head) => {
   }
 });
 
-server.listen(PORT, () => console.log(`hub on :${PORT} (${useTls ? 'https/wss' : 'http/ws'}; / → 大厅, /xiangqi → 象棋, /ws → 联机)`));
+server.listen(PORT, () => console.log(`hub on :${PORT} (${useTls ? 'https/wss' : 'http/ws'}; / → 大厅, /xiangqi → 大厅内 mount(象棋内置), /ws → 联机)`));

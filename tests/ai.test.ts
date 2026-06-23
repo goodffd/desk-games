@@ -316,17 +316,36 @@ describe('choosePlay 领牌（拆解驱动）', () => {
     expect(isLegalPlay(out!, null, hand, L3)).toBe(true);
   });
 
-  it('有小对子和大王 → 领小对，不先领大王', () => {
+  it('有小对子和大王 → 领小对，不先领大王【防回归守卫，非 TDD RED 差异点】', () => {
+    // ⚠️ 诚实标注：此条不是真 RED。老 AI 的 leadCost 排序对自然牌本就偏好低 key
+    //   （pair-3 cost=298 < bigJoker single cost≈1699），老 AI 同样不先甩大王，
+    //   新旧 AI 行为一致——它不验证 decompose 改造带来的差异，仅作"领牌不先甩控制大牌"
+    //   的防回归守卫，防止未来策略改动意外退化。真 RED 覆盖见上方"顺子→一手领完"
+    //   与下方"有自然对时不消耗逢人配"两条。
     // [3♠,3♥,bigJoker,2♠(level-non-wild)] 手牌结构：3对 + 大王单 + 2♠单(level非wild)。
     // 新 AI：decompose 拆为 pair-3 + single-bigJoker + single-2♠，nonControl 优先领 pair-3。
-    // 老 AI：pair-3 cost=298 < joker cost≈1699，也会选 pair-3——此测试已是绿。
-    // 真正需要验证：领出的不应包含大王（kind='joker',big=true）。
     const bj = bigJoker();
     const hand: Card[] = [n(3, 'S'), n(3, 'H'), bj, n(2, 'S')];
     const out = choosePlay(leadState3(hand), 0 as Seat);
     expect(out).not.toBeNull();
     // 领出的牌不应包含大王
     expect(out!.some(x => x.kind === 'joker' && x.big)).toBe(false);
+  });
+
+  it('手牌全是控制牌型 → 不崩溃，领 key 最低的那个控制牌（nonControl 为空分支）', () => {
+    // 覆盖 chooseLead 的 nonControl.length === 0 分支：构造一手 decompose 后全是控制牌型
+    // （key≥14 或炸弹）的手牌——[A♠,A♣,2♠,2♣] at level 2：
+    //   decompose → [pair-A(key=14), pair-2level(key=15)]，两者皆 isControl(key≥14)。
+    //   nonControl 过滤后为空 → pool 退回 combos，仍取最低 key=pair-A。
+    // 实测 decompose 输出：pair key=14 [S14,C14] | pair key=15 [S2,C2]，lead=S14,C14。
+    const hand: Card[] = [n(14, 'S'), n(14, 'C'), n(2, 'S'), n(2, 'C')];
+    const out = choosePlay(leadState3(hand), 0 as Seat);
+    // (a) 不会因 pool 为空而崩溃或返回 null；是合法领牌
+    expect(out).not.toBeNull();
+    expect(isLegalPlay(out!, null, hand, L3)).toBe(true);
+    // (b) 选的是 key 最低的控制牌型 = 那对 A（不是 key 更高的那对 level-2）
+    expect(out!.length).toBe(2);
+    expect(out!.every(x => x.kind === 'normal' && x.rank === 14)).toBe(true);
   });
 
   it('有自然对时不消耗逢人配（红心2）', () => {

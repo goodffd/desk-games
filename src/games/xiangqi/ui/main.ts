@@ -1,5 +1,6 @@
 import './style.css';
 import { XIANGQI_HTML } from './template';
+import { navigate } from '../../../shell/nav';
 import { isInCheck } from '../engine/rules';
 import { render, pixelToSquare, pointX, pointY, BOARD_W, BOARD_H } from './render';
 import { easeInOutQuad, lerp } from './anim';
@@ -31,6 +32,15 @@ export function mountXiangqi(root: HTMLElement): () => void {
   const listeners: Array<{ t: EventTarget; type: string; fn: EventListenerOrEventListenerObject }> = [];
   const on = (t: EventTarget, type: string, fn: EventListenerOrEventListenerObject) => { t.addEventListener(type, fn); listeners.push({ t, type, fn }); };
   let disposed = false;
+
+  // 返回大厅：内置后无刷新 mount，没有浏览器返回入口，故在 stage 顶部注入返回链接（与掼蛋一致，走壳的 navigate('/')）。
+  // 原独立 SPA 无此键（外链版靠浏览器后退）。属壳集成层，不入 template.ts；点击监听走 on() → cleanup 统一解绑、host.remove() 零残留。
+  const backBtn = document.createElement('button');
+  backBtn.type = 'button';
+  backBtn.className = 'xq-back';
+  backBtn.innerHTML = '<span class="xq-back__arrow">←</span><span>返回大厅</span>';
+  $('.stage').prepend(backBtn);
+  on(backBtn, 'click', () => navigate('/'));
 
   const canvas = $('#board') as HTMLCanvasElement;
   const ctx = canvas.getContext('2d')!;

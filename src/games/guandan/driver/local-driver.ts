@@ -17,10 +17,10 @@ import { makeDeck, deal, sortHand } from '../engine/cards';
 import { createDeal, play, pass, isDealOver, ranking } from '../engine/game';
 import type { DealState } from '../engine/game';
 import { isLegalPlay } from '../engine/legal';
-import { choosePlay } from '../ai/ai';
+import { choosePlay, chooseReturn } from '../ai/ai';
 import { comboSpeech } from '../ui/render';
 import {
-  startMatch, settleDeal, planTribute, autoReturn, applyTribute, dealLevel, returnableCards,
+  startMatch, settleDeal, planTribute, applyTribute, dealLevel, returnableCards,
   type MatchState,
 } from '../engine/match';
 import type { GameDriver, GameSnapshot, TributePrompt, LastPlays, GamePhase, DealOutcome } from './types';
@@ -233,12 +233,12 @@ export class LocalDriver implements GameDriver {
       myReturnOptions,
       level,
       resolve: (returnCardId: number | null): void => {
-        // 我选的还贡牌按 id 取；AI 收贡侧 autoReturn 兜底。
+        // 我选的还贡牌按 id 取；AI 收贡侧 chooseReturn 智能兜底。
         const returns = plan.exchanges.map((ex) => {
           if (ex.receiver === HUMAN_SEAT && returnCardId != null) {
-            return dealt[HUMAN_SEAT]!.find((c) => c.id === returnCardId) ?? autoReturn(dealt[ex.receiver]!, level);
+            return dealt[HUMAN_SEAT]!.find((c) => c.id === returnCardId) ?? chooseReturn(dealt[ex.receiver]!, level);
           }
-          return autoReturn(dealt[ex.receiver]!, level);
+          return chooseReturn(dealt[ex.receiver]!, level);
         });
         const tributed = applyTribute(dealt, plan, returns);
         this.startDealAfterTribute(level, tributed, plan.firstLeader);

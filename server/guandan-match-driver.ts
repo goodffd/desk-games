@@ -1,9 +1,9 @@
 import type { Card, Seat, Rank } from '../src/games/guandan/engine/types';
-import { dealHands, startMatch, dealLevel, settleDeal, planTribute, returnableCards, autoReturn, applyTribute, type MatchState, type SettleResult, type TributePlan } from '../src/games/guandan/engine/match';
+import { dealHands, startMatch, dealLevel, settleDeal, planTribute, returnableCards, applyTribute, type MatchState, type SettleResult, type TributePlan } from '../src/games/guandan/engine/match';
 import { createDeal, play, pass, isDealOver, ranking, type DealState } from '../src/games/guandan/engine/game';
 import { sortHand } from '../src/games/guandan/engine/cards';
 import { isLegalPlay } from '../src/games/guandan/engine/legal';
-import { choosePlay } from '../src/games/guandan/ai/ai';
+import { choosePlay, chooseReturn } from '../src/games/guandan/ai/ai';
 
 export type Outbound = { to: 'all' | 'seat'; seat?: Seat; msg: any };
 
@@ -118,7 +118,7 @@ export class MatchDriver {
       if (this.online[ex.receiver]) {
         out.push({ to: 'seat', seat: ex.receiver, msg: { t: 'need-tribute', options: returnableCards(hands[ex.receiver]!, dealLevel(this.match)) } });
       } else {
-        this.tributeReturns.set(ex.receiver, autoReturn(hands[ex.receiver]!, dealLevel(this.match)));
+        this.tributeReturns.set(ex.receiver, chooseReturn(hands[ex.receiver]!, dealLevel(this.match)));
       }
     }
     out.unshift(this.broadcastState());
@@ -140,7 +140,7 @@ export class MatchDriver {
     if (this.phase !== 'tribute' || !this.pendingDeal) return [];
     for (const ex of this.pendingDeal.plan.exchanges) {
       if (!this.tributeReturns.has(ex.receiver)) {
-        this.tributeReturns.set(ex.receiver, autoReturn(this.pendingDeal.hands[ex.receiver]!, dealLevel(this.match)));
+        this.tributeReturns.set(ex.receiver, chooseReturn(this.pendingDeal.hands[ex.receiver]!, dealLevel(this.match)));
       }
     }
     return this.maybeFinishTribute([]);

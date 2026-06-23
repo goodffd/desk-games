@@ -27,7 +27,7 @@ import { identify, beats } from './combos';
 // ---------------------------------------------------------------------------
 
 /** Is `c` a 逢人配 wildcard (red-heart card of the current level rank)? */
-function isWild(c: Card, level: Rank): boolean {
+export function isWild(c: Card, level: Rank): boolean {
   return c.kind === 'normal' && c.suit === 'H' && c.rank === level;
 }
 

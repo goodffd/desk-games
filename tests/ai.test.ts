@@ -11,13 +11,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { Seat } from '../src/games/guandan/engine/types';
+import type { Card, Rank, Seat, Suit } from '../src/games/guandan/engine/types';
 import type { DealState } from '../src/games/guandan/engine/game';
 import { makeDeck, deal } from '../src/games/guandan/engine/cards';
 import { isLegalPlay } from '../src/games/guandan/engine/legal';
 import { enumerateLeads } from '../src/games/guandan/engine/legal';
 import { createDeal, play as gamePlay, pass as gamePass } from '../src/games/guandan/engine/game';
-import { choosePlay } from '../src/games/guandan/ai/ai';
+import { choosePlay, chooseReturn } from '../src/games/guandan/ai/ai';
+import { identify } from '../src/games/guandan/engine/combos';
 
 // ---- deterministic shuffle ------------------------------------------------
 
@@ -277,5 +278,178 @@ describe('choosePlay — tendency assertions (weak / statistical)', () => {
       ratio,
       `only ${(ratio * 100).toFixed(1)}% pass when partner leads (want ≥70%)`
     ).toBeGreaterThanOrEqual(0.7);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 3 — 领牌策略（拆解驱动）行为断言
+//
+// Card 类型说明：
+//   普通牌：{ kind: 'normal', suit: Suit, rank: Rank, id: number }
+//   大王：  { kind: 'joker', big: true,  id: number }
+//   小王：  { kind: 'joker', big: false, id: number }
+//   逢人配（红心2 at level 2）：{ kind: 'normal', suit: 'H', rank: 2, id: number }
+// ---------------------------------------------------------------------------
+
+const L3: Rank = 2; // 固定打2
+let _nid3 = 2000;   // id 段与其余测试隔离
+function n(rank: number, suit: Suit): Card {
+  return { kind: 'normal', id: _nid3++, rank: rank as Rank, suit };
+}
+function bigJoker(): Card { return { kind: 'joker', big: true,  id: _nid3++ }; }
+
+/** 构造"自由领牌"DealState：seat0 手牌=hand，其余各持1张废牌，current=null, turn=0。 */
+function leadState3(hand: Card[]): DealState {
+  return {
+    hands: [hand, [n(14, 'S')], [n(14, 'H')], [n(14, 'C')]],
+    current: null, turn: 0 as Seat, passesInRow: 0, finished: [], level: L3,
+  };
+}
+
+describe('choosePlay 领牌（拆解驱动）', () => {
+  it('手里是一条顺子 → 一手领完（不拆单张）', () => {
+    // [3♠,4♥,5♣,6♦,7♠] 构成唯一顺子；新 AI decompose 识别到 1 手，应直接领完。
+    // 老 AI leadCost 选最低 key=single-3(cost=299) < straight(cost=695)，会拆单张 → FAIL。
+    const hand: Card[] = [n(3, 'S'), n(4, 'H'), n(5, 'C'), n(6, 'D'), n(7, 'S')];
+    const out = choosePlay(leadState3(hand), 0 as Seat);
+    expect(out).not.toBeNull();
+    expect(out!.length).toBe(5);
+    expect(isLegalPlay(out!, null, hand, L3)).toBe(true);
+  });
+
+  it('有小对子和大王 → 领小对，不先领大王【防回归守卫，非 TDD RED 差异点】', () => {
+    // ⚠️ 诚实标注：此条不是真 RED。老 AI 的 leadCost 排序对自然牌本就偏好低 key
+    //   （pair-3 cost=298 < bigJoker single cost≈1699），老 AI 同样不先甩大王，
+    //   新旧 AI 行为一致——它不验证 decompose 改造带来的差异，仅作"领牌不先甩控制大牌"
+    //   的防回归守卫，防止未来策略改动意外退化。真 RED 覆盖见上方"顺子→一手领完"
+    //   与下方"有自然对时不消耗逢人配"两条。
+    // [3♠,3♥,bigJoker,2♠(level-non-wild)] 手牌结构：3对 + 大王单 + 2♠单(level非wild)。
+    // 新 AI：decompose 拆为 pair-3 + single-bigJoker + single-2♠，nonControl 优先领 pair-3。
+    const bj = bigJoker();
+    const hand: Card[] = [n(3, 'S'), n(3, 'H'), bj, n(2, 'S')];
+    const out = choosePlay(leadState3(hand), 0 as Seat);
+    expect(out).not.toBeNull();
+    // 领出的牌不应包含大王
+    expect(out!.some(x => x.kind === 'joker' && x.big)).toBe(false);
+  });
+
+  it('手牌全是控制牌型 → 不崩溃，领 key 最低的那个控制牌（nonControl 为空分支）', () => {
+    // 覆盖 chooseLead 的 nonControl.length === 0 分支：构造一手 decompose 后全是控制牌型
+    // （key≥14 或炸弹）的手牌——[A♠,A♣,2♠,2♣] at level 2：
+    //   decompose → [pair-A(key=14), pair-2level(key=15)]，两者皆 isControl(key≥14)。
+    //   nonControl 过滤后为空 → pool 退回 combos，仍取最低 key=pair-A。
+    // 实测 decompose 输出：pair key=14 [S14,C14] | pair key=15 [S2,C2]，lead=S14,C14。
+    const hand: Card[] = [n(14, 'S'), n(14, 'C'), n(2, 'S'), n(2, 'C')];
+    const out = choosePlay(leadState3(hand), 0 as Seat);
+    // (a) 不会因 pool 为空而崩溃或返回 null；是合法领牌
+    expect(out).not.toBeNull();
+    expect(isLegalPlay(out!, null, hand, L3)).toBe(true);
+    // (b) 选的是 key 最低的控制牌型 = 那对 A（不是 key 更高的那对 level-2）
+    expect(out!.length).toBe(2);
+    expect(out!.every(x => x.kind === 'normal' && x.rank === 14)).toBe(true);
+  });
+
+  it('有自然对时不消耗逢人配（红心2）', () => {
+    // [3♠,3♣,2♥(wild),5♦]：自然对3 + 红心2(逢人配) + 5单张。
+    // decompose 拆为 pair-3自然 + single-5 + single-wild（3手），nonControl 最低 key=pair-3，直接领。
+    // 老 AI 枚举所有 leads 后 sort；pair-3自然 与 pair-3-wild 的 leadCost 相同(=298)，
+    // sort 不稳定，可能选含 wild 的 pair → 测试有机会 FAIL 验证了 RED。
+    // 新 AI 通过 wildCount tie-break 保证选不含 wild 的 pair-3自然 → GREEN。
+    const hand: Card[] = [n(3, 'S'), n(3, 'C'), n(2, 'H'), n(5, 'D')];
+    const out = choosePlay(leadState3(hand), 0 as Seat);
+    expect(out).not.toBeNull();
+    // 领出的不应包含红心2（逢人配）
+    expect(out!.some(x => x.kind === 'normal' && x.rank === 2 && x.suit === 'H')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 4 — 跟牌策略（保结构 + 战略不要 + 炸弹时机 + 配合）
+//
+// followState 构造跟牌局面：seat0 手牌=hand，台面 current=由 byCards 识别的牌型、by=seat1（对手）。
+// hands[2] / hands[3] 各持 1 张废牌（公开张数 > 0，保证 oppAboutToWin 不意外触发）。
+// ---------------------------------------------------------------------------
+
+/** 构造跟牌局面：seat0 手牌=hand，台面 current 由 byCards 识别、by=seat1（对手）。
+ *  seats 1/2/3 各持 3 张废牌（>2 张，保证 oppAboutToWin 不意外触发）。 */
+function followState(hand: Card[], byCards: Card[]): DealState {
+  const combo = identify(byCards, L3)!;
+  return {
+    hands: [hand, [n(14, 'D'), n(13, 'D'), n(12, 'D')], [n(14, 'H'), n(13, 'H'), n(12, 'H')], [n(14, 'C'), n(13, 'C'), n(12, 'C')]],
+    current: { combo, by: 1 as Seat },
+    turn: 0 as Seat,
+    passesInRow: 0,
+    finished: [],
+    level: L3,
+  };
+}
+
+describe('choosePlay 跟牌', () => {
+  it('对手出小单张：用零散单张压，不拆顺子', () => {
+    // 手里一条顺子3-7 + 一张散K；对手出一张10 → 应用散K压，不拆顺子
+    // 老 FOLLOW：取 nonBombs 里最低 key（散K key=13 > 顺子内最低单张 key=3），
+    // 老 AI 若枚举到拆顺子里单张3-7（key 更低），会错误选它们而非散K。
+    // 新 AI damage 度量：拆顺子中单张 damage>0（破坏结构），散K damage=0 → 选散K。
+    const hand = [n(3, 'S'), n(4, 'H'), n(5, 'C'), n(6, 'D'), n(7, 'S'), n(13, 'C')];
+    const out = choosePlay(followState(hand, [n(10, 'D')]), 0 as Seat);
+    expect(out).not.toBeNull();
+    expect(out!.length).toBe(1);
+    const played = out![0]!;
+    expect(played.kind === 'normal' && played.rank).toBe(13); // 散K，不是顺子里的牌
+  });
+
+  it('唯一能压的牌会拆掉关键结构、且非残局 → 战略不要(pass)', () => {
+    // 手里只有一对8(成对) + 一条顺子；对手出单张7，能压的最小是拆一张8，
+    // 但拆8会破坏对子结构（damage > 0）且非残局 → 期望 pass。
+    // 老 FOLLOW：nonBombs 取最低 key 直接出，会错误地拆对出单8。
+    const hand = [n(8, 'S'), n(8, 'H'), n(9, 'C'), n(10, 'D'), n(11, 'S'), n(12, 'C'), n(13, 'D')];
+    const out = choosePlay(followState(hand, [n(7, 'D')]), 0 as Seat);
+    expect(out).toBeNull();
+  });
+
+  it('spare(damage=0) 与结构内牌(damage>0)都能压 → 选 spare 不拆顺子【真 RED：覆盖 damage 主路径】', () => {
+    // 探针实测确认拆解结构（decompose([8S,9H,10C,11D,12S,14C], L3)）：
+    //   handCount=2 → straight 8-12 + single A(14)。A 是结构外 spare、8-12 是顺子。
+    //   A(14) 接不进 8-12 顺子 → decompose 必然把 A 留作单张，无歧义。
+    // 对手出单张10 → 合法跟牌只有 J(11)、Q(12)、散A(14)（探针：follows vs single-10）。
+    //   J(11)、Q(12) 都在顺子内：拆掉 → handCount 2→6，damage=(1+5)-2=4 (>0)。
+    //   散A(14) 是 spare：拿掉 → handCount 2→1，damage=(1+1)-2=0。
+    // 真 RED 论证：老 FOLLOW 取 nonBombs 最低 key → J(key=11) < Q(12) < A(14)，
+    //   会错误地拆顺子出 J。新 AI 按 (damage, key) 排序 → A 的 damage=0 最优，选散A。
+    const hand = [n(8, 'S'), n(9, 'H'), n(10, 'C'), n(11, 'D'), n(12, 'S'), n(14, 'C')];
+    const out = choosePlay(followState(hand, [n(10, 'D')]), 0 as Seat);
+    expect(out).not.toBeNull();
+    expect(out!.length).toBe(1);
+    const played = out![0]!;
+    // 应是结构外的 spare 散A(14)，不是顺子里的 J(11)/Q(12)
+    expect(played.kind === 'normal' && played.rank).toBe(14);
+  });
+
+  it('队友领先 → 默认不要', () => {
+    // 老 FOLLOW 对 partner 也是直接 return null，新旧行为一致；
+    // 此条作为"配合逻辑不退化"防回归守卫。
+    const hand = [n(5, 'S'), n(6, 'H')];
+    const st = followState(hand, [n(4, 'D')]);
+    st.current!.by = 2 as Seat; // 改为队友领先
+    expect(choosePlay(st, 0 as Seat)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5 — chooseReturn 智能还贡
+// ---------------------------------------------------------------------------
+
+describe('chooseReturn 还贡', () => {
+  it('不拆对子：宁还落单的小牌，也不拆掉一对', () => {
+    // 一对3(最小) + 落单5、9、10；还贡应给落单5(最小可还牌)，不拆对3
+    const hand = [n(3, 'S'), n(3, 'H'), n(5, 'C'), n(9, 'D'), n(10, 'S')];
+    const ret = chooseReturn(hand, L3);
+    expect(ret.kind === 'normal' && ret.rank).toBe(5);
+  });
+
+  it('全是落单小牌 → 给点数最小的（≤10）', () => {
+    const hand = [n(4, 'S'), n(7, 'H'), n(10, 'C'), n(13, 'D')];
+    const ret = chooseReturn(hand, L3);
+    expect(ret.kind === 'normal' && ret.rank).toBe(4);
   });
 });

@@ -87,20 +87,6 @@
   text-transform: uppercase;
 }
 
-/* 返回游戏大厅（仅 /xiangqi/ 托管时由 JS 注入到 .stage 顶部）。用系统字体避免象棋字体子集缺「厅」字混排 */
-.xq-root .hub-back {
-  display: inline-block;
-  margin-bottom: 12px;
-  color: var(--gold);
-  text-decoration: none;
-  font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 13px;
-  letter-spacing: 1px;
-  opacity: 0.82;
-  transition: opacity 0.15s;
-}
-.xq-root .hub-back:hover { opacity: 1; text-decoration: underline; }
-
 /* 签名元素：钤印式轮次指示 */
 .xq-root .seal {
   display: inline-flex;

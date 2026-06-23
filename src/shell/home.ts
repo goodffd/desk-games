@@ -5,7 +5,7 @@ import { navigate } from './nav';
  * 渲染首页游戏列表到 root，返回 cleanup 函数。
  * 两类卡片交互一致：**整张卡片可点**进入。
  * - 内置游戏：div + click → SPA navigate(/id)
- * - 外链游戏：整卡就是 <a href>（如象棋 /xiangqi/），同标签页进入
+ * - 外链游戏：整卡就是 <a href>，同标签页进入
  */
 export function renderHome(registry: GameEntry[], root: HTMLElement): () => void {
   root.innerHTML = '';
@@ -49,7 +49,7 @@ export function renderHome(registry: GameEntry[], root: HTMLElement): () => void
       card.addEventListener('click', onClick);
       card.addEventListener('keydown', onKeydown);
     } else {
-      // 整张卡片即链接：同标签页进入外链游戏（同源子路径，如 /xiangqi/）
+      // 整张卡片即链接：同标签页进入外链游戏
       (card as HTMLAnchorElement).href = entry.url;
       card.dataset['gameId'] = entry.id;
     }

@@ -30,6 +30,7 @@ export function mountXiangqi(root: HTMLElement): () => void {
 
   const listeners: Array<{ t: EventTarget; type: string; fn: EventListenerOrEventListenerObject }> = [];
   const on = (t: EventTarget, type: string, fn: EventListenerOrEventListenerObject) => { t.addEventListener(type, fn); listeners.push({ t, type, fn }); };
+  let disposed = false;
 
   const canvas = $('#board') as HTMLCanvasElement;
   const ctx = canvas.getContext('2d')!;
@@ -60,7 +61,15 @@ export function mountXiangqi(root: HTMLElement): () => void {
   const muteBtn = $('#mute') as HTMLButtonElement;
   function syncMuteBtn() { muteBtn.textContent = isMuted() ? '🔇 静音' : '🔊 音效'; }
   initSound(loadMuted());
-  unlockOnFirstGesture();   // 首次任意触摸即解锁音频（iOS Web Audio 必需）
+  // unlockOnFirstGesture() 在 window 挂 4 个手势监听解锁音频(sound.ts 内部闭包，首次手势才自删)。
+  // 进象棋未触摸就退回大厅会残留——临时拦截 window.addEventListener 把它们登记进 listeners[]，
+  // 交给 cleanup 统一解绑(保持 sound.ts 原样不动；removeEventListener 与 handler 自删幂等无冲突)。
+  const _origWinAdd = window.addEventListener;
+  window.addEventListener = function (type: string, fn: any, opts?: any) {
+    listeners.push({ t: window, type, fn });
+    return _origWinAdd.call(window, type, fn, opts);
+  } as typeof window.addEventListener;
+  try { unlockOnFirstGesture(); } finally { window.addEventListener = _origWinAdd; }
   syncMuteBtn();
 
   const bookIndex = buildBookIndex();
@@ -854,7 +863,7 @@ export function mountXiangqi(root: HTMLElement): () => void {
   refresh();
 
   // 嵌入的楷书子集字体加载完后重绘一次，避免首帧用系统兜底字体（确保四系统字形一致）。
-  document.fonts?.load('30px "XiangqiKai"', '帅将仕士相象马车炮兵卒楚河漢界').then(refresh).catch(() => {});
+  document.fonts?.load('30px "XiangqiKai"', '帅将仕士相象马车炮兵卒楚河漢界').then(() => { if (!disposed) refresh(); }).catch(() => {});
 
   // 刷新/切后台回来：若 sessionStorage 有进行中的联机对局/观战，自动重连回房间
   const onlineSaved = loadOnlineSession();
@@ -869,6 +878,7 @@ export function mountXiangqi(root: HTMLElement): () => void {
   }
 
   const cleanup = () => {
+    disposed = true;
     intentionalClose = true;     // 关 WS 前置 true → 关闭触发的 onState('closed') 命中主动退出分支，不调度重连
     online?.close();             // 关闭联机 WebSocket
     online = null;

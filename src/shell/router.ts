@@ -39,7 +39,7 @@ export function route(
   );
 
   if (!entry || entry.kind === 'external') {
-    // 未知游戏 / 外链游戏（象棋由服务端 /xiangqi 直接服务）不在本 SPA 内路由，回退首页
+    // 未知游戏 / 外链游戏不在本 SPA 内路由，回退首页
     return renderHome(registry, root);
   }
 

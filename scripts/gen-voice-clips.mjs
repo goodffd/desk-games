@@ -2,11 +2,13 @@
 // 需要 ffmpeg/ffprobe（brew install ffmpeg）。凭证在钥匙串 volc-tts-appid / volc-tts-token。
 import { execSync, execFileSync } from "node:child_process";
 import { writeFileSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const appid = execSync("security find-generic-password -s volc-tts-appid -w", { encoding: "utf8" }).trim();
 const token = execSync("security find-generic-password -s volc-tts-token -w", { encoding: "utf8" }).trim();
 const ENDPOINT = "https://openspeech.bytedance.com/api/v3/tts/unidirectional";
-const DEST = "$HOME/code/projects/desk-games/src/games/guandan/ui/voice-clips.ts";
+// 脚本相对路径（脱敏：不写死本机绝对路径/用户名）
+const DEST = fileURLToPath(new URL("../src/games/guandan/ui/voice-clips.ts", import.meta.url));
 
 // owner 选定：vivi + B 档（快+开心）
 const CONFIG = {

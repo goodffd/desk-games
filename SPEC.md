@@ -177,7 +177,7 @@
 ## 胜负与和棋（`engine/game.ts` `rules.ts`）
 - **将军**：走后对方被将（将位被攻击）或两将照面。
 - **将死 / 困毙**：轮到某方时**无任何合法着法** → 判该方**负**（被将=将死、未被将=困毙，均判负，对方胜）。将被吃（找不到将）亦视为被将。
-- **自然限着**：代码**未**设全局「N 回合无吃子判和」上限（如需按官方棋例增设，须先加单测）。
+- **自然限着**：连续 `naturalLimitPlies` 个单方着法双方均无吃子 → **判和**；默认 `DEFAULT_NATURAL_LIMIT_PLIES = 120`（= 60 回合，对应竞赛规则「自然限着 60 回合」），可经 `GameOptions.naturalLimitPlies` 覆写（变体/测试）。任意一步吃子即把计数器归零；将死/困毙/循环裁决优先于自然限着。`Game` 暴露只读 `movesWithoutCapture`、`naturalLimitPlies`，`undo()` 会回退计数器（UI 可提示「距和棋还剩 N 着」）。单测见 `tests/xiangqi/engine/natural-limit.test.ts`。
 - **重复局面**：同一局面出现**第 3 次**触发循环裁决（见下），可能判负或判和。
 
 ## 长将长捉判负 —— 重复局面裁决（`engine/repetition.ts`，最关键一节）

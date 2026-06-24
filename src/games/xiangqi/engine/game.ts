@@ -91,9 +91,18 @@ interface Snapshot {
   board: Board;
   turn: Color;
   status: GameStatus;
+  movesWithoutCapture: number;
 }
 
 const REPETITION_TRIGGER = 3; // 同一局面出现三次后触发循环裁决
+
+// 自然限着默认上限：连续 120 个单方着法（= 60 回合）双方均无吃子即判和，
+// 对应中国象棋竞赛规则的「自然限着 60 回合」。可经 GameOptions 覆写（变体/测试用）。
+export const DEFAULT_NATURAL_LIMIT_PLIES = 120;
+
+export interface GameOptions {
+  naturalLimitPlies?: number; // 自然限着上限（plies），默认 DEFAULT_NATURAL_LIMIT_PLIES
+}
 
 export class Game {
   board: Board;
@@ -105,8 +114,11 @@ export class Game {
   private startBoard: Board;
   private startTurn: Color;
   private moveList: Move[] = [];
+  private _movesWithoutCapture = 0; // 自上次吃子以来的连续无吃子着法数
+  private readonly naturalLimit: number; // 自然限着上限（plies）
 
-  constructor() {
+  constructor(opts: GameOptions = {}) {
+    this.naturalLimit = opts.naturalLimitPlies ?? DEFAULT_NATURAL_LIMIT_PLIES;
     this.board = initialBoard();
     this.turn = 'red';
     this.status = computeStatus(this.board, this.turn);
@@ -116,8 +128,8 @@ export class Game {
   }
 
   // 从自定义局面构造（测试 / 残局用）
-  static fromPosition(board: Board, turn: Color): Game {
-    const g = new Game();
+  static fromPosition(board: Board, turn: Color, opts: GameOptions = {}): Game {
+    const g = new Game(opts);
     g.board = cloneBoard(board);
     g.turn = turn;
     g.status = computeStatus(g.board, g.turn);
@@ -127,7 +139,18 @@ export class Game {
     g.startBoard = cloneBoard(board);
     g.startTurn = turn;
     g.moveList = [];
+    g._movesWithoutCapture = 0;
     return g;
+  }
+
+  // 自上次吃子以来的连续无吃子着法数（UI 可据此提示「距和棋还剩 N 着」）
+  get movesWithoutCapture(): number {
+    return this._movesWithoutCapture;
+  }
+
+  // 本局自然限着上限（plies）
+  get naturalLimitPlies(): number {
+    return this.naturalLimit;
   }
 
   legalMoves(from: Square): Square[] {
@@ -146,10 +169,12 @@ export class Game {
     if (!legal.some((to) => squaresEqual(to, m.to))) return false;
 
     const mover = this.turn;
-    this.history.push({ board: cloneBoard(this.board), turn: this.turn, status: this.status });
+    const captured = pieceAt(this.board, m.to) !== null; // 目标格有子 = 吃子
+    this.history.push({ board: cloneBoard(this.board), turn: this.turn, status: this.status, movesWithoutCapture: this._movesWithoutCapture });
     this.moveList.push({ from: { ...m.from }, to: { ...m.to } });
     this.board = applyMove(this.board, m);
     this.turn = opponent(this.turn);
+    this._movesWithoutCapture = captured ? 0 : this._movesWithoutCapture + 1;
     this.status = computeStatus(this.board, this.turn);
 
     // 记录本步属性：是否将军（走后对方被将）/ 是否捉无根子
@@ -162,6 +187,10 @@ export class Game {
     const key = positionKey(this.board, this.turn);
     this.positions.push(key);
     this.maybeAdjudicateRepetition(key);
+    // 自然限着：仍在进行且连续无吃子达上限 → 判和（将死/困毙/循环裁决优先）
+    if (this.status === 'playing' && this._movesWithoutCapture >= this.naturalLimit) {
+      this.status = 'draw';
+    }
     return true;
   }
 
@@ -188,6 +217,7 @@ export class Game {
     this.board = prev.board;
     this.turn = prev.turn;
     this.status = prev.status;
+    this._movesWithoutCapture = prev.movesWithoutCapture;
     this.positions.pop();
     this.plies.pop();
     this.moveList.pop();

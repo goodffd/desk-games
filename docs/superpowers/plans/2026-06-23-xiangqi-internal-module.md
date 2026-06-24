@@ -575,7 +575,7 @@ mv $HOME/code/projects/xiangqi-game $HOME/code/archive/xiangqi-game
 
 - [ ] **Step 5: 部署（red line：部署到生产，须 owner 单独授权）**
 
-授权后：本地 `npm run build` → 备份生产 `dist` → scp `dist/index.html` + `server/server.mjs`（删了 xiangqi-dist 分支）到 `/opt/desk-games` → server readFileSync 即时生效（HTTP 无需重启；但 server.mjs 改了路由**需要 restart**）：`ssh root@$DEPLOY_HOST systemctl restart desk-games`。生产服务器上 `xiangqi-dist` 目录可留可删（不再被引用）。然后公网真路径冒烟：大厅点象棋→联机一盘→来回切换零残留。
+授权后：本地 `npm run build` → 备份生产 `dist` → scp `dist/index.html` + `server/server.mjs`（删了 xiangqi-dist 分支）到 `/opt/desk-games` → server readFileSync 即时生效（HTTP 无需重启；但 server.mjs 改了路由**需要 restart**）：`ssh $DEPLOY_HOST systemctl restart desk-games`（真实主机脱敏，见 owner 私记/DEPLOY.md 占位约定）。生产服务器上 `xiangqi-dist` 目录可留可删（不再被引用）。然后公网真路径冒烟：大厅点象棋→联机一盘→来回切换零残留。
 
 ---
 

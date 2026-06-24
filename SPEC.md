@@ -148,3 +148,101 @@
 - **Q4 ✓** 还贡牌 ≤10。
 - **Q5 ✓** 抗贡 = 应进贡方持两张大王（双贡看三游+末游合计）。
 - **Q6 ✓** 进贡局由进贡方（末游）先首攻。
+
+---
+
+# 中国象棋（内置联机模块 — 实现详述）
+
+> 象棋原为独立项目 `xiangqi-game`（已归档、即将删库），2026-06-23 作为**内置联机模块**并入大厅：大厅内无刷新 mount、离开零残留，功能/字体全保留，联机走同源 `/ws`。下文是**引擎现状（代码即真相，已上线）**，与掼蛋同等详细度，删旧仓库后这里即唯一权威记录。各特性的设计依据见 `docs/superpowers/specs|plans/2026-06-1x-xiangqi-*.md`（已随本次一并迁入）。
+>
+> 代码：`src/games/xiangqi/`（`engine/` 纯逻辑无 DOM + `ui/` DOM/CSS + `ui/fonts/`）。`engine/` 是规则唯一真相，UI/AI 不另写判定（同掼蛋约束）。
+
+## 棋盘与棋子（`engine/types.ts` `board.ts` `fen.ts`）
+- **棋盘** 10 行 × 9 列（`ROWS=10, COLS=9`）。坐标 `row 0..9`（0=黑方底线、9=红方底线）、`col 0..8`（红方视角左→右）。
+- **红先**。七种棋子：`general(帅/将)`、`advisor(仕/士)`、`elephant(相/象)`、`horse(马)`、`chariot(车)`、`cannon(炮)`、`soldier(兵/卒)`。
+- **FEN**：A1 象棋标准 FEN，大写=红、小写=黑，字母映射 `r/n/b/a/k/c/p`(车马象士将炮兵)，轮走方 `w`=红 / `b`=黑。
+- **初始布阵**：黑 row0 背排(车马象士将士象马车)+row2 双炮(列1,7)+row3 五卒(列0,2,4,6,8)；红镜像于 row9/7/6。
+
+## 着法规则（`engine/moves.ts` `rules.ts`）
+- **帅/将**：九宫内（红 row7-9、黑 row0-2，列3-5）正交一步。
+- **仕/士**：九宫内斜一步。
+- **相/象**：斜走两格（田字），**不过河**（红 row≥5、黑 row≤4），且**象眼**（中间格）不能有子（塞象眼）。
+- **马**：日字跳，**蹩马腿**——马腿处（相邻直线格）有子则该方向不能走。
+- **车**：直线任意格，遇子即止，可吃敌、不越己子。
+- **炮**：不吃子时同车走空格；**吃子必须隔且仅隔一个子（炮架）**，吃炮架后第一个敌子。
+- **兵/卒**：向前一步；**过河后**（红 row≤4、黑 row≥5）可横走一步，永不后退。
+- **将帅照面（对脸）禁手**：两将同列且中间无子 = 违规，等同被将（`isInCheck` 判 true）；任何使本方照面的着法非法。
+- **合法着法**：伪合法着法须再过滤掉「走后己方被将军（含照面）」者（`game.ts:legalMovesFrom`）。
+
+## 胜负与和棋（`engine/game.ts` `rules.ts`）
+- **将军**：走后对方被将（将位被攻击）或两将照面。
+- **将死 / 困毙**：轮到某方时**无任何合法着法** → 判该方**负**（被将=将死、未被将=困毙，均判负，对方胜）。将被吃（找不到将）亦视为被将。
+- **自然限着**：代码**未**设全局「N 回合无吃子判和」上限（如需按官方棋例增设，须先加单测）。
+- **重复局面**：同一局面出现**第 3 次**触发循环裁决（见下），可能判负或判和。
+
+## 长将长捉判负 —— 重复局面裁决（`engine/repetition.ts`，最关键一节）
+> 设计依据：`docs/superpowers/specs/2026-06-19-xiangqi-b1-repetition-adjudication-design.md`（owner 拍板）。
+
+- **触发**：维护局面键历史，某局面出现达 `REPETITION_TRIGGER = 3` 次时，取「上一次出现该局面 → 当前」的最近一个完整循环 plies 交付裁决（2 次不裁，留调整余地）。
+- **局面键** `positionKey(board, turn)`：`轮走方 + '|' + 棋盘串`，每子映射唯一单字防车/炮碰撞。
+- **每步分类**（`PlyInfo`）：
+  - **将(check)**：`gaveCheck` —— 走后对方被将。
+  - **捉(chase)**：`chaseThreat` —— 本步**新制造**对一枚**无根（无保护）非将敌子**的吃子威胁，**排除兑/献**（捉子自身也被无保护地吃掉则算献、不算捉）。无根判定 `isDefended`：把目标格临时换敌子探测对方能否回吃。
+  - **闲(idle)**：既非将也非捉（含兑、拦、跟、献、纯不变）。
+- **攻击等级** `offenseLevel`（对红黑各算一圈循环内）：
+  - `2 = 长将`：全部步皆将。
+  - `1 = 长打`：全部步皆将或捉、但非全将。
+  - `0 = 闲`：含任一闲步。
+- **裁决** `adjudicateRepetition`：比红黑两侧等级 `rl / bl` ——**等级高（攻击更凶）的一方判负**：
+  | 红 rl × 黑 bl | 结果 |
+  |---|---|
+  | 2×0 / 1×0 / 2×1 | 红负（长将/长捉必变，对方胜） |
+  | 2×2 / 1×1 / 0×任意 | **和**（双方对等、或有闲步） |
+  | 0×1 / 1×2 / 0×2 | 黑负（对称） |
+
+  实现即 `rl===bl ? 'draw' : (rl>bl ? 'black_win' : 'red_win')`。
+
+## 残局库（`engine/endgames.ts`）
+- 结构 `Endgame { id, name, fen, goal:'红胜'|'和', solution:中文记谱[] }` + 线性步进器 `EndgameLine`（`position/moves/next/prev/canNext/canPrev/reset`，单主线无分支）。
+- 收录 **6 则实用短残局**：单车巧胜单士 `che-shi`、双车胜单士 `shuangche-shi`、炮兵胜单士 `paobing-shi`、马炮胜士象 `mapao-shixiang`、车低兵难胜士象全(和) `che-dibing-he`、马双兵胜士象 `mabing-shixiang`。
+- 用途：导入对弈自己摆 / 逐手看解法。
+
+## 开局库（`engine/openings.ts`）
+- 结构 `Opening { id, name, roots }` + `BookNode { zh, comment?, children }`（着法树）。`buildBookIndex` DFS 重放全书，在每个 FEN 节点记录续着+开局名（异途同归自动合并）；`lookupBook(index, board, turn)` 查当前局面续着与命中开局。
+- 收录 **10 套主流开局**：中炮对屏风马、仙人指路、顺炮、列炮、中炮对反宫马、飞相局、起马局、过宫炮、仕角炮、挺三兵。
+- 用途：对弈中开局名徽标 + 中文续着提示（可开关，出谱转「已出谱」）；打谱浏览。
+
+## AI（`engine/ai.ts`，纯函数）
+- **negamax + α-β 剪枝** + **静止搜索**（叶子只追吃子，消除「吃了被吃回」误判）+ **着法排序**（高价值被吃子优先，增强剪枝）。
+- **难度档**：`beginner`(入门，搜索深 1 + 约 40% 故意失误)、`easy`(初级，深 2、无失误)、`medium`(中级，深 3、无失误)。
+- **子力价值**：帅 100000 / 车 900 / 炮 450 / 马 450 / 仕 200 / 相 200 / 兵 100；位置项鼓励兵过河与中路、马出动占中、炮车控线，仕相留守不加分。
+
+## 计时 / 读秒（`engine/clock.ts`）
+- 模式 `banker`(包干) / `byoyomi`(读秒)。`ClockConfig { mode, mainMs, byoyomiMs }`；每方 `SideClock { mainMs, inByoyomi, periodMs }`。
+- `tick`：扣 running 方时间——包干 main→0 判负；读秒 main→0 进读秒态、每手满血、period→0 判负。`startTurn` 轮到该方开钟并重置读秒 period。`display` 读秒态显「读秒 N」否则 `m:ss`。
+
+## 记谱与 PGN（`engine/notation.ts` `pgn.ts`）
+- **ICCS 坐标记法**：纵线 `col 0..8 → a..i`、横线用 `row 0..9`，着法形如 `a0-b1`（联机/PGN 内部用）。
+- **中文记谱**：红方纵线用汉字数字（九八…一，自右向左）、黑方用阿拉伯数字（1-9，自左向右）；格式 `<子><纵><进/退/平><目标>`——直行子(车炮兵将)进/退接**步数**，斜行子(马象士)接**目标纵线**；同纵线多子用「前/后」、多兵卒用「一二三四五」消歧。双向 `moveToChinese` / `chineseToMove`。
+- **PGN 容器**：`[tags]` (Event/Date/Red/Black/Result/可选 FEN) + ICCS 着法表 + 中文注释 `{}` + 结果 `1-0 / 0-1 / 1/2-1/2 / *`。`gameToPgn` / `pgnToGame` 互转（联机同步、存档复用）。
+
+## 打谱 / 复盘（`engine/browse.ts`）
+- `BrowseSession`：`position/moves/frontier(可前进分支)/next(childIdx)/prev/canNext/canPrev/reset`，支持分支变着浏览。纯逻辑可单测。
+
+## 存档（`ui/persist.ts`，localStorage，失败静默）
+- `xiangqi:lastgame`(PGN 自动续局) / `xiangqi:theme` / `xiangqi:muted` / `xiangqi:bookhint`(开局提示开关) / `xiangqi:nick`(无则默认「棋友+3 位随机数」)。
+
+## 联机（`ui/online.ts` + C 设计）
+- **同源 WebSocket `/ws`**（`deriveWsUrl`：http→ws、https→wss、`file://`→空=禁用）。与掼蛋 `/ws-guandan` 完全隔离、互不影响。
+- **消息**（`OnlineMsg`）：身份 `hello/rename`(↔`hello-ok`/`nick-taken`)；大厅 `lobby`(订阅→持续推 rooms)；房间 `create/join/spectate/rejoin`(↔`created`/`paired{color,you,opponent}`/`spectating`/`error`)；对局 `move(iccs)`/`resign`/`draw-offer|accept|decline`/`undo-request|accept|decline`；通知 `need-sync`/`sync(pgn)`/`peer-left`/`peer-disconnected`/`peer-reconnected`/`room-closed`。
+- **断线重连**：`rejoin(code,nick)` 回座；观战者用 `need-sync`→玩家 `sync(pgn)` 补全棋谱。`OnlineSession` 暴露 `connect/hello/rename/subscribeLobby/createRoom/joinRoom/spectate/rejoin/send/close` + `onMessage/onState` 回调。
+
+## 界面 / 主题 / 音效 / 字体（`ui/`）
+- **主题** `ui/themes.ts`：4 套 `cinnabar`(朱砂水墨，默认)/`wood`(原木)/`night`(夜间墨玉)/`plain`(素雅)；棋子风格 `ivory|luminous|solid`，可记忆。
+- **音效** `ui/sound.ts`：`move/capture/check/win` 全 Web Audio 合成（零音频文件、`file://` 可用）；首次手势解锁、iOS 静音拨片绕过、可静音。
+- **字体**：霞鹜文楷子集 `ui/fonts/xiangqi-kai.woff2`(OFL)，内联保证四端固定文字（棋子名/术语/记谱）字形一致；昵称等任意文本走系统无衬线。新增固定汉字须重跑 `pyftsubset` 子集化（同掼蛋约束）。
+
+## 象棋验收（沿用旧仓库标准，现已全绿上线）
+- 引擎单测全绿：着法/将军/将死困毙/照面禁手、长将长捉裁决全分支、记谱双向、计时读秒、残局/开局库、打谱、PGN 互转（见 `tests/xiangqi/`）。
+- 真机冒烟：Playwright + 系统 Chrome 打完整局（参考 `feedback_xiangqi_ui_browser_smoke`：`runFor` 逼超时、fill 后 blur、`.clocks[hidden]` 守卫等坑）。
+- 联机：多 context 建房/加入/对弈/断线重连/观战同步真路径过。

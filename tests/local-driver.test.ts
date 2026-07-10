@@ -105,6 +105,11 @@ describe('LocalDriver — 发牌与开局', () => {
     expect(p.changes).toBeGreaterThanOrEqual(1); // start 触发一次 onChange
   });
 
+  it('seatStatus：人类座(0)online、其余三座 ai（头像显机器人）', () => {
+    const p = makeDriver({ schedule: () => 0 });
+    expect(snap(p).seatStatus).toEqual(['online', 'ai', 'ai', 'ai']);
+  });
+
   it('start 后非我回合 → AI 自动推进（即时 schedule）', () => {
     const p = makeDriver({ firstLeader: 1 }); // 首攻 seat1(AI)
     p.driver.start();

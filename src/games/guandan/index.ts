@@ -1,6 +1,7 @@
 /**
  * 掼蛋游戏模块入口（控制器）。
- * 路由分流：`/guandan?debug` → 本地对 AI(LocalDriver)；`/guandan` → 联机流。
+ * 入口分流：`/guandan` → 模式选择页（单机对战 / 4 人联机 并排二选一）；
+ *   单机 → 本地对 AI(LocalDriver)，联机 → 联机流。`/guandan?debug` → 直挂单机跳过选择页。
  * 联机状态机：昵称 → 大厅(建房/匹配/加入/观战) → 房间(挑座/开打) → 牌桌(OnlineDriver)。
  * 控制器只编排：session 收发 + UI 切换 + 开打挂牌桌 + 掉线/重连 toast。规则/AI 全在服务端。
  */
@@ -13,6 +14,7 @@ import { OnlineSession } from './online/session';
 import { c2s, type LobbyRoom, type SeatInfo } from './online/protocol';
 import './online/ui/lobby.css';
 import { mountTable, speechBusyMs, primeAudio, setTableHost, setSeatNames, setSpectator } from './ui/view';
+import { renderModeSelect } from './ui/mode-select';
 import { renderNickname, type NicknameHandle } from './online/ui/nickname';
 import { renderLobby, type LobbyHandle } from './online/ui/lobby';
 import { renderRoom, type RoomHandle, type RoomState } from './online/ui/room';
@@ -145,17 +147,34 @@ function onlineMount(root: HTMLElement): () => void {
 }
 
 function mount(root: HTMLElement): () => void {
-  if (new URLSearchParams(location.search).has('debug')) {
+  let active: (() => void) | null = null;
+
+  function goSingle(): void {
+    active?.();
+    primeAudio(); // 借用户点击解锁音频（WebKit 须真实手势才能放报牌语音）
     setSeatNames(null); // 本地用 你/下家/对家/上家
     setSpectator(false); // 本地恒为玩家
-    return mountTable(root, new LocalDriver({ speechBusyMs }));
+    active = mountTable(root, new LocalDriver({ speechBusyMs }));
   }
-  return onlineMount(root);
+  function goOnline(): void {
+    active?.();
+    active = onlineMount(root); // 选了联机才连 WS（单机不开 /ws-guandan）
+  }
+
+  // ?debug：直挂单机牌桌、跳过选择页（开发快捷入口，保留）
+  if (new URLSearchParams(location.search).has('debug')) {
+    goSingle();
+    return () => { active?.(); active = null; };
+  }
+
+  // 正门：先进模式选择页，单机 / 4 人联机并排二选一
+  active = renderModeSelect(root, { onSingle: goSingle, onOnline: goOnline });
+  return () => { active?.(); active = null; };
 }
 
 export const guandanModule: GameModule = {
   id: 'guandan',
   name: '掼蛋',
-  desc: '升级类扑克，2v2 四人局，建房或匹配 4 人联机（?debug 单机对 AI）',
+  desc: '升级类扑克，2v2 四人局：单机对 AI 或 4 人联机',
   mount,
 };

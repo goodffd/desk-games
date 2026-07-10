@@ -27,6 +27,10 @@ import type { GameDriver, GameSnapshot, TributePrompt, LastPlays, GamePhase, Dea
 
 const HUMAN_SEAT: Seat = 0;
 
+/** 本地座位连接态：人类座在线(人像)，其余三座 AI(头像显机器人)。view 据此渲染头像。 */
+const LOCAL_SEAT_STATUS: ('online' | 'ai')[] =
+  ([0, 1, 2, 3] as Seat[]).map((s) => (s === HUMAN_SEAT ? 'online' : 'ai'));
+
 /** 随机洗牌（注入用默认；与 view 旧实现一致）。 */
 function randomShuffle(n: number): number[] {
   const arr = Array.from({ length: n }, (_, i) => i);
@@ -100,7 +104,7 @@ export class LocalDriver implements GameDriver {
 
   // ── 快照 ───────────────────────────────────────────────────
   snapshot(): GameSnapshot {
-    return { state: this.state, match: this.match, lastPlays: this.lastPlays, lastActor: this.lastActor, started: this.started, phase: this.phase };
+    return { state: this.state, match: this.match, lastPlays: this.lastPlays, lastActor: this.lastActor, started: this.started, phase: this.phase, seatStatus: LOCAL_SEAT_STATUS };
   }
 
   // ── 事件订阅 ───────────────────────────────────────────────

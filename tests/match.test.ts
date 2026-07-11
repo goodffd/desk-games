@@ -8,6 +8,8 @@ import {
   returnableCards,
   autoReturn,
   applyTribute,
+  passALockedEarly,
+  fullRanking,
   teamOf,
   partnerOf,
   type MatchState,
@@ -197,5 +199,33 @@ describe('applyTribute — 牌在两家间交换，张数守恒', () => {
     const plan = planTribute([0, 1, 2, 3], hands, 2);
     const out = applyTribute(hands, plan, []);
     expect(out.flat().map(c => c.id)).toEqual(hands.flat().map(c => c.id));
+  });
+});
+
+describe('passALockedEarly / fullRanking — 打A双下提前收盘', () => {
+  it('打A方双下(头游+二游同队) → 锁定过A(true)', () => {
+    // 队0(座0&2)在 A；finished 前两名 0,2 同队 → 过A 已必成
+    expect(passALockedEarly(mkMatch({ levels: [14, 2] }), [0, 2])).toBe(true);
+    expect(passALockedEarly(mkMatch({ levels: [2, 14], trumpTeam: 1 }), [1, 3])).toBe(true);
+  });
+  it('打A方头游但二游是对手(非双下) → 不锁定(false)，需继续打', () => {
+    expect(passALockedEarly(mkMatch({ levels: [14, 2] }), [0, 1])).toBe(false);
+  });
+  it('双下但该队未到A → 不提前收盘(false)', () => {
+    expect(passALockedEarly(mkMatch({ levels: [13, 2] }), [0, 2])).toBe(false);
+  });
+  it('不足2人 → false', () => {
+    expect(passALockedEarly(mkMatch({ levels: [14, 2] }), [0])).toBe(false);
+  });
+  it('fullRanking 补全仍在场座位到末尾（顺序不影响双下 gain）', () => {
+    expect(fullRanking([0, 2])).toEqual([0, 2, 1, 3]);
+    expect(fullRanking([1, 3, 0, 2])).toEqual([1, 3, 0, 2]);
+  });
+  it('提前收盘名次交给 settleDeal → 双下过A(gain=3, over)', () => {
+    const settle = settleDeal(mkMatch({ levels: [14, 2] }), fullRanking([0, 2]));
+    expect(settle.gain).toBe(3);
+    expect(settle.passedA).toBe(true);
+    expect(settle.match.over).toBe(true);
+    expect(settle.match.winner).toBe(0);
   });
 });

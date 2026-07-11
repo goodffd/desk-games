@@ -67,12 +67,23 @@ export class RoomRegistry {
       const room = this.rooms.get(client._room);
       if (!room || room.status !== 'waiting') { client.send({ t: 'error', msg: '房间状态不对' }); return; }
       if (room.host !== client) { client.send({ t: 'error', msg: '只有房主能开始' }); return; }
-      if (room.seats.some(s => !s)) { client.send({ t: 'error', msg: '未坐满 4 人' }); return; }
+      if (!room.seats.some(s => s)) { client.send({ t: 'error', msg: '至少 1 人落座才能开始' }); return; }
       room.status = 'playing';
+      // ≥1 人即可开打：空座补 AI（无 client、ai=true），由服务端 choosePlay 代打（=单机对 3 AI 的特例）
+      for (let i = 0; i < 4; i++) {
+        if (!room.seats[i]) room.seats[i] = { client: null, nick: null, online: false, ai: true };
+      }
       room.driver = this.makeDriver ? this.makeDriver(room) : null;
       this._sendRoom(room);
-      for (const s of room.seats) s.client.send({ t: 'started' });
-      if (room.driver) this._dispatch(room, room.driver.start());
+      for (const s of room.seats) if (s && s.client) s.client.send({ t: 'started' }); // 跳过 AI 空座
+      if (room.driver) {
+        this._dispatch(room, room.driver.start());
+        // start() 不 driveAI；把 AI 座（含空座补的）设为 AI 以驱动其出牌（同 restart 的处理）
+        for (let i = 0; i < 4; i++) {
+          const s = room.seats[i];
+          if (s && s.ai && room.driver.setAI) this._dispatch(room, room.driver.setAI(i, true));
+        }
+      }
       if (!room.isPrivate) this._broadcastLobby();
       return;
     }
@@ -89,7 +100,7 @@ export class RoomRegistry {
         four.forEach((c, i) => this._seat(room, c, i));
         room.driver = this.makeDriver ? this.makeDriver(room) : null;
         this._sendRoom(room);
-        for (const s of room.seats) s.client.send({ t: 'started' });
+        for (const s of room.seats) if (s && s.client) s.client.send({ t: 'started' });
         if (room.driver) this._dispatch(room, room.driver.start());
         if (!room.isPrivate) this._broadcastLobby();
       }
@@ -183,7 +194,7 @@ export class RoomRegistry {
   _sendRoom(room, only = null) {
     const seats = this._seatInfo(room);
     const targets = only ? [only] : [
-      ...room.seats.filter(Boolean).map(s => s.client),
+      ...room.seats.filter(s => s && s.client).map(s => s.client), // 跳过 AI 空座(client=null)
       ...room.spectators,
     ];
     for (const c of targets) c.send({ t: 'room', code: room.code, status: room.status, seats, you: c._seat ?? null });

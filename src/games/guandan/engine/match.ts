@@ -32,6 +32,23 @@ export type Team = 0 | 1;     // 队 0 = 座位 0&2；队 1 = 座位 1&3
 export const teamOf = (seat: Seat): Team => (seat % 2) as Team;
 export const partnerOf = (seat: Seat): Seat => ((seat + 2) % 4) as Seat;
 
+/**
+ * 打 A 局"双下"即锁定过 A —— 可提前收盘、不必让对手打完剩牌。
+ * 条件：finished 前两名(头游+二游)同队 且 该队级牌已到 A。此时 gain=3(升3级)≥2，严格过A 已必成，
+ * 后两名(两个对手)的名次无论如何都不改变过 A 结果，故可立即宣布胜利。
+ */
+export function passALockedEarly(m: MatchState, finished: Seat[]): boolean {
+  return finished.length >= 2
+    && teamOf(finished[0] as Seat) === teamOf(finished[1] as Seat)
+    && m.levels[teamOf(finished[0] as Seat)] === A;
+}
+
+/** 提前收盘用的完整名次：不足 4 人时把仍在场座位补到末尾（顺序不影响双下 gain=3 / 过A 判定）。 */
+export function fullRanking(finished: Seat[]): Seat[] {
+  const rest = ([0, 1, 2, 3] as Seat[]).filter((s) => !finished.includes(s));
+  return [...finished, ...rest];
+}
+
 /** 一张逢人配（红心级牌）？ */
 const isWild = (c: Card, level: Rank): boolean =>
   c.kind === 'normal' && c.suit === 'H' && c.rank === level;

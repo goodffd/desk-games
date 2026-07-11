@@ -98,12 +98,38 @@ describe('RoomRegistry — 房主开打', () => {
     return cs;
   }
 
-  it('不满 4 人 start → error', () => {
+  it('不满 4 人 start → 开打成功，空座补 AI（≥1 人即可开）', () => {
     const cs = [fakeClient(), fakeClient()]; cs.forEach((c, i) => hello(c, 'p' + i));
     reg.handle(cs[0], { t: 'create' });
     reg.handle(cs[1], { t: 'join', code: 'ABC123' }); reg.handle(cs[1], { t: 'take-seat', seat: 1 });
     reg.handle(cs[0], { t: 'start' });
-    expect(last(cs[0]).t).toBe('error');
+    expect(cs[0]!.sent.some((m: any) => m.t === 'error')).toBe(false);
+    expect(cs[0]!.sent).toContainEqual({ t: 'started' });
+    const room = reg.rooms.get('ABC123');
+    expect(room.status).toBe('playing');
+    expect(room.seats[2].ai).toBe(true);   // 座 2 补 AI
+    expect(room.seats[3].ai).toBe(true);   // 座 3 补 AI
+    expect(room.seats[0].ai).toBe(false);  // 座 0 真人
+  });
+
+  it('1 人(房主)即可 start → 其余 3 座补 AI（单机 = 联机 1 人 + 3 AI）', () => {
+    const c = fakeClient(); hello(c, '阿东');
+    reg.handle(c, { t: 'create' });
+    reg.handle(c, { t: 'start' });
+    expect(c.sent.some((m: any) => m.t === 'error')).toBe(false);
+    expect(c.sent).toContainEqual({ t: 'started' });
+    const room = reg.rooms.get('ABC123');
+    expect(room.status).toBe('playing');
+    expect(room.seats.filter((s: any) => s && s.ai).length).toBe(3);
+    expect(room.seats.filter((s: any) => s && !s.ai).length).toBe(1);
+  });
+
+  it('无人落座 start → error（理论上房主必坐0，防御性）', () => {
+    const c = fakeClient(); hello(c, 'x');
+    reg.handle(c, { t: 'create' });
+    reg.rooms.get('ABC123').seats[0] = null; // 强制清空
+    reg.handle(c, { t: 'start' });
+    expect(last(c).t).toBe('error');
   });
 
   it('非房主 start → error', () => {

@@ -21,6 +21,7 @@ import { choosePlay, chooseReturn } from '../ai/ai';
 import { comboSpeech } from '../ui/render';
 import {
   startMatch, settleDeal, planTribute, applyTribute, dealLevel, returnableCards,
+  passALockedEarly, fullRanking,
   type MatchState,
 } from '../engine/match';
 import type { GameDriver, GameSnapshot, TributePrompt, LastPlays, GamePhase, DealOutcome } from './types';
@@ -139,12 +140,14 @@ export class LocalDriver implements GameDriver {
   /** 一步动作后：渲染 → 局终结算/否则若非我回合起 AI（= view 旧 afterAction/scheduleAi-inner 的公共尾）。 */
   private after(): void {
     this.fireChange();
-    if (isDealOver(this.state)) {
-      const finished = ranking(this.state);
+    // 局终 或 打A局双下即锁定过A(提前收盘、不必让对手打完剩牌) → 结算。
+    const early = passALockedEarly(this.match, this.state.finished);
+    if (isDealOver(this.state) || early) {
+      const finished = isDealOver(this.state) ? ranking(this.state) : fullRanking(this.state.finished);
       const settle = settleDeal(this.match, finished);
       this.match = settle.match; // 升级/打A过A 已结算；snapshot().match 随之更新
       this.phase = settle.match.over ? 'matchOver' : 'dealResult';
-      const leftover = this.state.hands[finished[3]!]!; // 末游剩牌
+      const leftover = this.state.hands[finished[3]!]!; // 末游剩牌（提前收盘时为某对手当前手牌）
       this.resultCb?.({ settle, leftover });
     } else if (this.state.turn !== HUMAN_SEAT) {
       this.scheduleAi();

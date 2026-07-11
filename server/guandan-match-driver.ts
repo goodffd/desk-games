@@ -1,5 +1,5 @@
 import type { Card, Seat, Rank } from '../src/games/guandan/engine/types';
-import { dealHands, startMatch, dealLevel, settleDeal, planTribute, returnableCards, applyTribute, type MatchState, type SettleResult, type TributePlan } from '../src/games/guandan/engine/match';
+import { dealHands, startMatch, dealLevel, settleDeal, planTribute, returnableCards, applyTribute, passALockedEarly, fullRanking, type MatchState, type SettleResult, type TributePlan } from '../src/games/guandan/engine/match';
 import { createDeal, play, pass, isDealOver, ranking, type DealState } from '../src/games/guandan/engine/game';
 import { sortHand } from '../src/games/guandan/engine/cards';
 import { isLegalPlay } from '../src/games/guandan/engine/legal';
@@ -223,7 +223,7 @@ export class MatchDriver {
   private driveAI(): Outbound[] {
     const out: Outbound[] = [];
     let guard = 0;
-    while (!isDealOver(this.state) && !this.online[this.state.turn] && guard++ < 200) {
+    while (!isDealOver(this.state) && !passALockedEarly(this.match, this.state.finished) && !this.online[this.state.turn] && guard++ < 200) {
       const seat = this.state.turn;
       const decision = choosePlay(this.state, seat);
       if (decision === null) {
@@ -238,8 +238,10 @@ export class MatchDriver {
 
   private afterAction(actor: Seat): Outbound[] {
     const out: Outbound[] = [];
-    if (isDealOver(this.state)) {
-      const finished = ranking(this.state);
+    // 局终 或 打A局双下即锁定过A(提前收盘、不必让对手打完剩牌) → 结算收盘。
+    const early = passALockedEarly(this.match, this.state.finished);
+    if (isDealOver(this.state) || early) {
+      const finished = isDealOver(this.state) ? ranking(this.state) : fullRanking(this.state.finished);
       const settle = settleDeal(this.match, finished);
       this.match = settle.match;
       const lastSeat = finished[3] as Seat;

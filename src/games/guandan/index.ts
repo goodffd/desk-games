@@ -19,7 +19,9 @@ import { renderNickname, type NicknameHandle } from './online/ui/nickname';
 import { renderLobby, type LobbyHandle } from './online/ui/lobby';
 import { renderRoom, type RoomHandle, type RoomState } from './online/ui/room';
 
-function onlineMount(root: HTMLElement): () => void {
+/** opts.solo=true：单机（=联机 1 人 + 3 AI）。自动建私房+开打、跳过昵称/大厅/房间页、座名用 你/下家/对家/上家。 */
+function onlineMount(root: HTMLElement, opts: { solo?: boolean } = {}): () => void {
+  const solo = !!opts.solo;
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const session = new OnlineSession(`${proto}://${location.host}/ws-guandan`);
 
@@ -35,6 +37,7 @@ function onlineMount(root: HTMLElement): () => void {
   let roomSeats: (SeatInfo | null)[] = []; // 最近的座位昵称（牌桌 state 不带昵称，从 room/spectating 取）
 
   function applySeatNames(): void {
+    if (solo) { setSeatNames(null); if (onTable && driver) driver.requestRender(); return; } // 单机：你/下家/对家/上家
     if (mySeat === null || !roomSeats.length) { setSeatNames(null); return; }
     const base = typeof mySeat === 'number' ? mySeat : 0; // egocentric：view 座 i → 服务端座
     const names = [0, 1, 2, 3].map((v) => {
@@ -106,19 +109,23 @@ function onlineMount(root: HTMLElement): () => void {
   }
 
   // ── session 事件 → 状态机 ──
-  session.onOpen(() => { if (!session.savedRoom()) showNickname(); }); // 有房况：session 自动 rejoin，等 rejoined
-  session.on('hello-ok', () => showLobby());
+  session.onOpen(() => {
+    if (session.savedRoom()) return; // 有房况：session 自动 rejoin，等 rejoined
+    if (solo) { const nick = `你${Math.floor(Math.random() * 1e6)}`; session.setNick(nick); session.send(c2s.hello(nick)); } // 单机：内部唯一昵称、不显示
+    else showNickname();
+  });
+  session.on('hello-ok', () => { if (solo) session.send(c2s.create(true)); else showLobby(); }); // 单机：自动建私房
   session.on('rename-ok', () => showLobby());
-  session.on('nick-taken', () => nickH?.showError('昵称已被占用，换一个'));
+  session.on('nick-taken', () => { if (solo) session.send(c2s.hello(`你${Math.floor(Math.random() * 1e6)}`)); else nickH?.showError('昵称已被占用，换一个'); });
   session.on('lobby', (m) => lobbyH?.update((m as { rooms: LobbyRoom[] }).rooms));
-  session.on('created', () => { isHost = true; });
+  session.on('created', () => { isHost = true; if (solo) session.send(c2s.start()); }); // 单机：建好即开打（服务端补 3 AI）
   session.on('room', (m) => {
     const r = m as { code: string; status: 'waiting' | 'playing'; seats: (SeatInfo | null)[]; you: Seat | 'spectator' | null };
     mySeat = r.you;
     roomSeats = r.seats; applySeatNames(); // 牌桌昵称（联机中 room 不再来，故这里抓住）
-    // 重连凭据：带本座真实昵称（服务端座位昵称，非共享 gd_nick——多标签会被覆盖致 rejoin 拿错座）
-    if (typeof r.you === 'number') session.saveRoom(r.code, r.you, r.seats[r.you]?.nick ?? session.nick);
-    if (r.status === 'waiting') showRoom(r.code, r.seats, r.you);
+    // 重连凭据：带本座真实昵称（联机用；单机不存，刷新=开新局）
+    if (typeof r.you === 'number' && !solo) session.saveRoom(r.code, r.you, r.seats[r.you]?.nick ?? session.nick);
+    if (r.status === 'waiting' && !solo) showRoom(r.code, r.seats, r.you); // 单机不显示房间页（start 已发）
   });
   session.on('spectating', (m) => {
     mySeat = 'spectator';
@@ -149,26 +156,33 @@ function onlineMount(root: HTMLElement): () => void {
 function mount(root: HTMLElement): () => void {
   let active: (() => void) | null = null;
 
+  // 本地 LocalDriver（纯客户端）——现仅 ?debug 用；单机正门已并入联机(goSoloOnline)，Phase 3 会删。
   function goSingle(): void {
     active?.();
-    primeAudio(); // 借用户点击解锁音频（WebKit 须真实手势才能放报牌语音）
-    setSeatNames(null); // 本地用 你/下家/对家/上家
-    setSpectator(false); // 本地恒为玩家
+    primeAudio();
+    setSeatNames(null);
+    setSpectator(false);
     active = mountTable(root, new LocalDriver({ speechBusyMs }));
+  }
+  // 单机 = 联机 1 人 + 3 AI（走服务端，自动建私房+开打）
+  function goSoloOnline(): void {
+    active?.();
+    primeAudio(); // 借用户点击解锁音频（WebKit 须真实手势才能放报牌语音）
+    active = onlineMount(root, { solo: true });
   }
   function goOnline(): void {
     active?.();
-    active = onlineMount(root); // 选了联机才连 WS（单机不开 /ws-guandan）
+    active = onlineMount(root);
   }
 
-  // ?debug：直挂单机牌桌、跳过选择页（开发快捷入口，保留）
+  // ?debug：直挂本地 LocalDriver（开发快捷入口，保留）
   if (new URLSearchParams(location.search).has('debug')) {
     goSingle();
     return () => { active?.(); active = null; };
   }
 
-  // 正门：先进模式选择页，单机 / 4 人联机并排二选一
-  active = renderModeSelect(root, { onSingle: goSingle, onOnline: goOnline });
+  // 正门：模式选择页，「单机对战」→ 联机 1人+3AI，「4 人联机」→ 联机流
+  active = renderModeSelect(root, { onSingle: goSoloOnline, onOnline: goOnline });
   return () => { active?.(); active = null; };
 }
 

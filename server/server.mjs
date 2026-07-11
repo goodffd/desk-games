@@ -56,6 +56,24 @@ gwss.on('connection', (ws) => {
   ws.on('close', () => gReg.leave(client));
 });
 
+// WS 心跳：定期 ping，未回 pong 的半开连接(掉线/合盖/手机切后台没走完 TCP FIN)予以 terminate——
+// terminate 触发 close → 走正常 leave 清理(座位释放/掉线宽限)。否则僵尸连接一直"占"着座，
+// 真人刷新重连被拒「座位已占」、对手也永远收不到掉线通知。两个 wss 都挂。
+const HEARTBEAT_MS = Number(process.env.GD_HEARTBEAT) || 30000;
+function heartbeat(wsServer) {
+  wsServer.on('connection', (ws) => { ws.isAlive = true; ws.on('pong', () => { ws.isAlive = true; }); });
+  const timer = setInterval(() => {
+    for (const ws of wsServer.clients) {
+      if (ws.isAlive === false) { ws.terminate(); continue; }
+      ws.isAlive = false;
+      try { ws.ping(); } catch {}
+    }
+  }, HEARTBEAT_MS);
+  wsServer.on('close', () => clearInterval(timer));
+}
+heartbeat(wss);
+heartbeat(gwss);
+
 // 统一升级路由：按路径分派到对应 WebSocketServer
 server.on('upgrade', (req, socket, head) => {
   const pathname = (req.url || '/').split('?')[0];

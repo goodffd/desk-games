@@ -108,6 +108,8 @@ export function heuristicChoose(s: DealState, seat: Seat, unseen: Card[]): Card[
       if (!oppAboutToWin) {
         // 喂牌：优先领一个大小 == 队友张数的最小牌型(赌队友手里是可一手走完的 pc 张牌型：
         // 剩2张喂对子、剩3张喂三张，让他一手走成头游)；没有对应牌型则喂最小单张让他逐张脱手。
+        // 用 decompose 的分解结果(而非 enumerateLeads 全枚举)：实测后者会喂"逢人配拼的对子"浪费
+        // 万能牌、拉低胜率(ai-improvement 55.2%→54.2%)；decompose 的 totalWild tiebreak 天然省万能牌。
         const sized = combos.filter((c) => c.cards.length === pc);
         if (sized.length) return sized.reduce((b, c) => (c.key < b.key ? c : b)).cards;
         return [hand.reduce((lo, c) => (rankValue(c, level) < rankValue(lo, level) ? c : lo))];

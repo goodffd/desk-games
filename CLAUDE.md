@@ -8,7 +8,7 @@
 - **Vite + vite-plugin-singlefile**：构建为单个 HTML（JS/CSS/字体全内联），`file://` 双击可运行，零运行时依赖。
 - **DOM + CSS**：卡牌渲染与交互（扇形手牌、多选、动画），不用 Canvas。
 - **嵌入字体**：霞鹜文楷子集(OFL)，保证四系统固定文字字形一致（牌型名/提示/名次等）。掼蛋字体在 `src/ui/fonts/`，象棋自带子集在 `src/games/xiangqi/ui/fonts/`，同一 `pyftsubset` 子集化流程。
-- **壳路由**：hash 路由(`#/` 列表，`#/guandan`、`#/xiangqi` 游戏)，零框架 vanilla TS。
+- **壳路由**：真路径 pathname 路由(`/` 列表，`/guandan`、`/xiangqi` 游戏；pushState+popstate，非 hash)，零框架 vanilla TS。
 - **联机后端**：单 node 进程(`server/server.mjs`)一端口托管整厅——掼蛋走 `/ws-guandan`、象棋走 `/ws`，两者隔离；服务端只依赖 `ws`，掼蛋引擎 esbuild 打成 `*.bundle.mjs` 自包含。部署见 `DEPLOY.md`。
 
 ## 目录结构
@@ -17,15 +17,15 @@ desk-games/
 ├── SPEC.md / CLAUDE.md / README.md / DEPLOY.md   # 规格 / 规范 / 简介 / 部署
 ├── package.json / tsconfig*.json / vite.config.ts / index.html
 ├── src/
-│   ├── shell/                    # 游戏厅壳：模块注册表 + 列表页 + hash 路由
+│   ├── shell/                    # 游戏厅壳：模块注册表 + 列表页 + pathname 路由
 │   │   ├── registry.ts           # GameModule 接口 + 内置游戏登记(掼蛋/象棋)
 │   │   ├── home.ts               # 游戏列表首页 (DOM)
-│   │   └── router.ts             # hash 路由：列表 ↔ mount(游戏)
+│   │   └── router.ts             # pathname 路由：列表 ↔ mount(游戏)
 │   ├── games/
 │   │   ├── guandan/              # 掼蛋（内置：单机对 AI + 联机）
 │   │   │   ├── engine/           # 纯逻辑无 DOM·唯一真相：cards/combos/legal/wild(逢人配)/game(单局)/match(整盘)/types
 │   │   │   ├── ai/               # choosePlay 策略 + decompose(手牌分解)
-│   │   │   ├── driver/           # 本地/联机驱动抽象 local·online·types
+│   │   │   ├── driver/           # 联机驱动抽象 online·types(单机=联机1人+3AI，无独立本地驱动)
 │   │   │   ├── online/           # 联机协议 protocol·session + 大厅/房间/昵称 UI
 │   │   │   ├── ui/               # DOM+CSS 渲染/交互/动画 + 花色图/名次字体/报牌语音
 │   │   │   └── index.ts          # GameModule 导出

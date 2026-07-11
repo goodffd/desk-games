@@ -35,10 +35,15 @@ export function deal(deck: Card[], shuffle: (n: number) => number[]): Card[][] {
   const shuffled = perm.map(i => deck[i] as Card);
 
   const hands: Card[][] = [[], [], [], []];
-  for (let i = 0; i < 108; i++) {
+  for (let i = 0; i < shuffled.length; i++) {   // 按实际牌数分发，不硬编码 108（防非 108 牌堆越界取 undefined）
     hands[i % 4]!.push(shuffled[i]!);
   }
   return hands;
+}
+
+/** 一张逢人配（红心级牌）？engine 唯一真相——wild/legal/match 统一 import 此处，勿各自复制。 */
+export function isWild(c: Card, level: Rank): boolean {
+  return c.kind === 'normal' && c.suit === 'H' && c.rank === level;
 }
 
 /**

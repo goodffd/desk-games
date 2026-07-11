@@ -697,6 +697,9 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     const settle = o.settle;
     const ranks = ranking(state);
     // settle 由 driver 结算并经 onResult 载荷传入；match 已结算同步进镜像、renderLevels 已在 onResult handler 调。
+    // 先清掉已存在的结算弹层：dealResult/matchOver 阶段内若有人掉线/重连，服务端会重广播同一份
+    // result → onState 再次 fireResult；不清旧弹层会逐次叠加半透明黑背景(越来越暗)且泄漏 DOM。
+    if (resultOverlay) { resultOverlay.remove(); resultOverlay = null; }
 
     const overlay = document.createElement('div');
     overlay.className = 'gd-overlay';

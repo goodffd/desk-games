@@ -80,6 +80,16 @@ describe('RoomRegistry — 建房 + 挑座', () => {
     expect(r.seats[0]).toBeNull();
     expect(r.seats[1]).toMatchObject({ nick: '甲' });
   });
+
+  it('take-seat 非整数座位号(1.5) → error，不产生幽灵座、房主仍在座 0', () => {
+    const a = fakeClient(); hello(a, '甲');
+    reg.handle(a, { t: 'create' });                 // 甲(房主)坐 0
+    reg.handle(a, { t: 'take-seat', seat: 1.5 });
+    expect(last(a).t).toBe('error');
+    const room = reg.rooms.get('ABC123');
+    expect(room.seats.filter(Boolean).length).toBe(1); // 无幽灵座
+    expect(room.seats[0].client).toBe(a);              // 甲没被清出
+  });
 });
 
 describe('RoomRegistry — 房主开打', () => {
@@ -424,6 +434,18 @@ describe('RoomRegistry — 再来一盘(restart)', () => {
     reg.handle(cs[0], { t: 'restart' });
     expect(last(cs[0]).t).toBe('error');
     expect(made.length).toBe(1);
+  });
+
+  it('房主断线重连后 restart 仍有效（房主标识随重连座转移，不永久失效）', () => {
+    const cs = playing();
+    const room = reg.rooms.get('ABC123');
+    reg.leave(cs[0]);                                  // 房主(座0)断线
+    const re = fakeClient();
+    reg.handle(re, { t: 'rejoin', code: 'ABC123', nick: 'p0' }); // 房主用新连接重连座0
+    expect(re.sent).toContainEqual({ t: 'rejoined', seat: 0 });
+    room.driver.match.over = true;                     // 整盘结束
+    reg.handle(re, { t: 'restart' });                  // 新连接发再来一盘
+    expect(made.length).toBe(2);                       // 成功新建 driver(修前 room.host 仍指旧连接→error 不新建)
   });
 });
 

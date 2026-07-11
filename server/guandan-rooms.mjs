@@ -36,7 +36,7 @@ export class RoomRegistry {
     if (msg.t === 'create') {
       this._leaveRoom(client);
       const code = this._newCode();
-      const room = { code, isPrivate: !!msg.isPrivate, host: client,
+      const room = { code, isPrivate: !!msg.isPrivate, host: client, hostSeat: 0,
         seats: [null, null, null, null], spectators: new Set(), pendingSync: new Set(),
         status: 'waiting', driver: null };
       this.rooms.set(code, room);
@@ -58,9 +58,10 @@ export class RoomRegistry {
       const room = this.rooms.get(client._room);
       if (!room || room.status !== 'waiting') { client.send({ t: 'error', msg: '不在等待房中' }); return; }
       const i = msg.seat;
-      if (!(i >= 0 && i < 4) || (room.seats[i] && room.seats[i].client !== client)) {
-        client.send({ t: 'error', msg: '座位已占或非法' }); return; }
+      if (!(Number.isInteger(i) && i >= 0 && i < 4) || (room.seats[i] && room.seats[i].client !== client)) {
+        client.send({ t: 'error', msg: '座位已占或非法' }); return; } // 须整数座位号：非整数(如1.5)会挂成幽灵数组属性、把自己从4座清出
       this._seat(room, client, i);
+      if (room.host === client) room.hostSeat = i; // 房主换座：房主座号跟随(重连据此转移房主标识)
       this._sendRoom(room);
       return;
     }
@@ -94,7 +95,7 @@ export class RoomRegistry {
       if (this.queue.length >= 4) {
         const four = this.queue.splice(0, 4);
         const code = this._newCode();
-        const room = { code, isPrivate: false, host: four[0],
+        const room = { code, isPrivate: false, host: four[0], hostSeat: 0,
           seats: [null, null, null, null], spectators: new Set(), pendingSync: new Set(),
           status: 'playing', driver: null };
         this.rooms.set(code, room);
@@ -134,7 +135,9 @@ export class RoomRegistry {
       this._leaveRoom(client);
       room.seats[idx].client = client; room.seats[idx].online = true; room.seats[idx].ai = false;
       room.seats[idx].disconnected = false; room.seats[idx].graceMisses = 0; // 回来即收座、宽限计数清零
+      if (idx === room.hostSeat) room.host = client; // 房主重连(重连座=房主座)：房主标识转到新连接，否则 restart「再来一盘」永久失效
       client._room = room.code; client._seat = idx;
+      const prevNk = this.nicks.get(client); if (prevNk) this.byNick.delete(this._nickKey(prevNk)); // 清该连接旧昵称占用(防 byNick 泄漏)
       this.nicks.set(client, msg.nick); this.byNick.add(this._nickKey(msg.nick)); // 重登昵称维持判重一致
       client.send({ t: 'rejoined', seat: idx });
       if (room.driver && room.driver.setAI) this._dispatch(room, room.driver.setAI(idx, false));
@@ -148,7 +151,7 @@ export class RoomRegistry {
       if (!room || room.status !== 'playing' || client._seat === 'spectator' || typeof client._seat !== 'number') return;
       if (!room.driver) return;
       let out;
-      if (msg.t === 'play') out = room.driver.handlePlay(client._seat, msg.cardIds || []);
+      if (msg.t === 'play') out = room.driver.handlePlay(client._seat, Array.isArray(msg.cardIds) ? msg.cardIds : []); // 防畸形 cardIds(非数组)在 cardsByIds for-of 抛异常被顶层静默吞
       else if (msg.t === 'pass') out = room.driver.handlePass(client._seat);
       else out = room.driver.handleTributeReturn(client._seat, msg.cardId);
       this._dispatch(room, out);
@@ -378,7 +381,7 @@ export class RoomRegistry {
       out.push({
         code: r.code,
         status: r.status,
-        players: r.seats.filter(Boolean).map(s => s.nick),
+        players: r.seats.filter(s => s && s.nick).map(s => s.nick), // 滤除 AI 补位空座(client=null,nick=null)，别混进大厅玩家名单
         spectators: r.spectators.size
       });
     }

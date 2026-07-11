@@ -300,18 +300,5 @@ export function isDealOver(s: DealState): boolean {
 export function ranking(s: DealState): Seat[] {
   return [...s.finished];
 }
-
-/**
- * 升级数 (display only, not accumulated across deals): the HEAD player's team rises by an
- * amount keyed on the partner's finish rank — partner 二游(rank index 1) → 3,
- * 三游(index 2) → 2, 末游(index 3) → 1. Throws if the deal is not over.
- */
-export function levelGain(s: DealState): { team: 0 | 1; gain: 1 | 2 | 3 } {
-  if (!isDealOver(s)) throw new Error('levelGain: deal is not over');
-  const head = s.finished[0]!;
-  const partner = partnerOf(head);
-  const partnerRankIndex = s.finished.indexOf(partner); // 0 head,1 二游,2 三游,3 末游
-  const gain = ((4 - partnerRankIndex) as 1 | 2 | 3 | 4);
-  // partnerRankIndex is 1/2/3 (head is index 0 and is `head`, not its partner) → gain 3/2/1.
-  return { team: teamOf(head), gain: gain as 1 | 2 | 3 };
-}
+// 一期遗留的 levelGain(单局升级数)已删：整盘升级统一由 match.ts 的 settleDeal 计算(gain = 4 - partnerIdx)，
+// levelGain 是死代码(仅其自身单测引用)且重复同一公式，删除避免规则改动时两处漂移。

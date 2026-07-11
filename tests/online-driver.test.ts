@@ -14,8 +14,10 @@ function mockIO() {
   const sent: C2SMessage[] = [];
   return {
     on(t: S2CType, cb: (m: unknown) => void): void { const a = handlers.get(t) ?? []; a.push(cb); handlers.set(t, a); },
+    off(t: S2CType, cb: (m: unknown) => void): void { const a = handlers.get(t); if (a) { const i = a.indexOf(cb); if (i >= 0) a.splice(i, 1); } },
     send(m: C2SMessage): void { sent.push(m); },
     emit(t: string, m: unknown): void { (handlers.get(t) ?? []).forEach((cb) => cb(m)); },
+    count(t: string): number { return handlers.get(t)?.length ?? 0; },
     sent,
   };
 }
@@ -231,5 +233,16 @@ describe('OnlineDriver — dispose', () => {
     d.dispose();
     io.emit('state', mkState());
     expect(n).toBe(0);
+  });
+
+  it('dispose 解绑 io 监听（跨房不累积泄漏）', () => {
+    const io = mockIO();
+    expect(io.count('state')).toBe(0);
+    const d = new OnlineDriver(io, 0);
+    expect(io.count('state')).toBe(1);   // 注册了 state 监听
+    d.dispose();
+    expect(io.count('state')).toBe(0);   // dispose 后解绑（修前恒为 1，反复换房会累积）
+    expect(io.count('hand')).toBe(0);
+    expect(io.count('need-tribute')).toBe(0);
   });
 });

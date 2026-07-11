@@ -5,7 +5,6 @@ import {
   pass,
   isDealOver,
   ranking,
-  levelGain,
   type DealState,
 } from '../src/games/guandan/engine/game';
 import type { Card, Rank, Seat } from '../src/games/guandan/engine/types';
@@ -352,52 +351,7 @@ describe('full deal → ranking + conservation', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// levelGain — three partner-rank outcomes
-// ---------------------------------------------------------------------------
-
-describe('levelGain', () => {
-  /** Build a finished state with a chosen finish order (head first). */
-  function finishedState(order: Seat[]): DealState {
-    return {
-      hands: [[], [], [], []],
-      current: null,
-      turn: order[3]!,
-      passesInRow: 0,
-      finished: [...order],
-      level: LEVEL,
-    };
-  }
-
-  it('partner 二游 → gain 3', () => {
-    // head=0, partner=2 finishes 2nd.
-    const s = finishedState([0, 2, 1, 3]);
-    expect(levelGain(s)).toEqual({ team: 0, gain: 3 });
-  });
-
-  it('partner 三游 → gain 2', () => {
-    // head=0, partner=2 finishes 3rd.
-    const s = finishedState([0, 1, 2, 3]);
-    expect(levelGain(s)).toEqual({ team: 0, gain: 2 });
-  });
-
-  it('partner 末游 → gain 1', () => {
-    // head=0, partner=2 finishes last.
-    const s = finishedState([0, 1, 3, 2]);
-    expect(levelGain(s)).toEqual({ team: 0, gain: 1 });
-  });
-
-  it('reports the head player\'s team (odd seats → team 1)', () => {
-    // head=1 (team 1), partner=3 二游.
-    const s = finishedState([1, 3, 0, 2]);
-    expect(levelGain(s)).toEqual({ team: 1, gain: 3 });
-  });
-
-  it('throws if the deal is not over', () => {
-    const s = createDeal([[S(3)], [S(4)], [S(5)], [S(6)]], 0, LEVEL);
-    expect(() => levelGain(s)).toThrow();
-  });
-});
+// levelGain 已删（一期遗留死代码，整盘升级由 match.ts settleDeal 计算）。
 
 // ---------------------------------------------------------------------------
 // conservation across a FULL 108-card deal (sanity: ids stay 0..107, no dup/conjure)

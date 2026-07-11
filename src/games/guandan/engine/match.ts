@@ -21,7 +21,7 @@
  */
 
 import type { Card, Rank, Seat } from './types';
-import { makeDeck, deal, rankValue } from './cards';
+import { makeDeck, deal, rankValue, isWild } from './cards';
 
 const A: Rank = 14;            // 打 A（升级终点）
 const RESET_LEVEL: Rank = 2;  // 连续卡 A 3 次降回 2（Q2b）
@@ -48,10 +48,6 @@ export function fullRanking(finished: Seat[]): Seat[] {
   const rest = ([0, 1, 2, 3] as Seat[]).filter((s) => !finished.includes(s));
   return [...finished, ...rest];
 }
-
-/** 一张逢人配（红心级牌）？ */
-const isWild = (c: Card, level: Rank): boolean =>
-  c.kind === 'normal' && c.suit === 'H' && c.rank === level;
 
 // ---------------------------------------------------------------------------
 // 整盘状态
@@ -106,7 +102,7 @@ export interface SettleResult {
  * 并按 Q2/Q2b 判打 A 过 A / 卡 A / 降级。返回新整盘状态 + 结果（供 UI / 进贡使用）。
  */
 export function settleDeal(m: MatchState, finished: Seat[]): SettleResult {
-  if (finished.length !== 4) throw new Error('settleDeal: 名次须为完整 4 人排列');
+  if (finished.length !== 4 || new Set(finished).size !== 4) throw new Error('settleDeal: 名次须为 0-3 的完整 4 人排列'); // 防重复座位致 partnerIdx=-1、gain=5
   const head = finished[0] as Seat;
   const winTeam = teamOf(head);
   const partnerIdx = finished.indexOf(partnerOf(head)); // 1=二游 / 2=三游 / 3=末游
@@ -251,6 +247,8 @@ export function applyTribute(hands: Card[][], plan: TributePlan, returns: Card[]
   const out = hands.map(h => [...h]);
   plan.exchanges.forEach((ex, i) => {
     const ret = returns[i] as Card;
+    if (!(out[ex.receiver] as Card[]).some(c => c.id === ret.id)) // 还贡牌须真在 receiver 手中，否则 filter 空转 + concat 会让其多 1 张、静默破坏 108 守恒
+      throw new Error(`applyTribute: 还贡牌 ${ret.id} 不在 receiver ${ex.receiver} 手中`);
     out[ex.giver] = (out[ex.giver] as Card[]).filter(c => c.id !== ex.tribute.id).concat(ret);
     out[ex.receiver] = (out[ex.receiver] as Card[]).filter(c => c.id !== ret.id).concat(ex.tribute);
   });

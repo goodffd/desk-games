@@ -30,6 +30,7 @@ function onlineMount(root: HTMLElement): () => void {
   let mySeat: Seat | 'spectator' | null = null;
   let isHost = false;
   let onTable = false;
+  let pendingRejoin = false; // 自动 rejoin 在途（onOpen 见 savedRoom 置位，成功进房/牌桌清除）；失败据此回昵称页
   let roomSeats: (SeatInfo | null)[] = []; // 最近的座位昵称（牌桌 state 不带昵称，从 room/spectating 取）
 
   function applySeatNames(): void {
@@ -105,7 +106,7 @@ function onlineMount(root: HTMLElement): () => void {
 
   // ── session 事件 → 状态机 ──
   session.onOpen(() => {
-    if (session.savedRoom()) return; // 有房况：session 自动 rejoin，等 rejoined
+    if (session.savedRoom()) { pendingRejoin = true; return; } // 有房况：session 自动 rejoin，等 rejoined；标记在途，失败要回昵称页
     showNickname();
   });
   session.on('hello-ok', () => showLobby());
@@ -114,6 +115,7 @@ function onlineMount(root: HTMLElement): () => void {
   session.on('lobby', (m) => lobbyH?.update((m as { rooms: LobbyRoom[] }).rooms));
   session.on('created', () => { isHost = true; });
   session.on('room', (m) => {
+    pendingRejoin = false;
     const r = m as { code: string; status: 'waiting' | 'playing'; seats: (SeatInfo | null)[]; you: Seat | 'spectator' | null };
     mySeat = r.you;
     roomSeats = r.seats; applySeatNames(); // 牌桌昵称（联机中 room 不再来，故这里抓住）
@@ -121,11 +123,12 @@ function onlineMount(root: HTMLElement): () => void {
     if (r.status === 'waiting') showRoom(r.code, r.seats, r.you);
   });
   session.on('spectating', (m) => {
+    pendingRejoin = false;
     mySeat = 'spectator';
     roomSeats = (m as { seats: (SeatInfo | null)[] }).seats; applySeatNames();
     ensureTable();
   });
-  session.on('rejoined', (m) => { mySeat = (m as { seat: Seat }).seat; applySeatNames(); ensureTable(); });
+  session.on('rejoined', (m) => { pendingRejoin = false; mySeat = (m as { seat: Seat }).seat; applySeatNames(); ensureTable(); });
   session.on('started', () => ensureTable());
   session.on('state', () => { if (mySeat !== null) ensureTable(); }); // 观战/重连首个 state 兜底挂台
   // 掉线/AI接管/回来 全靠座位头像图案显示(state 带 seatStatus)，不再弹一闪而过的顶部 toast。
@@ -133,8 +136,10 @@ function onlineMount(root: HTMLElement): () => void {
   session.on('error', (m) => {
     const msg = (m as { msg: string }).msg;
     lobbyH?.setMatching(false);
-    // 空屏=重连(rejoin)失败(常见于服务端重启后房间没了、或座位被收回)→ 清陈旧房况、回昵称页，不卡死
-    if (!nickH && !lobbyH && !roomH && !tableCleanup) {
+    // 自动 rejoin 在途却收到 error = 重连失败(服务端重启房间没了/座位被收回)——无论当前停在哪屏(含旧牌桌)
+    // 都清陈旧房况、回昵称页，不把玩家晾在再也不会更新的冻结牌桌上；空屏(页面刚载)同样回昵称页。
+    if (pendingRejoin || (!nickH && !lobbyH && !roomH && !tableCleanup)) {
+      pendingRejoin = false;
       session.clearRoom();
       showNickname();
     } else {

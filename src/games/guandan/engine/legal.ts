@@ -1,5 +1,5 @@
 import type { Card, Rank, Suit, Combo, ComboType } from './types';
-import { rankValue } from './cards';
+import { rankValue, isWild } from './cards';
 import { identify, beats } from './combos';
 
 /**
@@ -26,10 +26,8 @@ import { identify, beats } from './combos';
 // wildcard helpers
 // ---------------------------------------------------------------------------
 
-/** Is `c` a 逢人配 wildcard (red-heart card of the current level rank)? */
-export function isWild(c: Card, level: Rank): boolean {
-  return c.kind === 'normal' && c.suit === 'H' && c.rank === level;
-}
+/** 逢人配判定收敛在 cards.ts；此处再导出，供 ai/decompose 沿用 `from './legal'` 的既有引用。 */
+export { isWild };
 
 const SUITS: readonly Suit[] = ['S', 'H', 'D', 'C'];
 // Natural ranks a wildcard / structural slot may take: 2..14.

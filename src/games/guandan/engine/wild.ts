@@ -1,5 +1,6 @@
 import type { Card, Rank, Suit, Combo } from './types';
 import { identify } from './combos';
+import { isWild } from './cards';
 
 /**
  * 逢人配 (red-heart level card wildcards) layer for Guandan.
@@ -28,11 +29,6 @@ import { identify } from './combos';
 const SUITS: readonly Suit[] = ['S', 'H', 'D', 'C'];
 // Natural ranks a wildcard may impersonate: 2..14 (2 == the level point too).
 const RANKS: readonly Rank[] = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
-
-/** Is `c` a 逢人配 wildcard (red-heart card of the current level rank)? */
-function isWild(c: Card, level: Rank): boolean {
-  return c.kind === 'normal' && c.suit === 'H' && c.rank === level;
-}
 
 /** Count the red-heart level cards (wildcards) in `cards`. */
 export function wildCount(cards: Card[], level: Rank): number {

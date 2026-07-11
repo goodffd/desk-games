@@ -19,6 +19,7 @@ import type { GameDriver, GameSnapshot, GamePhase, DealOutcome, TributePrompt, L
 /** OnlineDriver 依赖的最小 IO（OnlineSession 满足）。 */
 export interface OnlineIO {
   on(type: S2CType, cb: (msg: unknown) => void): void;
+  off(type: S2CType, cb: (msg: unknown) => void): void;
   send(msg: C2SMessage): void;
 }
 
@@ -55,6 +56,7 @@ export class OnlineDriver implements GameDriver {
   private pendingTribute: PublicState['tribute'] | null = null;
   private lastSpokenSig = '';
   private disposed = false;
+  private subs: Array<[S2CType, (m: unknown) => void]> = []; // 已注册的 io 监听，dispose 时逐个解绑防跨房累积泄漏
 
   private changeCb: (() => void) | null = null;
   private resultCb: ((o: DealOutcome) => void) | null = null;
@@ -66,9 +68,12 @@ export class OnlineDriver implements GameDriver {
     this.io = io;
     this.spectator = mySeat === 'spectator';
     this.base = mySeat === 'spectator' ? 0 : mySeat;
-    io.on('state', (m) => { if (!this.disposed) this.onState(m as PublicState); });
-    io.on('hand', (m) => { if (!this.disposed) this.onHand(m as { cards: Card[] }); });
-    io.on('need-tribute', (m) => { if (!this.disposed) this.onNeedTribute(m as { options: Card[] }); });
+    this.subs = [
+      ['state', (m) => { if (!this.disposed) this.onState(m as PublicState); }],
+      ['hand', (m) => { if (!this.disposed) this.onHand(m as { cards: Card[] }); }],
+      ['need-tribute', (m) => { if (!this.disposed) this.onNeedTribute(m as { options: Card[] }); }],
+    ];
+    for (const [t, cb] of this.subs) io.on(t, cb);
   }
 
   // ── 旋转 ──
@@ -238,5 +243,5 @@ export class OnlineDriver implements GameDriver {
   /** 联机抗贡/提示文案当前由服务端态体现，保留接口（暂未主动 fire）。 */
   emitHint(text: string, kind: 'info' | 'warn'): void { this.hintCb?.(text, kind); }
 
-  dispose(): void { this.disposed = true; }
+  dispose(): void { this.disposed = true; for (const [t, cb] of this.subs) this.io.off(t, cb); this.subs = []; }
 }

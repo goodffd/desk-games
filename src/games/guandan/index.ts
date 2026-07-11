@@ -1,19 +1,18 @@
 /**
  * 掼蛋游戏模块入口（控制器）。
  * 入口分流：`/guandan` → 模式选择页（单机对战 / 4 人联机 并排二选一）；
- *   单机 → 本地对 AI(LocalDriver)，联机 → 联机流。`/guandan?debug` → 直挂单机跳过选择页。
+ *   单机 = 联机 1 人 + 3 AI（走服务端），联机 = 联机流。`/guandan?debug` → 跳过选择页直挂单机。
  * 联机状态机：昵称 → 大厅(建房/匹配/加入/观战) → 房间(挑座/开打) → 牌桌(OnlineDriver)。
  * 控制器只编排：session 收发 + UI 切换 + 开打挂牌桌 + 掉线/重连 toast。规则/AI 全在服务端。
  */
 import type { GameModule } from '../../shell/types';
 import type { Seat } from './engine/types';
 import { navigate } from '../../shell/nav';
-import { LocalDriver } from './driver/local-driver';
 import { OnlineDriver } from './driver/online-driver';
 import { OnlineSession } from './online/session';
 import { c2s, type LobbyRoom, type SeatInfo } from './online/protocol';
 import './online/ui/lobby.css';
-import { mountTable, speechBusyMs, primeAudio, setTableHost, setSeatNames, setSpectator } from './ui/view';
+import { mountTable, primeAudio, setTableHost, setSeatNames, setSpectator } from './ui/view';
 import { renderModeSelect } from './ui/mode-select';
 import { renderNickname, type NicknameHandle } from './online/ui/nickname';
 import { renderLobby, type LobbyHandle } from './online/ui/lobby';
@@ -156,14 +155,6 @@ function onlineMount(root: HTMLElement, opts: { solo?: boolean } = {}): () => vo
 function mount(root: HTMLElement): () => void {
   let active: (() => void) | null = null;
 
-  // 本地 LocalDriver（纯客户端）——现仅 ?debug 用；单机正门已并入联机(goSoloOnline)，Phase 3 会删。
-  function goSingle(): void {
-    active?.();
-    primeAudio();
-    setSeatNames(null);
-    setSpectator(false);
-    active = mountTable(root, new LocalDriver({ speechBusyMs }));
-  }
   // 单机 = 联机 1 人 + 3 AI（走服务端，自动建私房+开打）
   function goSoloOnline(): void {
     active?.();
@@ -175,9 +166,9 @@ function mount(root: HTMLElement): () => void {
     active = onlineMount(root);
   }
 
-  // ?debug：直挂本地 LocalDriver（开发快捷入口，保留）
+  // ?debug：跳过模式选择页，直挂单机(联机 1人+3AI)——开发快捷入口
   if (new URLSearchParams(location.search).has('debug')) {
-    goSingle();
+    goSoloOnline();
     return () => { active?.(); active = null; };
   }
 

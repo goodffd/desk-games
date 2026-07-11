@@ -1,8 +1,8 @@
 /**
  * online-driver.ts — 联机模式牌局驱动（Plan 3 Task 4+5）。
  *
- * 实现 GameDriver：把权威服务端的公开态 `state` + 私有 `hand` + `need-tribute` 翻译成跟
- * LocalDriver 同形的 GameSnapshot / onResult / onTribute；动作发 WS。**自身无引擎无 AI**。
+ * 实现 GameDriver：把权威服务端的公开态 `state` + 私有 `hand` + `need-tribute` 翻译成
+ * GameDriver 契约的 GameSnapshot / onResult / onTribute；动作发 WS。**自身无引擎无 AI**。
  *
  * egocentric 旋转：玩家真实座位 base 映射到 view 座位 0（你恒在底部），队伍维度同步重映射
  * （"我方"恒为你这队），使 view 的牌桌渲染（HUMAN_SEAT=0 + 四向布局）零改动继承。

@@ -1,8 +1,8 @@
 /**
  * mode-select.ts — 掼蛋模式选择页（正门入口）。
- * 进入 /guandan 先到这：并排两模式——「单机对战」(本地引擎 + 3 AI，即点即玩) ｜
+ * 进入 /guandan 先到这：并排两模式——「单机对战」(联机 1人 + 3 AI，即点即玩) ｜
  * 「4 人联机」(建房/匹配真人 2v2)。纯渲染 + 回调，不碰引擎/WS：控制器(index.ts)
- * 在回调里挂 LocalDriver 或走联机流。复用联机前置页的绿毡金线品牌视觉(lobby.css)，
+ * 在回调里走单机(联机 1人+3AI)或联机流。复用联机前置页的绿毡金线品牌视觉(lobby.css)，
  * 两模式并排布局见 mode-select.css。
  */
 import '../online/ui/lobby.css';

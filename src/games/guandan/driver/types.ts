@@ -2,7 +2,7 @@
  * driver/types.ts — 客户端「牌局驱动层」接口契约（Plan 2）。
  *
  * view.ts 只通过 GameDriver 读快照(snapshot)、调动作(play/pass/...)、订阅事件(onChange/...)。
- * 本地(调试)模式用 LocalDriver（本地引擎+AI+进贡）；联机(正常)模式 Plan 3 再加 OnlineDriver。
+ * 唯一实现是 OnlineDriver（翻译服务端权威态）；规则/AI/进贡全在服务端。单机=联机 1人+3AI。
  * 引擎是唯一真相——driver 只调 engine/ai/match 导出，绝不另写规则判定。
  */
 

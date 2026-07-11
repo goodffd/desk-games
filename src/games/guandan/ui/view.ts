@@ -182,7 +182,7 @@ function avatarEl(seat: Seat, status: 'online' | 'disconnected' | 'ai' = 'online
 }
 
 export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
-  // 牌桌视图：driver 注入（本地 LocalDriver=调试 / 联机 OnlineDriver=正常）。view 只读快照渲染、调动作、订阅事件。
+  // 牌桌视图：driver 注入（OnlineDriver；规则/AI/进贡全在服务端，单机=联机1人+3AI）。view 只读快照渲染、调动作、订阅事件。
   // 渲染镜像：onChange 把 driver.snapshot() 拷进这些变量后 renderAll（渲染函数体原样不改）。
   const snap0 = driver.snapshot();
   let state = snap0.state;            // 当前这一局引擎态
@@ -507,7 +507,7 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     handEl.classList.toggle('gd-hand--dim', !myTurn && started && !isDealOver(state) && latestPlayCoversHand());
   }
 
-  // ── 出牌（牌局推进在 LocalDriver；view 只取选中牌、转 driver） ──
+  // ── 出牌（牌局推进在服务端，经 driver；view 只取选中牌、转 driver） ──
   function getSelectedCards(): Card[] {
     return state.hands[HUMAN_SEAT]!.filter(c => selectedIds.has(c.id));
   }
@@ -565,7 +565,7 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     driver.pass(); // 领出(current=null)时 driver 返回 false，等价原 early-return
   }
 
-  // ── 局终 / 整盘编排（弹层在 view；牌局推进/结算/进贡决策在 LocalDriver） ──
+  // ── 局终 / 整盘编排（弹层在 view；牌局推进/结算/进贡决策在服务端，经 driver） ──
   /**
    * 进贡阶段弹层：展示进贡(动画滑入) + 人类收贡时手选 ≤10 还贡。点「确定」回调 returns 开局。
    * 人类为收贡方时须手选；AI 收贡走 chooseReturn(智能还贡)；人类仅为进贡方时无需选(进贡牌自动取最大)。
@@ -794,7 +794,7 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
   playBtn.addEventListener('click', handlePlay);
   passBtn.addEventListener('click', handlePass);
 
-  // ── LocalDriver 事件 → view 渲染/弹层/语音/提示 ──────────────
+  // ── driver 事件 → view 渲染/弹层/语音/提示 ──────────────
   // onChange：拷快照进镜像变量 + 顶栏级别 + 整屏渲染（renderAll 等渲染函数体不变）。
   function syncFromDriver(): void {
     const s = driver.snapshot();

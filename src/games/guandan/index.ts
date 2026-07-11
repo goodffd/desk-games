@@ -13,7 +13,6 @@ import { OnlineSession } from './online/session';
 import { c2s, type LobbyRoom, type SeatInfo } from './online/protocol';
 import './online/ui/lobby.css';
 import { mountTable, primeAudio, setTableHost, setSeatNames, setSpectator } from './ui/view';
-import { renderModeSelect } from './ui/mode-select';
 import { renderNickname, type NicknameHandle } from './online/ui/nickname';
 import { renderLobby, type LobbyHandle } from './online/ui/lobby';
 import { renderRoom, type RoomHandle, type RoomState } from './online/ui/room';
@@ -155,31 +154,22 @@ function onlineMount(root: HTMLElement, opts: { solo?: boolean } = {}): () => vo
 function mount(root: HTMLElement): () => void {
   let active: (() => void) | null = null;
 
-  // 单机 = 联机 1 人 + 3 AI（走服务端，自动建私房+开打）
-  function goSoloOnline(): void {
-    active?.();
-    primeAudio(); // 借用户点击解锁音频（WebKit 须真实手势才能放报牌语音）
-    active = onlineMount(root, { solo: true });
-  }
-  function goOnline(): void {
-    active?.();
-    active = onlineMount(root);
-  }
-
-  // ?debug：跳过模式选择页，直挂单机(联机 1人+3AI)——开发快捷入口
+  // ?debug：一键直挂单机(联机 1人+3AI，自动建私房+开打)，跳过昵称/大厅——开发快捷入口(隐藏 URL 参数，非可见入口)
   if (new URLSearchParams(location.search).has('debug')) {
-    goSoloOnline();
+    primeAudio(); // 借进入手势解锁音频（WebKit 须真实手势才能放报牌语音）
+    active = onlineMount(root, { solo: true });
     return () => { active?.(); active = null; };
   }
 
-  // 正门：模式选择页，「单机对战」→ 联机 1人+3AI，「4 人联机」→ 联机流
-  active = renderModeSelect(root, { onSingle: goSoloOnline, onOnline: goOnline });
+  // 正门：直接进联机大厅（昵称→大厅：建房/随机匹配/输房号加入/观战）。单机已并入联机——
+  // 想一个人打就建房→开打，空座自动补 AI；界面不再有单独的「单机 / 联机」二选一入口。
+  active = onlineMount(root);
   return () => { active?.(); active = null; };
 }
 
 export const guandanModule: GameModule = {
   id: 'guandan',
   name: '掼蛋',
-  desc: '升级类扑克，2v2 四人局：单机对 AI 或 4 人联机',
+  desc: '升级类扑克，2v2 四人局：在线对战，可一人对 AI 或凑真人组队',
   mount,
 };

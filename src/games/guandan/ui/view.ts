@@ -730,10 +730,12 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     }
     box.appendChild(gainEl);
 
-    // 末游没出完的牌：用 driver 提供的 leftover（联机别家手牌是占位，不能读 state.hands）
+    // 末游没出完的牌：用 driver 提供的 leftover（联机别家手牌是占位，不能读 state.hands）。
+    // 整盘结束(matchOver)不显示——拿下整盘后末游剩牌无意义；且双下提前收盘时 finished 仅 2 人、
+    // ranks[3] 为 undefined，显示会成"末游 undefined 剩xx张"。仅单局结算(dealResult)才展示。
     const last = ranks[3]!;
     const leftover = sortHand(o.leftover, state.level);
-    if (leftover.length > 0) {
+    if (leftover.length > 0 && !settle.match.over) {
       const lbl = document.createElement('div');
       lbl.className = 'gd-result__leftlabel';
       lbl.textContent = `末游 ${SEAT_LABELS[last]} 剩 ${leftover.length} 张`;

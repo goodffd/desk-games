@@ -542,6 +542,9 @@
   padding: 2rem 3rem;
   text-align: center;
   max-width: 340px;
+  max-height: 90%;          /* 窄屏(旋转后可用高度小)整盘胜利内容多时不撑破被裁 */
+  overflow-y: auto;         /* 超高则框内滚动，按钮/名次不丢 */
+  box-sizing: border-box;
   box-shadow: 0 8px 32px rgba(0,0,0,0.6);
 }
 
@@ -584,6 +587,9 @@
   padding: 1.3rem 1.8rem;
   text-align: center;
   max-width: 92vw;
+  max-height: 90%;          /* 进贡+还贡双行、窄屏内容高时不撑破被裁 */
+  overflow-y: auto;
+  box-sizing: border-box;
   box-shadow: 0 8px 32px rgba(0,0,0,0.6);
 }
 .gd-tribute__row {
@@ -591,6 +597,13 @@
 }
 .gd-tribute__who { color: var(--gold); font-weight: 600; font-size: 0.95rem; }
 .gd-tribute__arrow { color: var(--text-dim); font-size: 0.85rem; }
+/* 还贡行：紧贴其上进贡行、略降权重；还贡槽与小牌等尺寸，填牌前后不跳动 */
+.gd-tribute__row--return { margin-top: 0.1rem; margin-bottom: 0.7rem; opacity: 0.96; }
+.gd-tribute__retslot {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 40px; min-height: 54px;
+  color: var(--text-dim); font-size: 0.82rem;
+}
 .gd-tribute__fly { animation: gd-tribute-fly 0.5s cubic-bezier(.2,.8,.3,1) both; }
 @keyframes gd-tribute-fly {
   from { transform: translateX(-48px) scale(0.82); opacity: 0; }
@@ -657,6 +670,19 @@
   .gd-play--bottom { top: 64%; bottom: auto; }  /* 与对家出牌区上下对称 */
   .gd-play--left   { left: 116px; top: 46%; }   /* 再往中心推 + 略上移，不压上家头像下的名字/闹钟那行 */
   .gd-play--right  { right: 116px; top: 46%; }  /* 同上，下家对称 */
+  /* 弹层(整盘胜利 / 进贡还贡)：窄屏旋转后可用高度小，压缩内边距/字号尽量一屏放下(max-height 滚动兜底) */
+  .gd-result { padding: 1rem 1.4rem; }
+  .gd-result__title { font-size: 1.15rem; margin-bottom: 0.5rem; }
+  .gd-result__ranking { margin-bottom: 0.5rem; }
+  .gd-result__ranking li { font-size: 0.82rem; padding: 0.08rem 0; }
+  .gd-result__gain { font-size: 0.78rem; margin-bottom: 0.5rem; }
+  .gd-result__leftlabel { margin-bottom: 0.2rem; }
+  .gd-result__leftover { gap: 3px; margin-bottom: 0.6rem; }
+  .gd-tribute { padding: 0.9rem 1.1rem; }
+  .gd-tribute__row { gap: 6px; margin: 0.22rem 0; }
+  .gd-tribute__row--return { margin-bottom: 0.5rem; }
+  .gd-tribute__retslot { min-height: 46px; }
+  .gd-tribute__hint { margin: 0.5rem 0 0.35rem; font-size: 0.82rem; }
 }
 
 /* --- 手机竖屏自动转横屏：掼蛋牌桌需要横向空间，竖握时整页旋转 90° 显示为横屏 ---

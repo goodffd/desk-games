@@ -240,4 +240,23 @@ describe('LocalDriver — 语音/结算/进贡', () => {
     expect(hands[ex.giver]!.some((c) => c.id === ex.tribute.id)).toBe(false);  // 进贡牌已离开 giver
     expect(hands[0]!.some((c) => c.id === ex.tribute.id)).toBe(true);          // 进贡牌到了我(receiver)
   });
+
+  // 还贡明牌展示：AI 收贡方的还贡牌随 prompt 预先给出（供弹层显示"谁还了什么给谁"）。
+  // "resolve 复用同一张（显示=应用）"是代码不变量（prompt.returns 与 resolve 共用同一 aiReturns 对象），
+  // 由「我收贡 resolve 落 giver 手」+ played-log 守恒测试覆盖。
+  it('每个 AI 收贡方的还贡牌随 prompt 预给出（供弹层展示）', () => {
+    let prompt: TributePrompt | null = null;
+    for (let seed = 1; seed <= 80 && !prompt; seed++) {
+      const cand = makeDriver({ firstLeader: (seed % 4) as Seat, shuffle: makeSeededShuffle(seed) });
+      playDealToEnd(cand);
+      if (!isDealOver(snap(cand).state)) continue;
+      cand.driver.nextDealOrResult();
+      const pr = cand.tributes[0];
+      if (pr && pr.exchanges.some((e) => e.receiver !== 0)) prompt = pr;
+    }
+    expect(prompt).not.toBeNull(); // 80 个种子里必有含 AI 收贡方的进贡局面
+    for (const ex of prompt!.exchanges.filter((e) => e.receiver !== 0)) {
+      expect(prompt!.returns.some((r) => r.receiver === ex.receiver)).toBe(true);
+    }
+  });
 });

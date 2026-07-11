@@ -25,6 +25,8 @@ const partnerOf = (seat: Seat): Seat => ((seat + 2) % 4) as Seat;
 
 /** 残局：自己 ≤ 此张数即放宽出牌、敢拆敢炸。 */
 const ENDGAME_CARDS = 6;
+/** 队友 ≤ 此张数即"近上游"，领牌时考虑喂牌助其走成头游（保我方一个头游续升级）。 */
+const FEED_CARDS = 3;
 /** 对手手牌 ≤ 此张数即"即将走完"，放宽跟牌（敢拆敢炸阻挡）。 */
 const OPP_ABOUT_TO_WIN_CARDS = 2;
 
@@ -72,6 +74,12 @@ export function choosePlay(s: DealState, seat: Seat): Card[] | null {
   const unseen = computeUnseen(s, seat);
   const heur = heuristicChoose(s, seat, unseen);
 
+  // 队友近上游(≤FEED_CARDS 张)时的"喂牌/出有把握牌"是明确的团队决策，直接用启发式、不交给 rollout
+  // （rollout 采样队友那几张牌是随机的，会稀释此判断而误覆盖）。
+  const partner = ((seat + 2) % 4) as Seat;
+  const pc = s.hands[partner]!.length;
+  if (s.current === null && hand.length > 1 && pc >= 1 && pc <= FEED_CARDS) return heur;
+
   // 残局精算：真残局时用 determinized rollout 精修——把启发式选择也纳入候选，
   // 只有别的候选"明显更优"才覆盖（保证不劣于启发式）。
   const totalLeft = s.hands.reduce((n, h) => n + h.length, 0);
@@ -89,6 +97,27 @@ export function heuristicChoose(s: DealState, seat: Seat, unseen: Card[]): Card[
 
   // ---- LEAD ----
   if (s.current === null) {
+    // 队友近上游(≤FEED_CARDS 张) 且 我这手走不完(否则自己上游拿双下更优) → 视牌面决定喂牌 or 出有把握的牌。
+    // 诚实：只看各家张数、不看其牌。保住"我方拿下一个头游"以持续升级。
+    const partner = partnerOf(seat);
+    const pc = s.hands[partner]!.length;
+    const { combos } = decompose(hand, level);
+    if (pc >= 1 && pc <= FEED_CARDS && combos.length > 1) {
+      const oppAboutToWin = ([0, 1, 2, 3] as Seat[])
+        .some((o) => o !== seat && o !== partner && s.hands[o]!.length === 1);
+      if (!oppAboutToWin) {
+        // 喂牌：优先领一个大小 == 队友张数的最小牌型(赌队友手里是可一手走完的 pc 张牌型：
+        // 剩2张喂对子、剩3张喂三张，让他一手走成头游)；没有对应牌型则喂最小单张让他逐张脱手。
+        const sized = combos.filter((c) => c.cards.length === pc);
+        if (sized.length) return sized.reduce((b, c) => (c.key < b.key ? c : b)).cards;
+        return [hand.reduce((lo, c) => (rankValue(c, level) < rankValue(lo, level) ? c : lo))];
+      }
+      // 对手也剩1张(争头游)：不能喂——喂的低单张会被对手接走上游。出有把握的牌：
+      // 优先领非单张(对/三/顺…)，剩1张的对手是单牌、接不上 → 上不了游；只有单张则领最大单张(最难被截)。
+      const multi = combos.filter((c) => c.cards.length >= 2);
+      if (multi.length) return multi.reduce((b, c) => (c.key < b.key ? c : b)).cards;
+      return [hand.reduce((hi, c) => (rankValue(c, level) > rankValue(hi, level) ? c : hi))];
+    }
     return chooseLead(hand, level, unseen);
   }
   // ---- FOLLOW ----

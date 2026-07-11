@@ -69,7 +69,9 @@ export class MatchDriver {
     if (this.phase === 'tribute' && this.pendingDeal) {
       const plan = this.pendingDeal.plan;
       const pending = plan.exchanges.filter(e => !this.tributeReturns.has(e.receiver)).map(e => e.receiver);
-      return { ...base, tribute: { exchanges: plan.exchanges, resist: plan.resist, doubleDown: plan.doubleDown, pending } };
+      // 带上已知还贡牌（AI 收贡进阶段即算好、人类的收到即有）→ 客户端展示"谁还了什么给谁"
+      const exchanges = plan.exchanges.map(e => ({ ...e, return: this.tributeReturns.get(e.receiver) }));
+      return { ...base, tribute: { exchanges, resist: plan.resist, doubleDown: plan.doubleDown, pending } };
     }
     if ((this.phase === 'dealResult' || this.phase === 'matchOver') && this.pendingResult) {
       const { finished, settle, lastHand } = this.pendingResult;
@@ -151,7 +153,9 @@ export class MatchDriver {
     if (need.length) return out;
     const returns = this.pendingDeal!.plan.exchanges.map(e => this.tributeReturns.get(e.receiver)!);
     const hands = applyTribute(this.pendingDeal!.hands, this.pendingDeal!.plan, returns);
-    return [...out, ...this.beginDeal(hands, this.pendingDeal!.plan.firstLeader)];
+    // 开新局前先广播一次"全部还贡已知"的 tribute state，让客户端拿到完整还贡（供开局汇总揭示）。
+    const reveal = this.broadcastState();
+    return [...out, reveal, ...this.beginDeal(hands, this.pendingDeal!.plan.firstLeader)];
   }
 
   private beginDeal(hands: Card[][], firstLeader: Seat): Outbound[] {

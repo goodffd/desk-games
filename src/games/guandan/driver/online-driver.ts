@@ -171,11 +171,16 @@ export class OnlineDriver implements GameDriver {
 
   private fireTribute(tw: NonNullable<PublicState['tribute']>): void {
     const exchanges: TributeExchange[] = tw.exchanges.map((e) => ({ giver: this.v(e.giver), receiver: this.v(e.receiver), tribute: e.tribute }));
+    // 已知还贡（服务端已下发的 return）：旋转 receiver 座到 view 空间，还贡牌随之带上
+    const returns = tw.exchanges
+      .filter((e) => e.return != null)
+      .map((e) => ({ receiver: this.v(e.receiver), card: e.return! }));
     const st = this.lastState!;
     const level = st.levels[st.trumpTeam] as Rank; // 新局级牌（庄家队级别），用于进贡牌逢人配渲染
     const options = this.myTributeOptions;
     this.tributeCb?.({
       exchanges,
+      returns,
       myReturnOptions: options ?? null,
       level,
       resolve: (returnCardId: number | null): void => {

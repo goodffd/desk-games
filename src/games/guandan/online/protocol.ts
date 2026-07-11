@@ -29,7 +29,7 @@ export interface SeatPublic {
 }
 
 /** 进贡一项（公开态 tribute.exchanges[i]）。 */
-export interface TributeExchangeWire { giver: Seat; receiver: Seat; tribute: Card; }
+export interface TributeExchangeWire { giver: Seat; receiver: Seat; tribute: Card; return?: Card; }
 
 /** 公开态 `state`（发房内所有在线玩家 + 观众；手牌另经私有 `hand` 私发本人）。 */
 export interface PublicState {

@@ -232,17 +232,27 @@ export class LocalDriver implements GameDriver {
     const cands = humanEx ? returnableCards(dealt[HUMAN_SEAT]!, level) : [];
     const myReturnOptions = humanEx ? (cands.length ? cands : dealt[HUMAN_SEAT]!) : null;
 
+    // 提前把 AI 收贡方的还贡牌算好并存下——弹层据此立即展示"AI 还了什么给谁"，
+    // 且 resolve 复用同一批（显示的牌 = 实际应用的牌，绝不显示一张暗地换另一张）。
+    const aiReturns = new Map<Seat, Card>();
+    for (const ex of plan.exchanges) {
+      if (ex.receiver !== HUMAN_SEAT) aiReturns.set(ex.receiver, chooseReturn(dealt[ex.receiver]!, level));
+    }
+    const returnsForView = [...aiReturns].map(([receiver, card]) => ({ receiver, card }));
+
     this.tributeCb?.({
       exchanges: plan.exchanges,
+      returns: returnsForView,
       myReturnOptions,
       level,
       resolve: (returnCardId: number | null): void => {
-        // 我选的还贡牌按 id 取；AI 收贡侧 chooseReturn 智能兜底。
+        // 我选的还贡牌按 id 取（兜底 chooseReturn）；AI 侧复用上面预算的那批。
         const returns = plan.exchanges.map((ex) => {
-          if (ex.receiver === HUMAN_SEAT && returnCardId != null) {
-            return dealt[HUMAN_SEAT]!.find((c) => c.id === returnCardId) ?? chooseReturn(dealt[ex.receiver]!, level);
+          if (ex.receiver === HUMAN_SEAT) {
+            const picked = returnCardId != null ? dealt[HUMAN_SEAT]!.find((c) => c.id === returnCardId) : undefined;
+            return picked ?? chooseReturn(dealt[HUMAN_SEAT]!, level);
           }
-          return chooseReturn(dealt[ex.receiver]!, level);
+          return aiReturns.get(ex.receiver)!;
         });
         const tributed = applyTribute(dealt, plan, returns);
         this.startDealAfterTribute(level, tributed, plan.firstLeader);

@@ -15,6 +15,7 @@ import type { Card, Seat, Combo, Rank } from '../engine/types';
 import { sortHand, rankValue } from '../engine/cards';
 import { isDealOver, ranking } from '../engine/game';
 import { cardEl, rankName } from './render';
+import { sortComboCards } from './combo-order';
 import { VOICE_CLIPS } from './voice-clips';
 import type { DealOutcome, TributePrompt, GameDriver } from '../driver/types';
 
@@ -43,18 +44,6 @@ const SEAT_LABELS: Record<Seat, string> = { 0: '你', 1: '下家', 2: '对家', 
 const SEAT_POS: Record<Seat, string> = { 0: 'bottom', 1: 'right', 2: 'top', 3: 'left' };
 
 type LastPlay = Combo | 'pass' | null;
-
-/** 出牌展示排序：同点数聚一起，组越大越靠前（三带二=三同在前/对子在后；连对/钢板/顺子自然成组） */
-function sortComboCards(cards: Card[], level: Rank): Card[] {
-  const cnt = new Map<number, number>();
-  for (const c of cards) { const v = rankValue(c, level); cnt.set(v, (cnt.get(v) ?? 0) + 1); }
-  return [...cards].sort((a, b) => {
-    const va = rankValue(a, level), vb = rankValue(b, level);
-    const ca = cnt.get(va)!, cb = cnt.get(vb)!;
-    if (ca !== cb) return cb - ca; // 大组在前
-    return va - vb;                // 同组按点数升序
-  });
-}
 
 /** 选系统里最自然的中文语音：增强/高级/Siri/网络语音优先，其次知名本地语音 */
 let gdVoice: SpeechSynthesisVoice | null = null;
@@ -214,6 +203,10 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
   // 弹层引用：onChange 时按 phase 收（本地按钮点击也会直接收，二者幂等；联机无按钮场景靠 phase 收）
   let tributeOverlay: HTMLElement | null = null;
   let resultOverlay: HTMLElement | null = null;
+  // 进贡弹层的还贡槽（receiver 座 → 该行还贡牌容器）+ 本轮进贡快照 + 我选的还贡牌（供更新式揭示 + 开局汇总）
+  let tributeSlots: Map<number, HTMLElement> | null = null;
+  let lastTribute: TributePrompt | null = null;
+  let humanReturnCard: Card | null = null;
 
   const sortedHand = (seat: Seat): Card[] => sortHand(state.hands[seat]!, state.level);
 
@@ -577,11 +570,34 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
    * 进贡阶段弹层：展示进贡(动画滑入) + 人类收贡时手选 ≤10 还贡。点「确定」回调 returns 开局。
    * 人类为收贡方时须手选；AI 收贡走 chooseReturn(智能还贡)；人类仅为进贡方时无需选(进贡牌自动取最大)。
    */
+  /** 填一个还贡槽（receiver 的还贡行显示其还的牌）。 */
+  function fillReturnSlot(receiver: number, card: Card, level: Rank): void {
+    const slot = tributeSlots?.get(receiver);
+    if (!slot) return;
+    slot.innerHTML = '';
+    const ce = cardEl(card, level, true);
+    ce.classList.add('gd-tribute__fly');
+    slot.appendChild(ce);
+  }
+  /** 批量填已知还贡（AI/他人已还的 + 我已选的）。 */
+  function fillReturns(returns: TributePrompt['returns'], level: Rank): void {
+    if (!tributeSlots) return;
+    for (const { receiver, card } of returns) fillReturnSlot(receiver, card, level);
+    if (humanReturnCard) fillReturnSlot(HUMAN_SEAT, humanReturnCard, level);
+  }
+
   function showTribute(p: TributePrompt): void {
-    const { exchanges, myReturnOptions, level } = p;
+    const { exchanges, returns, myReturnOptions, level } = p;
+    lastTribute = p;
+
+    // 已有弹层（联机后续 state 陆续揭示还贡）→ 只更新还贡槽，不重建（保留手选 UI 与已选态）
+    if (tributeOverlay && tributeSlots) { fillReturns(returns, level); return; }
+
+    humanReturnCard = null;
     const overlay = document.createElement('div');
     overlay.className = 'gd-overlay';
     tributeOverlay = overlay;
+    tributeSlots = new Map();
     const box = document.createElement('div');
     box.className = 'gd-tribute';
     const title = document.createElement('div');
@@ -589,29 +605,31 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     title.textContent = '进贡 · 还贡';
     box.appendChild(title);
 
-    exchanges.forEach((ex) => {
-      const row = document.createElement('div');
-      row.className = 'gd-tribute__row';
-      const g = document.createElement('span');
-      g.className = 'gd-tribute__who'; g.textContent = SEAT_LABELS[ex.giver];
-      const arrow = document.createElement('span');
-      arrow.className = 'gd-tribute__arrow'; arrow.textContent = '进贡 ⟶';
-      const card = cardEl(ex.tribute, level, true);
-      card.classList.add('gd-tribute__fly');
-      const r = document.createElement('span');
-      r.className = 'gd-tribute__who'; r.textContent = SEAT_LABELS[ex.receiver];
-      row.append(g, arrow, card, r);
-      box.appendChild(row);
-    });
-
-    // 确定后：收弹层 + 进贡结果文案提示（X 进贡♥给 Y）。
-    const closeAndHint = (): void => {
-      overlay.remove(); if (tributeOverlay === overlay) tributeOverlay = null;
-      selectedIds.clear();
-      const parts = exchanges.map((ex) =>
-        `${SEAT_LABELS[ex.giver]}进贡${cardBrief(ex.tribute, level)}给${SEAT_LABELS[ex.receiver]}`);
-      showHint(parts.join('；'), 'info');
+    const who = (seat: Seat): HTMLElement => {
+      const s = document.createElement('span'); s.className = 'gd-tribute__who'; s.textContent = SEAT_LABELS[seat]; return s;
     };
+    const arrow = (t: string): HTMLElement => {
+      const a = document.createElement('span'); a.className = 'gd-tribute__arrow'; a.textContent = t; return a;
+    };
+
+    exchanges.forEach((ex) => {
+      // 进贡行：giver 进贡⟶ [大牌] receiver
+      const giveRow = document.createElement('div');
+      giveRow.className = 'gd-tribute__row';
+      const gcard = cardEl(ex.tribute, level, true); gcard.classList.add('gd-tribute__fly');
+      giveRow.append(who(ex.giver), arrow('进贡 ⟶'), gcard, who(ex.receiver));
+      box.appendChild(giveRow);
+      // 还贡行：receiver 还贡⟶ [小牌/占位] giver
+      const backRow = document.createElement('div');
+      backRow.className = 'gd-tribute__row gd-tribute__row--return';
+      const slot = document.createElement('span');
+      slot.className = 'gd-tribute__retslot';
+      slot.textContent = ex.receiver === HUMAN_SEAT ? '待选' : '还贡中';
+      tributeSlots!.set(ex.receiver, slot);
+      backRow.append(who(ex.receiver), arrow('还贡 ⟶'), slot, who(ex.giver));
+      box.appendChild(backRow);
+    });
+    fillReturns(returns, level); // 填已知还贡（AI/他人已还的）
 
     if (myReturnOptions) {
       // 我收贡：手选一张 ≤10 还贡 → resolve(选的牌 id)
@@ -635,29 +653,44 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
           picks.querySelectorAll('.gd-tribute__pickcard').forEach(x => x.classList.remove('is-picked'));
           ce.classList.add('is-picked');
           confirmBtn.disabled = false;
+          humanReturnCard = c;                    // 记住我还的牌（供还贡槽/开局汇总）
+          fillReturnSlot(HUMAN_SEAT, c, level);   // 我的还贡行立即显示所选牌
         });
         picks.appendChild(ce);
       }
       box.appendChild(picks);
-      confirmBtn.addEventListener('click', () => { p.resolve(pickedId); closeAndHint(); });
+      // 收弹层 + 开局汇总交给 phase 切换统一处理（本地 resolve 同步开局、联机等服务端）
+      confirmBtn.addEventListener('click', () => { p.resolve(pickedId); });
       box.appendChild(confirmBtn);
     } else if (!driver.autoAdvance) {
-      // 本地非收贡方：确定继续（driver AI 收贡走 chooseReturn 后开新局）
+      // 本地非收贡方：AI 还贡已在还贡行显示，点确定开局
       const confirmBtn = document.createElement('button');
       confirmBtn.className = 'gd-btn gd-btn--restart';
       confirmBtn.textContent = '确定，开局';
-      confirmBtn.addEventListener('click', () => { p.resolve(null); closeAndHint(); });
+      confirmBtn.addEventListener('click', () => { p.resolve(null); });
       box.appendChild(confirmBtn);
     } else {
-      // 联机非收贡方：等待（服务端自动收齐还贡→新局 state→phase 变→onChange 收弹层）
+      // 联机非收贡方：等服务端收齐（还贡行会随 state 陆续填上真牌）
       const waiting = document.createElement('div');
       waiting.className = 'gd-tribute__hint';
-      waiting.textContent = '等待收贡方还贡…';
+      waiting.textContent = '等待各家还贡…';
       box.appendChild(waiting);
     }
 
     overlay.appendChild(box);
     gameEl.appendChild(overlay);
+  }
+
+  /** 开局时的进贡·还贡汇总提示（谁进贡什么给谁、谁还什么给谁）。 */
+  function tributeSummaryHint(p: TributePrompt): string {
+    return p.exchanges.map((ex) => {
+      const ret = ex.receiver === HUMAN_SEAT
+        ? humanReturnCard
+        : (p.returns.find((r) => r.receiver === ex.receiver)?.card ?? null);
+      const give = `${SEAT_LABELS[ex.giver]}进贡${cardBrief(ex.tribute, p.level)}给${SEAT_LABELS[ex.receiver]}`;
+      const back = ret ? `，${SEAT_LABELS[ex.receiver]}还${cardBrief(ret, p.level)}给${SEAT_LABELS[ex.giver]}` : '';
+      return give + back;
+    }).join('；');
   }
 
   function showResult(o: DealOutcome): void {
@@ -771,7 +804,11 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     syncFromDriver();
     // 按 phase 收弹层：本地按钮点击也会直接收(幂等)；联机无按钮场景(自动续局/非收贡)靠这里收。
     const phase = driver.snapshot().phase;
-    if (phase !== 'tribute' && tributeOverlay) { tributeOverlay.remove(); tributeOverlay = null; }
+    if (phase !== 'tribute') {
+      if (tributeOverlay) { tributeOverlay.remove(); tributeOverlay = null; }
+      // 开局：顶一条进贡·还贡汇总（谁进贡什么给谁、谁还什么给谁），保证还贡明牌可见
+      if (lastTribute) { selectedIds.clear(); showHint(tributeSummaryHint(lastTribute), 'info'); lastTribute = null; humanReturnCard = null; tributeSlots = null; }
+    }
     if (phase !== 'dealResult' && phase !== 'matchOver' && resultOverlay) { resultOverlay.remove(); resultOverlay = null; }
     renderLevels(); renderAll();
   });

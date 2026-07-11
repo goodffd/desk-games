@@ -46,10 +46,15 @@ export interface DealOutcome {
   leftover: Card[];
 }
 
+/** 已知的还贡（receiver 还了哪张牌，view 空间座位）。用于弹层展示"谁还了什么给谁"。 */
+export interface TributeReturn { receiver: Seat; card: Card; }
+
 /** 进贡阶段交给 view 弹层处理（归一形状：本地/联机同形）。 */
 export interface TributePrompt {
   /** 各进贡：giver→receiver + 进贡牌（view 空间，OnlineDriver 已旋转）。 */
   exchanges: TributeExchange[];
+  /** 已知的还贡（本地=AI 收贡方全部预算；联机=服务端已收到的；未还者不在内）。view 空间。 */
+  returns: TributeReturn[];
   /** 我是收贡方 → 可还的牌（本地=≤10 池/兜底全手牌；联机=服务端 need-tribute.options）；否则 null（仅展示）。 */
   myReturnOptions: Card[] | null;
   level: Rank;

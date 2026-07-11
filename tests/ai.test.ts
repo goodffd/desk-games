@@ -299,10 +299,12 @@ function n(rank: number, suit: Suit): Card {
 }
 function bigJoker(): Card { return { kind: 'joker', big: true,  id: _nid3++ }; }
 
-/** 构造"自由领牌"DealState：seat0 手牌=hand，其余各持1张废牌，current=null, turn=0。 */
+/** 构造"自由领牌"DealState：seat0 手牌=hand，其余各持 8 张废牌，current=null, turn=0。
+ *  各家 8 张（非 1）以免误触发"队友剩1张喂牌"与残局 rollout，纯验 decompose 领牌逻辑。 */
 function leadState3(hand: Card[]): DealState {
+  const filler = (): Card[] => Array.from({ length: 8 }, () => n(14, 'S'));
   return {
-    hands: [hand, [n(14, 'S')], [n(14, 'H')], [n(14, 'C')]],
+    hands: [hand, filler(), filler(), filler()],
     current: null, turn: 0 as Seat, passesInRow: 0, finished: [], level: L3,
   };
 }
@@ -361,6 +363,43 @@ describe('choosePlay 领牌（拆解驱动）', () => {
     expect(out).not.toBeNull();
     // 领出的不应包含红心2（逢人配）
     expect(out!.some(x => x.kind === 'normal' && x.rank === 2 && x.suit === 'H')).toBe(false);
+  });
+
+  it('队友剩1张即将上游 → 领最小单张喂他上游（不自顾自出牌/不拆对不出大牌）', () => {
+    // seat0 领牌，队友 seat2 剩 1 张；seat0=对9+散5/7/K → 应领最小散牌 5(喂牌)，
+    // 而非领对9或出 K。低单张对手多半不截，传到队友由其牌接走上游，保我方一个头游续升级。
+    const hand0 = [n(9, 'S'), n(9, 'H'), n(5, 'C'), n(7, 'D'), n(13, 'S')];
+    const s: DealState = {
+      hands: [hand0, Array.from({ length: 6 }, () => n(14, 'S')), [n(4, 'C')], Array.from({ length: 6 }, () => n(14, 'H'))],
+      current: null, turn: 0 as Seat, passesInRow: 0, finished: [], level: L3,
+    };
+    const out = choosePlay(s, 0 as Seat)!;
+    expect(out.length).toBe(1);                                  // 领单张(喂牌)
+    expect(out[0]!.kind === 'normal' && out[0]!.rank).toBe(5);   // 最小散牌5(rankValue最低)
+  });
+
+  it('队友剩2张(近上游)、无对手近上游 → 喂对子(大小匹配队友张数，非单张)', () => {
+    // 队友剩 2 张多半是个对子 → 喂对子让他一手走完(喂单张他只脱1张)；喂牌可 2/3 张不止 1 张。
+    const hand0 = [n(9, 'S'), n(9, 'H'), n(5, 'C'), n(7, 'D'), n(13, 'S')];
+    const s: DealState = {
+      hands: [hand0, Array.from({ length: 6 }, () => n(14, 'S')), [n(3, 'C'), n(4, 'C')], Array.from({ length: 6 }, () => n(14, 'H'))],
+      current: null, turn: 0 as Seat, passesInRow: 0, finished: [], level: L3,
+    };
+    const out = choosePlay(s, 0 as Seat)!;
+    expect(out.length).toBe(2);                                               // 喂对子(队友剩2张)
+    expect(out.every((c) => c.kind === 'normal' && c.rank === 9)).toBe(true); // 对9
+  });
+
+  it('队友近上游但对手也剩1张 → 不喂牌，出非单张(对手单牌接不上上不了游)', () => {
+    // 队友 seat2 剩1张，但对手 seat1(下家) 也剩1张 → 争头游，不喂低单张(会被对手接走)，改领对9。
+    const hand0 = [n(9, 'S'), n(9, 'H'), n(5, 'C'), n(7, 'D')];
+    const s: DealState = {
+      hands: [hand0, [n(4, 'S')], [n(3, 'C')], Array.from({ length: 6 }, () => n(14, 'H'))],
+      current: null, turn: 0 as Seat, passesInRow: 0, finished: [], level: L3,
+    };
+    const out = choosePlay(s, 0 as Seat)!;
+    expect(out.length).toBe(2);                                       // 领非单张(对子)，不喂单张
+    expect(out.every((c) => c.kind === 'normal' && c.rank === 9)).toBe(true); // 对9
   });
 });
 

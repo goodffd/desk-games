@@ -87,11 +87,11 @@ export function renderRoom(root: HTMLElement, opts: RoomOpts): RoomHandle {
     center.appendChild(text('div', 'gd-room__center-count', `${filled} / 4 就座`));
     if (st.isHost) {
       const startBtn = button('gd-room__start', '开打', opts.onStart);
-      startBtn.disabled = filled < 4;
+      startBtn.disabled = filled < 1; // ≥1 人(房主已坐)即可开打，空座由 AI 补
       center.appendChild(startBtn);
-      if (filled < 4) center.appendChild(text('div', 'gd-room__hint', '坐满 4 人可开打'));
+      if (filled < 4) center.appendChild(text('div', 'gd-room__hint', `空 ${4 - filled} 座将由 AI 补`));
     } else {
-      center.appendChild(text('div', 'gd-room__hint', filled < 4 ? '等待玩家入座…' : '等房主开打…'));
+      center.appendChild(text('div', 'gd-room__hint', '等房主开打（空座由 AI 补）'));
     }
   }
   renderState(opts.initial);

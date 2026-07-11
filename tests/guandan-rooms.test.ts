@@ -4,6 +4,7 @@ import { RoomRegistry } from '../server/guandan-rooms.mjs';
 
 function fakeClient() { const sent: any[] = []; return { sent, send: (m: any) => sent.push(m) }; }
 const last = (c: any) => c.sent[c.sent.length - 1];
+const tokenOf = (c: any) => [...c.sent].reverse().find((m: any) => m.t === 'seat-token')?.token; // 本座会话令牌(最近一次)
 
 describe('RoomRegistry — 昵称', () => {
   let reg: any;
@@ -269,11 +270,12 @@ describe('RoomRegistry — 重连', () => {
     return cs;
   }
 
-  it('掉线后 rejoin → 收回座位、收 rejoined + 重发态、其余收 peer-back', () => {
+  it('掉线后 rejoin(带会话令牌) → 收回座位、收 rejoined + 重发态、其余收 peer-back', () => {
     const cs = playing();
+    const token = tokenOf(cs[2]);
     reg.leave(cs[2]);
     const re = fakeClient();
-    reg.handle(re, { t: 'rejoin', code: 'ABC123', nick: 'p2' });
+    reg.handle(re, { t: 'rejoin', code: 'ABC123', token, nick: 'p2' });
     expect(re.sent).toContainEqual({ t: 'rejoined', seat: 2 });
     expect(re.sent).toContainEqual({ t: 'state', resync: 2 });
     const room = reg.rooms.get('ABC123');
@@ -281,11 +283,24 @@ describe('RoomRegistry — 重连', () => {
     expect(cs[0]!.sent).toContainEqual({ t: 'peer-back', seat: 2 });
   });
 
-  it('座位未掉线 / 昵称不符 → error', () => {
-    playing();
+  it('座位未掉线时 rejoin(哪怕带正确令牌) → error', () => {
+    const cs = playing();
     const re = fakeClient();
-    reg.handle(re, { t: 'rejoin', code: 'ABC123', nick: 'p2' }); // p2 仍在线
+    reg.handle(re, { t: 'rejoin', code: 'ABC123', token: tokenOf(cs[2]), nick: 'p2' }); // p2 仍在线
     expect(last(re).t).toBe('error');
+  });
+
+  it('会话令牌错误/缺失 → error（防拿房号+昵称冒名劫持座位与手牌）', () => {
+    const cs = playing();
+    reg.leave(cs[2]);                                                          // p2 掉线、座位空出
+    const attacker = fakeClient();
+    reg.handle(attacker, { t: 'rejoin', code: 'ABC123', token: 'wrong', nick: 'p2' }); // 知昵称但令牌错
+    expect(last(attacker).t).toBe('error');
+    reg.handle(attacker, { t: 'rejoin', code: 'ABC123', nick: 'p2' });                  // 完全无令牌
+    expect(last(attacker).t).toBe('error');
+    expect(attacker.sent.some((m: any) => m.t === 'hand')).toBe(false);                 // 绝不给攻击者下发手牌
+    reg.handle(cs[2], { t: 'rejoin', code: 'ABC123', token: tokenOf(cs[2]), nick: 'p2' }); // 真主凭令牌可回
+    expect(cs[2]!.sent).toContainEqual({ t: 'rejoined', seat: 2 });
   });
 });
 
@@ -439,9 +454,10 @@ describe('RoomRegistry — 再来一盘(restart)', () => {
   it('房主断线重连后 restart 仍有效（房主标识随重连座转移，不永久失效）', () => {
     const cs = playing();
     const room = reg.rooms.get('ABC123');
+    const token = tokenOf(cs[0]);
     reg.leave(cs[0]);                                  // 房主(座0)断线
     const re = fakeClient();
-    reg.handle(re, { t: 'rejoin', code: 'ABC123', nick: 'p0' }); // 房主用新连接重连座0
+    reg.handle(re, { t: 'rejoin', code: 'ABC123', token, nick: 'p0' }); // 房主用新连接重连座0
     expect(re.sent).toContainEqual({ t: 'rejoined', seat: 0 });
     room.driver.match.over = true;                     // 整盘结束
     reg.handle(re, { t: 'restart' });                  // 新连接发再来一盘
@@ -553,10 +569,11 @@ describe('RoomRegistry — 掉线宽限接管', () => {
   });
 
   it('宽限/已接管中重连 → 收回座位、计数清零、变回人打', () => {
+    const token = tokenOf(cs[1]);
     reg.leave(cs[1]);
     turnTo(1); vi.advanceTimersByTime(10000);    // 被代打1手，graceMisses=1
     const re = fakeClient();
-    reg.handle(re, { t: 'rejoin', code: 'ABC123', nick: 'p1' });
+    reg.handle(re, { t: 'rejoin', code: 'ABC123', token, nick: 'p1' });
     expect(re.sent).toContainEqual({ t: 'rejoined', seat: 1 });
     expect(room().seats[1]).toMatchObject({ online: true, disconnected: false, graceMisses: 0, ai: false });
   });

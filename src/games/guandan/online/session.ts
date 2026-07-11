@@ -68,26 +68,33 @@ export class OnlineSession {
   get nick(): string { return this.local.getItem(NICK_KEY) ?? ''; }
   setNick(n: string): void { this.local.setItem(NICK_KEY, n); }
 
-  // ── 房况（重连凭据 {房号,座位,昵称}）──
-  private _readCred(store: StorageLike): { code: string; seat: number; nick: string } | null {
+  // ── 房况（重连凭据 {房号,座位,昵称,会话令牌}）──
+  private seatToken = ''; // 服务端落座后私发的会话令牌(座位私钥)；rejoin 靠它认证、防冒名劫持隐藏手牌
+  private _readCred(store: StorageLike): { code: string; seat: number; nick: string; token: string } | null {
     const raw = store.getItem(ROOM_KEY);
     if (!raw) return null;
     try {
-      const o = JSON.parse(raw) as { code?: unknown; seat?: unknown; nick?: unknown };
+      const o = JSON.parse(raw) as { code?: unknown; seat?: unknown; nick?: unknown; token?: unknown };
       if (typeof o.code !== 'string' || typeof o.seat !== 'number') return null;
-      return { code: o.code, seat: o.seat, nick: typeof o.nick === 'string' ? o.nick : this.nick };
+      return { code: o.code, seat: o.seat, nick: typeof o.nick === 'string' ? o.nick : this.nick, token: typeof o.token === 'string' ? o.token : '' };
     } catch { return null; }
   }
   /** 本标签页(session)优先 → 其次跨重开兜底(local)。多标签下各守各座，手机杀后台仍能捞回。 */
-  savedRoom(): { code: string; seat: number; nick: string } | null {
+  savedRoom(): { code: string; seat: number; nick: string; token: string } | null {
     return this._readCred(this.session) ?? this._readCred(this.local);
   }
   saveRoom(code: string, seat: number, nick: string): void {
-    const cred = JSON.stringify({ code, seat, nick });
+    const cred = JSON.stringify({ code, seat, nick, token: this.seatToken });
     this.session.setItem(ROOM_KEY, cred); // 本标签页（主，多标签互不覆盖）
     this.local.setItem(ROOM_KEY, cred);   // 跨重开兜底（手机杀后台/重开浏览器）
   }
   clearRoom(): void { this.session.removeItem(ROOM_KEY); this.local.removeItem(ROOM_KEY); }
+  /** 收到本座会话令牌：记住 + 补写进已存的重连凭据(seat-token 可能晚于 room 到，故要回补 token)。 */
+  private onSeatToken(token: string): void {
+    this.seatToken = token;
+    const cur = this.savedRoom();
+    if (cur) this.saveRoom(cur.code, cur.seat, cur.nick); // 用新 token 重写凭据
+  }
 
   // ── 连接 ──
   connect(): void {
@@ -98,13 +105,14 @@ export class OnlineSession {
       this.reconnecting = false;
       // 断线重连：有房况则自动收回座位（用凭据里的本座昵称，不用共享 gd_nick——多标签会被覆盖）
       const room = this.savedRoom();
-      if (room && room.nick) this.rawSend(c2s.rejoin(room.code, room.nick));
+      if (room && room.token) this.rawSend(c2s.rejoin(room.code, room.token, room.nick)); // 有会话令牌才自动 rejoin
       this.openCbs.forEach((cb) => cb());
     };
     ws.onmessage = (ev: { data: unknown }): void => {
       let msg: { t?: unknown };
       try { msg = JSON.parse(typeof ev.data === 'string' ? ev.data : String(ev.data)) as { t?: unknown }; } catch { return; }
       if (!msg || typeof msg.t !== 'string') return;
+      if (msg.t === 'seat-token') { const tk = (msg as { token?: unknown }).token; if (typeof tk === 'string') this.onSeatToken(tk); return; } // 会话令牌内部消化，不外派给控制器
       this.listeners.get(msg.t)?.forEach((cb) => cb(msg));
     };
     ws.onclose = (): void => {

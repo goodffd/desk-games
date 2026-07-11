@@ -106,7 +106,7 @@ function onlineMount(root: HTMLElement): () => void {
 
   // ── session 事件 → 状态机 ──
   session.onOpen(() => {
-    if (session.savedRoom()) { pendingRejoin = true; return; } // 有房况：session 自动 rejoin，等 rejoined；标记在途，失败要回昵称页
+    if (session.savedRoom()?.token) { pendingRejoin = true; return; } // 有会话令牌：session 自动 rejoin，等结果；标记在途，失败回昵称页(无 token 的旧凭据不空等)
     showNickname();
   });
   session.on('hello-ok', () => showLobby());

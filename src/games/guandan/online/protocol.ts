@@ -69,7 +69,7 @@ export type C2SMessage =
   | { t: 'pass' }
   | { t: 'tribute-return'; cardId: number }
   | { t: 'restart' }
-  | { t: 'rejoin'; code: string; nick: string };
+  | { t: 'rejoin'; code: string; token: string; nick: string }; // token=会话令牌(座位私钥)，认证按 token 非昵称，防冒名劫持
 
 /** 服务端 → 客户端。 */
 export type S2CMessage =
@@ -84,6 +84,7 @@ export type S2CMessage =
   | { t: 'lobby'; rooms: LobbyRoom[] }
   | { t: 'spectating'; code: string; seats: (SeatInfo | null)[] }
   | { t: 'rejoined'; seat: Seat }
+  | { t: 'seat-token'; seat: Seat; token: string } // 落座后私发本座会话令牌(仅本人收)，客户端存作重连凭据
   | { t: 'peer-offline'; seat: Seat }
   | { t: 'peer-back'; seat: Seat }
   | { t: 'hand'; cards: Card[] }
@@ -108,5 +109,5 @@ export const c2s = {
   pass: (): C2SMessage => ({ t: 'pass' }),
   tributeReturn: (cardId: number): C2SMessage => ({ t: 'tribute-return', cardId }),
   restart: (): C2SMessage => ({ t: 'restart' }),
-  rejoin: (code: string, nick: string): C2SMessage => ({ t: 'rejoin', code, nick }),
+  rejoin: (code: string, token: string, nick: string): C2SMessage => ({ t: 'rejoin', code, token, nick }),
 };

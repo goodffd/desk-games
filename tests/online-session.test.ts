@@ -73,16 +73,25 @@ describe('OnlineSession', () => {
     expect(opened).toBe(1);
   });
 
-  it('断线 + 有房况 → 自动重连并 rejoin（用凭据里的本座昵称）', () => {
+  it('断线 + 有房况 → 自动重连并 rejoin（带凭据里的会话令牌 + 本座昵称）', () => {
     const { s } = makeSession();
     s.setNick('别的名');                       // 共享 gd_nick 被别的标签覆盖
     s.saveRoom('ABC123', 2, '阿东');           // 凭据里是本座真实昵称
     s.connect(); lastWS()._open();
+    lastWS()._recv({ t: 'seat-token', seat: 2, token: 'TK2' }); // 服务端私发会话令牌 → 内部补进凭据
     const before = MockWS.instances.length;
     lastWS().close();                         // 断线 → 即时 schedule → 重连 connect()
     expect(MockWS.instances.length).toBe(before + 1); // 新建了一条连接
-    lastWS()._open();                         // 重连 open → 自动发 rejoin（用凭据 nick，不用 gd_nick）
-    expect(sentMsgs(lastWS())).toContainEqual({ t: 'rejoin', code: 'ABC123', nick: '阿东' });
+    lastWS()._open();                         // 重连 open → 自动发 rejoin（带令牌，非仅昵称）
+    expect(sentMsgs(lastWS())).toContainEqual({ t: 'rejoin', code: 'ABC123', token: 'TK2', nick: '阿东' });
+  });
+
+  it('无会话令牌的凭据 → 不自动 rejoin（防旧凭据空等/认证缺口）', () => {
+    const { s } = makeSession();
+    s.saveRoom('ABC123', 2, '阿东');           // 只存了房况、从未收到 seat-token
+    s.connect(); lastWS()._open();
+    lastWS().close(); lastWS()._open();
+    expect(sentMsgs(lastWS()).some((m: any) => m.t === 'rejoin')).toBe(false); // 无令牌不发 rejoin
   });
 
   it('断线但无房况 → 不重连', () => {
@@ -107,7 +116,7 @@ describe('OnlineSession', () => {
     s1.saveRoom('ABC123', 2, '阿东');
     // 新标签页/重开：session 是新的(空)，local 共享 → savedRoom 走 local 兜底
     const s2 = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local, session: memStorage() });
-    expect(s2.savedRoom()).toEqual({ code: 'ABC123', seat: 2, nick: '阿东' });
+    expect(s2.savedRoom()).toEqual({ code: 'ABC123', seat: 2, nick: '阿东', token: '' });
   });
 
   it('一台电脑多标签：各 session 独立，各守各座不互相覆盖（共享 local）', () => {
@@ -116,15 +125,15 @@ describe('OnlineSession', () => {
     const tabB = new OnlineSession('ws://x', { WebSocketCtor: MockWS, local, session: memStorage() });
     tabA.saveRoom('ROOM01', 0, '甲');
     tabB.saveRoom('ROOM01', 3, '丁'); // 共享 local 被丁覆盖，但各自 session 守住自己的座
-    expect(tabA.savedRoom()).toEqual({ code: 'ROOM01', seat: 0, nick: '甲' }); // 甲仍是座0
-    expect(tabB.savedRoom()).toEqual({ code: 'ROOM01', seat: 3, nick: '丁' }); // 丁仍是座3
+    expect(tabA.savedRoom()).toEqual({ code: 'ROOM01', seat: 0, nick: '甲', token: '' }); // 甲仍是座0
+    expect(tabB.savedRoom()).toEqual({ code: 'ROOM01', seat: 3, nick: '丁', token: '' }); // 丁仍是座3
   });
 
   it('savedRoom/saveRoom/clearRoom 往返', () => {
     const { s } = makeSession();
     expect(s.savedRoom()).toBeNull();
     s.saveRoom('XYZ789', 1, '阿东');
-    expect(s.savedRoom()).toEqual({ code: 'XYZ789', seat: 1, nick: '阿东' });
+    expect(s.savedRoom()).toEqual({ code: 'XYZ789', seat: 1, nick: '阿东', token: '' });
     s.clearRoom();
     expect(s.savedRoom()).toBeNull();
   });

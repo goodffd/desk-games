@@ -19,7 +19,7 @@ describe('protocol c2s 发包构造器', () => {
     expect(c2s.pass()).toEqual({ t: 'pass' });
     expect(c2s.tributeReturn(42)).toEqual({ t: 'tribute-return', cardId: 42 });
     expect(c2s.restart()).toEqual({ t: 'restart' });
-    expect(c2s.rejoin('ABC123', '阿东')).toEqual({ t: 'rejoin', code: 'ABC123', nick: '阿东' });
+    expect(c2s.rejoin('ABC123', 'TK', '阿东')).toEqual({ t: 'rejoin', code: 'ABC123', token: 'TK', nick: '阿东' });
   });
 
   it('JSON 往返不丢字段（WS 走 JSON.stringify）', () => {

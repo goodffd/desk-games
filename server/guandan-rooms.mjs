@@ -1,9 +1,13 @@
 // 纯房间登记 + 转发（不依赖真 socket；client 只需有 send(msgObj)）。互信，不校验牌规。
+import { randomUUID } from 'node:crypto';
+
 function defaultCode() {
   const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // 去易混 0O1I
   let s = ''; for (let i = 0; i < 6; i++) s += A[Math.floor(Math.random() * A.length)];
   return s;
 }
+/** 会话令牌（座位私钥）：落座私发给本人，rejoin 靠它认证——防他人拿房号+昵称冒名重连、劫持座位+手牌。 */
+function newToken() { return randomUUID(); }
 
 export class RoomRegistry {
   constructor(codeGen = defaultCode, makeDriver = null, tributeTimeoutMs = 0, turnTimeoutMs = 0, disconnectGraceMs = 0, disconnectGraceMisses = 2, dealResultLingerMs = 0) {
@@ -130,7 +134,9 @@ export class RoomRegistry {
     }
     if (msg.t === 'rejoin') {
       const room = this.rooms.get(msg.code);
-      const idx = room ? room.seats.findIndex(s => s && !s.online && s.nick === msg.nick) : -1;
+      const token = (typeof msg.token === 'string' && msg.token) ? msg.token : null;
+      // 按会话令牌认证(非昵称)：令牌落座时私发、只本人有，防他人拿房号+昵称冒名重连劫持座位+手牌
+      const idx = (room && token) ? room.seats.findIndex(s => s && !s.online && s.token === token) : -1;
       if (idx === -1) { client.send({ t: 'error', msg: '无法重连：房间不存在或座位已占' }); return; }
       this._leaveRoom(client);
       room.seats[idx].client = client; room.seats[idx].online = true; room.seats[idx].ai = false;
@@ -189,8 +195,10 @@ export class RoomRegistry {
     // 先清掉该 client 在本房的旧座
     for (let k = 0; k < 4; k++) if (room.seats[k] && room.seats[k].client === client) room.seats[k] = null;
     const nick = this.nicks.get(client) || '玩家';
-    room.seats[i] = { client, nick, online: true, ai: false };
+    const token = newToken();
+    room.seats[i] = { client, nick, online: true, ai: false, token };
     client._room = room.code; client._seat = i;
+    client.send({ t: 'seat-token', seat: i, token }); // 私发本座会话令牌(仅本人收)，客户端存作重连凭据
   }
   _seatInfo(room) {
     return room.seats.map((s, i) => s ? { seat: i, nick: s.nick, online: s.online, ai: s.ai } : null);

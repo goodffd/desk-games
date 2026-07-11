@@ -84,6 +84,9 @@ export class OnlineDriver implements GameDriver {
     this.rebuild();
     this.fireChange();
     this.detectSpeak(st);
+    // 离开进贡阶段即清旧候选：否则上一局遗留的 myTributeOptions(非空)会让本局 onTributePhase
+    // 跳过「等 need-tribute」直接用旧 options 建还贡弹层 → 玩家点旧牌 id 不在本局手牌 → 服务端「不合规」。
+    if (st.phase !== 'tribute') this.myTributeOptions = null;
     if (st.phase === 'tribute' && st.tribute) this.onTributePhase(st);
     if ((st.phase === 'dealResult' || st.phase === 'matchOver') && st.result) this.fireResult(st);
   }

@@ -190,6 +190,25 @@ describe('OnlineDriver — 进贡还贡', () => {
     expect(io.sent).toContainEqual({ t: 'tribute-return', cardId: 3 });
   });
 
+  it('跨局收贡不串旧候选：上一局未 resolve 的 options 离开进贡阶段被清，本局用本局 need-tribute', () => {
+    const io = mockIO();
+    const d = new OnlineDriver(io, 0);
+    let prompt: TributePrompt | null = null;
+    d.onTribute((p) => { prompt = p; });
+    // 第2局：我收贡，拿到候选 [3,4]，但未 resolve（服务端超时自动替选场景）
+    const tribute2: NonNullable<PublicState['tribute']> = { exchanges: [{ giver: 2, receiver: 0, tribute: card(99) }], resist: false, doubleDown: false, pending: [0] };
+    io.emit('state', mkState({ phase: 'tribute', tribute: tribute2, dealNo: 2 }));
+    io.emit('need-tribute', { options: [card(3), card(4)] });
+    expect(prompt!.myReturnOptions!.map((c) => c.id)).toEqual([3, 4]);
+    // 第2局进入出牌（非进贡阶段）→ 旧候选必须被清
+    io.emit('state', mkState({ phase: 'playing', dealNo: 2 }));
+    // 第3局：我又收贡。若旧候选没清，onTributePhase 会用旧 [3,4] 直接建弹层且不再刷新
+    const tribute3: NonNullable<PublicState['tribute']> = { exchanges: [{ giver: 2, receiver: 0, tribute: card(98) }], resist: false, doubleDown: false, pending: [0] };
+    io.emit('state', mkState({ phase: 'tribute', tribute: tribute3, dealNo: 3 }));
+    io.emit('need-tribute', { options: [card(7), card(8)] });
+    expect(prompt!.myReturnOptions!.map((c) => c.id)).toEqual([7, 8]); // 本局候选，非上局 [3,4]
+  });
+
   it('我非收贡：立即 fire onTribute(myReturnOptions=null)；resolve(null) 不发包', () => {
     const io = mockIO();
     const d = new OnlineDriver(io, 1); // base1，server 收贡座=0 ≠ 我(1)

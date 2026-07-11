@@ -118,6 +118,8 @@
   position: absolute; bottom: 2.5%; left: 50%; transform: translateX(-50%);
   z-index: 9;            /* 头像始终可见：在手牌(6)/出牌区(3~7)之上 */
   flex-direction: column-reverse; align-items: center; gap: 4px;
+  pointer-events: none;  /* 纯展示(头像/名字/倒计时)：长昵称时盒子会撑出中间空隙、盖住出牌/不要按钮内侧，
+                            设穿透让点击落到底下按钮上——不然长昵称/窄屏时按钮内侧点不动(z-9 盖 z-8) */
 }
 /* 左右家：只锚定头像竖向居中；名/张数绝对排到头像下方，残局张数角标变大也不顶动头像。
    贴屏幕边缘，故限宽 + 换行：昵称占一行，张数/闹钟放不下就换到下一行，整体不超出屏幕左右边缘 */

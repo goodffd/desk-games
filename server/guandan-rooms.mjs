@@ -356,7 +356,10 @@ export class RoomRegistry {
   }
   _armTributeTimeout(room, out) {
     const needsTribute = (out || []).some(o => o.msg && o.msg.t === 'need-tribute');
-    if (needsTribute && !room._tributeTimer && this.tributeTimeoutMs) {
+    // 还贡超时只在"不止 1 个真人"时启用：多人才需防一人发呆卡住别人；单机(1真人+AI)没人等你，
+    // 让你慢慢选（=本地单机版无还贡超时的手感），不到点自动替选。
+    const humans = room.seats.filter(s => s && s.online).length;
+    if (needsTribute && humans > 1 && !room._tributeTimer && this.tributeTimeoutMs) {
       room._tributeTimer = setTimeout(() => { room._tributeTimer = null; if (room.driver) this._dispatch(room, room.driver.forceAutoReturn()); }, this.tributeTimeoutMs);
     }
     const leftTribute = (out || []).some(o => o.msg && o.msg.t === 'state' && o.msg.phase === 'playing');

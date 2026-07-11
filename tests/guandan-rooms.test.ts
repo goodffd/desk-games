@@ -514,3 +514,22 @@ describe('RoomRegistry — 掉线宽限接管', () => {
     expect(drv.autoCalls).toContain(0);
   });
 });
+
+describe('还贡超时：仅"不止 1 真人"时启用（单机不催）', () => {
+  const ai = () => ({ online: false, ai: true });
+  const human = () => ({ online: true, ai: false });
+  const needTribute = [{ msg: { t: 'need-tribute' } }] as any;
+  it('1 真人 + 3 AI（单机）→ 不设还贡超时（可慢慢选）', () => {
+    const reg: any = new RoomRegistry(() => 'X', null, 30000);
+    const room: any = { seats: [human(), ai(), ai(), ai()], driver: { forceAutoReturn: () => [] } };
+    reg._armTributeTimeout(room, needTribute);
+    expect(room._tributeTimer).toBeFalsy();
+  });
+  it('2 真人 + 2 AI → 设还贡超时（防一人发呆卡住别人）', () => {
+    const reg: any = new RoomRegistry(() => 'X', null, 30000);
+    const room: any = { seats: [human(), human(), ai(), ai()], driver: { forceAutoReturn: () => [] } };
+    reg._armTributeTimeout(room, needTribute);
+    expect(room._tributeTimer).toBeTruthy();
+    clearTimeout(room._tributeTimer);
+  });
+});

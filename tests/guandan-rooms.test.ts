@@ -334,6 +334,47 @@ describe('RoomRegistry — play/pass 转 driver', () => {
   });
 });
 
+describe('RoomRegistry — 单局结算停留(dealResultLinger)', () => {
+  afterEach(() => { vi.useRealTimers(); });
+  function mkDriver() {
+    return {
+      match: { over: false }, online: [true, true, true, true], started: false, nextDealCalls: 0,
+      start() { this.started = true; return [{ to: 'all', msg: { t: 'state', phase: 'playing', turn: 0 } }]; },
+      nextDeal() { this.nextDealCalls++; return [{ to: 'all', msg: { t: 'state', phase: 'tribute', tribute: { exchanges: [], resist: false, doubleDown: false, pending: [] } } }]; },
+    };
+  }
+  function playingRoom(lingerMs: number) {
+    const drv = mkDriver();
+    const reg = new RoomRegistry(() => 'ABC123', () => drv, 0, 0, 0, 2, lingerMs);
+    const cs = [fakeClient(), fakeClient(), fakeClient(), fakeClient()];
+    cs.forEach((c, i) => reg.handle(c, { t: 'hello', nick: 'p' + i }));
+    reg.handle(cs[0], { t: 'create' });
+    for (let i = 1; i < 4; i++) { reg.handle(cs[i], { t: 'join', code: 'ABC123' }); reg.handle(cs[i], { t: 'take-seat', seat: i }); }
+    reg.handle(cs[0], { t: 'start' });
+    return { reg, drv, room: reg.rooms.get('ABC123') };
+  }
+  const dealResult = [{ to: 'all', msg: { t: 'state', phase: 'dealResult', result: { lastHand: [] } } }];
+
+  it('dealResult 后停留 lingerMs 再续局（不立即 nextDeal，避免一闪而过看不清末游牌）', () => {
+    vi.useFakeTimers();
+    const { reg, drv, room } = playingRoom(4500);
+    reg._dispatch(room, dealResult);
+    expect(drv.nextDealCalls).toBe(0);        // 刚结算：未续局
+    vi.advanceTimersByTime(4400);
+    expect(drv.nextDealCalls).toBe(0);        // 未到点：仍停留
+    vi.advanceTimersByTime(200);
+    expect(drv.nextDealCalls).toBe(1);        // 过 4.5s → 续局
+  });
+
+  it('lingerMs=0 → 下一 tick 即续局（测试默认，保持快）', () => {
+    vi.useFakeTimers();
+    const { reg, drv, room } = playingRoom(0);
+    reg._dispatch(room, dealResult);
+    vi.advanceTimersByTime(0);
+    expect(drv.nextDealCalls).toBe(1);
+  });
+});
+
 describe('RoomRegistry — 再来一盘(restart)', () => {
   let made: any[]; let reg: any;
   const makeDrv = (_room: any) => {

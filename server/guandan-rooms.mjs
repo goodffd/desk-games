@@ -6,10 +6,11 @@ function defaultCode() {
 }
 
 export class RoomRegistry {
-  constructor(codeGen = defaultCode, makeDriver = null, tributeTimeoutMs = 0, turnTimeoutMs = 0, disconnectGraceMs = 0, disconnectGraceMisses = 2) {
+  constructor(codeGen = defaultCode, makeDriver = null, tributeTimeoutMs = 0, turnTimeoutMs = 0, disconnectGraceMs = 0, disconnectGraceMisses = 2, dealResultLingerMs = 0) {
     this.codeGen = codeGen;
     this.makeDriver = makeDriver;       // (room) => MatchDriver；Task 9 接入
     this.tributeTimeoutMs = tributeTimeoutMs;
+    this.dealResultLingerMs = dealResultLingerMs; // 单局结算弹层停留时长再自动续局（0=立即，生产给几秒让玩家看清末游剩牌）
     this.turnTimeoutMs = turnTimeoutMs; // 回合超时(在线真人座发呆)→ 服务端 choosePlay 代打
     this.disconnectGraceMs = disconnectGraceMs;         // 掉线宽限：单次回合超时(0=不启用,掉线即转全速AI=旧行为)
     this.disconnectGraceMisses = disconnectGraceMisses; // 掉线宽限座连续被超时代打几手仍没回来 → 转全速AI
@@ -214,6 +215,7 @@ export class RoomRegistry {
       room.seats[idx] = null;
       if (room.host === client) {       // 房主走：删房
         if (room._aiTimer) { clearTimeout(room._aiTimer); room._aiTimer = null; }
+        if (room._advanceTimer) { clearTimeout(room._advanceTimer); room._advanceTimer = null; }
         for (const sp of room.spectators) sp.send({ t: 'room-closed' });
         this.rooms.delete(code); if (!room.isPrivate) this._broadcastLobby();
       } else { this._sendRoom(room); }
@@ -242,9 +244,11 @@ export class RoomRegistry {
       if (room.driver && room.driver.broadcastState) this._dispatch(room, [room.driver.broadcastState()]);
     }
     const anyHuman = room.seats.some(s => s && s.online);
-    if (!anyHuman) {                    // 全部掉线 → 删房（清回合/AI计时，避免对死房代打）
+    if (!anyHuman) {                    // 全部掉线 → 删房（清回合/AI/续局/还贡计时，避免对死房代打/续局）
       if (room._turnTimer) { clearTimeout(room._turnTimer); room._turnTimer = null; }
       if (room._aiTimer) { clearTimeout(room._aiTimer); room._aiTimer = null; }
+      if (room._advanceTimer) { clearTimeout(room._advanceTimer); room._advanceTimer = null; }
+      if (room._tributeTimer) { clearTimeout(room._tributeTimer); room._tributeTimer = null; }
       for (const sp of room.spectators) sp.send({ t: 'room-closed' });
       this.rooms.delete(code); if (!room.isPrivate) this._broadcastLobby();
     }
@@ -279,14 +283,16 @@ export class RoomRegistry {
     const hasDealResult = (outbound || []).some(o => o.msg && o.msg.t === 'state' && o.msg.phase === 'dealResult');
     if (hasDealResult && room.driver && !room._advancing && typeof room.driver.nextDeal === 'function') {
       room._advancing = true;
-      setImmediate(() => {
+      // 停留 dealResultLingerMs 再续局：让玩家看清本局名次与末游剩牌（否则弹层被下一局瞬间覆盖，一闪而过）
+      room._advanceTimer = setTimeout(() => {
+        room._advanceTimer = null;
         room._advancing = false;
         if (room.driver && typeof room.driver.nextDeal === 'function') {
           const o = room.driver.nextDeal();
           this._dispatch(room, o);
           this._armTributeTimeout(room, o);
         }
-      });
+      }, this.dealResultLingerMs);
     }
     // 当前回合若是 AI 座 → 带 1.2~2.5s 思考延迟逐手驱动（服务端权威计时，观感同单机版；不再瞬间打完）
     this._scheduleAIStep(room);

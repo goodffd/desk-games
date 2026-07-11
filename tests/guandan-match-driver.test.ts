@@ -82,6 +82,7 @@ describe('MatchDriver — 局终结算', () => {
     const d = new MatchDriver({ shuffle: defaultShuffleSeeded() }); // 见下：可复现洗牌
     const out = d.start();
     for (let s = 0; s < 4; s++) out.push(...d.setAI(s as any, true));
+    out.push(...d.driveAI()); // 驱动外置：显式同步驱动 AI 打完（房间层实时是带思考延迟逐手）
     const lastState = [...out].reverse().find(o => o.msg.t === 'state')!.msg;
     expect(['dealResult', 'tribute', 'matchOver']).toContain(lastState.phase);
     if (lastState.phase === 'dealResult') expect(lastState.result.ranking).toHaveLength(4);
@@ -99,8 +100,9 @@ describe('MatchDriver — AI 接管', () => {
   it('setAI(座位X,true) 且轮到该座 → AI 自动推进，turn 不停在 AI 座', () => {
     const d = new MatchDriver({ shuffle: noShuffle }); d.start(); // 轮到座位0
     const out = d.setAI(0, true);
+    out.push(...d.driveAI()); // 驱动外置：显式驱动
     expect(out.some((o: any) => o.msg.t === 'state')).toBe(true);
-    // 座位0 被 AI 接管且首攻 → 应已自动出牌，turn 前移
+    // 座位0 被 AI 接管且首攻 → 驱动后应已出牌，turn 前移
     expect(d.online[0]).toBe(false);
     expect(d.state.turn).not.toBe(0);
   });
@@ -108,7 +110,8 @@ describe('MatchDriver — AI 接管', () => {
   it('全 4 座 AI → 一路自动打完整局不卡死', () => {
     const d = new MatchDriver({ shuffle: noShuffle }); d.start();
     for (let s = 0; s < 4; s++) d.setAI(s as any, true);
-    // setAI 链式驱动后，本局应已结束（finished 满 4 或 deal over）
+    d.driveAI(); // 驱动外置：显式驱动到底
+    // 驱动后本局应已结束（finished 满 4 或 deal over）
     expect(d.state.finished.length).toBeGreaterThanOrEqual(3);
   });
 
@@ -126,16 +129,15 @@ describe('MatchDriver — AI 接管', () => {
     for (const s of [0, 2, 3]) d.setAI(s as any, true); // 其余 3 座 AI（=掉线接管）
     // 真人 human 全程发呆：每轮都靠 forceAutoPlay 托管。验证：能一路把整盘推完，不会卡在 human 座。
     let guard = 0;
-    while (!d.match.over && guard++ < 400) {
+    while (!d.match.over && guard++ < 600) {
       if (d.phase === 'playing' && d.state.turn === human && d.state.finished.indexOf(human as any) === -1) {
-        d.forceAutoPlay(); // 真人发呆 → 服务端代打
+        d.forceAutoPlay(); d.driveAI(); // 真人发呆代打一手 + 驱动后续 AI 到下个人类回合(驱动外置)
       } else if (d.phase === 'tribute') {
-        d.forceAutoReturn();
+        d.forceAutoReturn(); d.driveAI();
       } else if (d.phase === 'dealResult') {
-        d.nextDeal();
+        d.nextDeal(); d.driveAI();
       } else {
-        // 轮到 AI 座但 driveAI 未推进（理论不应发生）→ 防御性兜底
-        break;
+        d.driveAI(); // AI 座回合：显式同步驱动（房间层实时是带思考延迟逐手）
       }
     }
     expect(d.match.over).toBe(true); // 整盘能打完，真人座不会永久卡住
@@ -147,15 +149,16 @@ describe('MatchDriver — 进贡/还贡', () => {
     const d = new MatchDriver({ shuffle: defaultShuffleSeeded() });
     const out = d.start();
     for (let s = 0; s < 4; s++) out.push(...d.setAI(s as any, true));
+    out.push(...d.driveAI());
     let guard = 0;
-    while (!d.match.over && guard++ < 30) { out.push(...d.nextDeal()); for (let s = 0; s < 4; s++) out.push(...d.setAI(s as any, true)); }
+    while (!d.match.over && guard++ < 30) { out.push(...d.nextDeal()); for (let s = 0; s < 4; s++) out.push(...d.setAI(s as any, true)); out.push(...d.driveAI()); }
     expect(d.match.over || guard >= 30).toBeTruthy(); // 不死循环
   });
 
   it('收贡座位是真人 → 发 need-tribute；该人 tribute-return 后开下一局', () => {
     // 造一个「非抗贡单贡、收贡座位在线」的局面：用全 AI 打完首局拿到 finished，再设收贡座位 online
     const d = new MatchDriver({ shuffle: defaultShuffleSeeded() });
-    d.start(); for (let s = 0; s < 4; s++) d.setAI(s as any, true);
+    d.start(); for (let s = 0; s < 4; s++) d.setAI(s as any, true); d.driveAI(); // 驱动外置：显式驱动完首局
     // 头游座位设为在线真人
     const head = d.pendingResult!.finished[0]!;
     d.online[head] = true;
@@ -171,7 +174,7 @@ describe('MatchDriver — 进贡/还贡', () => {
   it('双贡：planTribute 产出 2 项 exchange 时，给两个收贡真人各发 need-tribute', () => {
     // 直接构造 driver 内部状态触发：mock pendingResult 为双下名次 + 两收贡在线
     const d = new MatchDriver({ shuffle: defaultShuffleSeeded() });
-    d.start(); for (let s = 0; s < 4; s++) d.setAI(s as any, true);
+    d.start(); for (let s = 0; s < 4; s++) d.setAI(s as any, true); d.driveAI(); // 驱动外置：显式驱动完首局
     d.pendingResult = { finished: [0, 2, 1, 3], settle: { match: d.match } } as any; // 头0/二2 同队=双下
     d.online[0] = true; d.online[2] = true;
     const out = d.nextDeal();

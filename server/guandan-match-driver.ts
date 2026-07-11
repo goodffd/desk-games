@@ -165,7 +165,7 @@ export class MatchDriver {
     this.lastActor = null;
     this.pendingDeal = null;
     this.pendingResult = null;
-    return [this.broadcastState(), ...this.handMsgs(), ...this.driveAI()];
+    return [this.broadcastState(), ...this.handMsgs()]; // 首攻若 AI 座，由房间层带延迟驱动
   }
 
   // ── PUBLIC: validate → applyPlay → afterAction → driveAI ──────────────────
@@ -176,14 +176,14 @@ export class MatchDriver {
     if (!isLegalPlay(cards, this.state.current?.combo ?? null, this.state.hands[seat]!, this.state.level))
       return [err(seat, '不合规')];
     this.applyPlay(seat, cards);
-    return [...this.afterAction(seat), ...this.driveAI()];
+    return [...this.afterAction(seat)]; // AI 后续座由房间层带延迟逐手驱动
   }
 
   handlePass(seat: Seat): Outbound[] {
     if (this.state.turn !== seat) return [err(seat, '还没轮到你')];
     if (this.state.current === null) return [err(seat, '领出不能不要')];
     this.applyPass(seat);
-    return [...this.afterAction(seat), ...this.driveAI()];
+    return [...this.afterAction(seat)]; // AI 后续座由房间层带延迟逐手驱动
   }
 
   /** 回合超时托管：替当前轮到的座位（在线真人发呆时）用 choosePlay 自动出一手，同 AI 接管。 */
@@ -192,7 +192,7 @@ export class MatchDriver {
     const seat = this.state.turn;
     const decision = choosePlay(this.state, seat);
     if (decision === null) this.applyPass(seat); else this.applyPlay(seat, decision);
-    return [...this.afterAction(seat), ...this.driveAI()];
+    return [...this.afterAction(seat)]; // AI 后续座由房间层带延迟逐手驱动
   }
 
   // ── PRIVATE: state-advancing core (no driveAI) ────────────────────────────
@@ -215,24 +215,25 @@ export class MatchDriver {
   // ── AI 接管 ───────────────────────────────────────────────────────────────
   setAI(seat: Seat, on: boolean): Outbound[] {
     this.online[seat] = !on;
-    const out: Outbound[] = [this.broadcastState()];
-    out.push(...this.driveAI());
-    return out;
+    return [this.broadcastState()]; // 转 AI 后由房间层带延迟驱动其出牌
   }
 
-  private driveAI(): Outbound[] {
+  /** 玩一手 AI：当前回合是 AI 座(online[seat]=false)且未收盘才出一手，返回该手公开态+私发；否则 []。
+   *  房间层据此逐手带思考延迟驱动（延迟在服务端=权威计时，所有客户端一致）。 */
+  stepAI(): Outbound[] {
+    if (this.phase !== 'playing' || isDealOver(this.state) || passALockedEarly(this.match, this.state.finished)) return [];
+    const seat = this.state.turn;
+    if (this.online[seat]) return []; // 人类座不代打
+    const decision = choosePlay(this.state, seat);
+    if (decision === null) this.applyPass(seat); else this.applyPlay(seat, decision);
+    return this.afterAction(seat);
+  }
+
+  /** 同步把连续 AI 座一次打完（无延迟）——仅测试/内部用；房间层实时对局用 stepAI 逐手带延迟。 */
+  driveAI(): Outbound[] {
     const out: Outbound[] = [];
     let guard = 0;
-    while (!isDealOver(this.state) && !passALockedEarly(this.match, this.state.finished) && !this.online[this.state.turn] && guard++ < 200) {
-      const seat = this.state.turn;
-      const decision = choosePlay(this.state, seat);
-      if (decision === null) {
-        this.applyPass(seat);
-      } else {
-        this.applyPlay(seat, decision);
-      }
-      out.push(...this.afterAction(seat));
-    }
+    for (let step = this.stepAI(); step.length && guard++ < 200; step = this.stepAI()) out.push(...step);
     return out;
   }
 

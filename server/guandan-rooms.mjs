@@ -213,6 +213,7 @@ export class RoomRegistry {
     if (room.status === 'waiting') {
       room.seats[idx] = null;
       if (room.host === client) {       // 房主走：删房
+        if (room._aiTimer) { clearTimeout(room._aiTimer); room._aiTimer = null; }
         for (const sp of room.spectators) sp.send({ t: 'room-closed' });
         this.rooms.delete(code); if (!room.isPrivate) this._broadcastLobby();
       } else { this._sendRoom(room); }
@@ -241,8 +242,9 @@ export class RoomRegistry {
       if (room.driver && room.driver.broadcastState) this._dispatch(room, [room.driver.broadcastState()]);
     }
     const anyHuman = room.seats.some(s => s && s.online);
-    if (!anyHuman) {                    // 全部掉线 → 删房（清回合计时，避免对死房代打）
+    if (!anyHuman) {                    // 全部掉线 → 删房（清回合/AI计时，避免对死房代打）
       if (room._turnTimer) { clearTimeout(room._turnTimer); room._turnTimer = null; }
+      if (room._aiTimer) { clearTimeout(room._aiTimer); room._aiTimer = null; }
       for (const sp of room.spectators) sp.send({ t: 'room-closed' });
       this.rooms.delete(code); if (!room.isPrivate) this._broadcastLobby();
     }
@@ -286,6 +288,25 @@ export class RoomRegistry {
         }
       });
     }
+    // 当前回合若是 AI 座 → 带 1.2~2.5s 思考延迟逐手驱动（服务端权威计时，观感同单机版；不再瞬间打完）
+    this._scheduleAIStep(room);
+  }
+  /** AI 座回合：延迟一手思考时间再 stepAI 出牌，dispatch 后自然递归排下一手 AI（到人类回合/收盘停）。 */
+  _scheduleAIStep(room) {
+    const d = room.driver;
+    const turn = (d && d.phase === 'playing' && d.state) ? d.state.turn : null;
+    const seat = (typeof turn === 'number') ? room.seats[turn] : null;
+    const isAiTurn = !!(seat && seat.ai && !seat.online && d && typeof d.stepAI === 'function');
+    if (!isAiTurn) { if (room._aiTimer) { clearTimeout(room._aiTimer); room._aiTimer = null; } return; }
+    if (room._aiTimer) return; // 已排一手，等它落子
+    const delay = 1200 + Math.floor(Math.random() * 1300); // 同单机版 scheduleAi 的思考时长
+    room._aiTimer = setTimeout(() => {
+      room._aiTimer = null;
+      if (room.driver && typeof room.driver.stepAI === 'function') {
+        const out = room.driver.stepAI();
+        if (out && out.length) this._dispatch(room, out); // _dispatch 末尾会再排下一手 AI
+      }
+    }, delay);
   }
   /** 回合超时计时：在线真人座(turnTimeoutMs) 或 掉线宽限座(disconnectGraceMs) 发呆到点 → forceAutoPlay 代打。
    *  只在「该计时座位变(armSeat) 或 出现新行棋(driver.ply 变)」时才重置；同座同 ply 的纯重广播（观战/重连/

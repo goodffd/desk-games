@@ -1,7 +1,6 @@
 /**
  * 掼蛋游戏模块入口（控制器）。
- * 入口分流：`/guandan` → 模式选择页（单机对战 / 4 人联机 并排二选一）；
- *   单机 = 联机 1 人 + 3 AI（走服务端），联机 = 联机流。`/guandan?debug` → 跳过选择页直挂单机。
+ * 入口：`/guandan` → 直接进联机大厅（无单机/联机选择页；单机已并入联机=1人+3AI、空座服务端补）。
  * 联机状态机：昵称 → 大厅(建房/匹配/加入/观战) → 房间(挑座/开打) → 牌桌(OnlineDriver)。
  * 控制器只编排：session 收发 + UI 切换 + 开打挂牌桌 + 掉线/重连 toast。规则/AI 全在服务端。
  */
@@ -17,9 +16,8 @@ import { renderNickname, type NicknameHandle } from './online/ui/nickname';
 import { renderLobby, type LobbyHandle } from './online/ui/lobby';
 import { renderRoom, type RoomHandle, type RoomState } from './online/ui/room';
 
-/** opts.solo=true：单机（=联机 1 人 + 3 AI）。自动建私房+开打、跳过昵称/大厅/房间页、座名用 你/下家/对家/上家。 */
-function onlineMount(root: HTMLElement, opts: { solo?: boolean } = {}): () => void {
-  const solo = !!opts.solo;
+/** 掼蛋联机牌局：昵称→大厅(建房/匹配/加入/观战)→房间→牌桌。单人=建房→开打，空座服务端补 AI。 */
+function onlineMount(root: HTMLElement): () => void {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const session = new OnlineSession(`${proto}://${location.host}/ws-guandan`);
 
@@ -35,7 +33,6 @@ function onlineMount(root: HTMLElement, opts: { solo?: boolean } = {}): () => vo
   let roomSeats: (SeatInfo | null)[] = []; // 最近的座位昵称（牌桌 state 不带昵称，从 room/spectating 取）
 
   function applySeatNames(): void {
-    if (solo) { setSeatNames(null); if (onTable && driver) driver.requestRender(); return; } // 单机：你/下家/对家/上家
     if (mySeat === null || !roomSeats.length) { setSeatNames(null); return; }
     const base = typeof mySeat === 'number' ? mySeat : 0; // egocentric：view 座 i → 服务端座
     const names = [0, 1, 2, 3].map((v) => {
@@ -109,21 +106,19 @@ function onlineMount(root: HTMLElement, opts: { solo?: boolean } = {}): () => vo
   // ── session 事件 → 状态机 ──
   session.onOpen(() => {
     if (session.savedRoom()) return; // 有房况：session 自动 rejoin，等 rejoined
-    if (solo) { const nick = `你${Math.floor(Math.random() * 1e6)}`; session.setNick(nick); session.send(c2s.hello(nick)); } // 单机：内部唯一昵称、不显示
-    else showNickname();
+    showNickname();
   });
-  session.on('hello-ok', () => { if (solo) session.send(c2s.create(true)); else showLobby(); }); // 单机：自动建私房
+  session.on('hello-ok', () => showLobby());
   session.on('rename-ok', () => showLobby());
-  session.on('nick-taken', () => { if (solo) session.send(c2s.hello(`你${Math.floor(Math.random() * 1e6)}`)); else nickH?.showError('昵称已被占用，换一个'); });
+  session.on('nick-taken', () => nickH?.showError('昵称已被占用，换一个'));
   session.on('lobby', (m) => lobbyH?.update((m as { rooms: LobbyRoom[] }).rooms));
-  session.on('created', () => { isHost = true; if (solo) session.send(c2s.start()); }); // 单机：建好即开打（服务端补 3 AI）
+  session.on('created', () => { isHost = true; });
   session.on('room', (m) => {
     const r = m as { code: string; status: 'waiting' | 'playing'; seats: (SeatInfo | null)[]; you: Seat | 'spectator' | null };
     mySeat = r.you;
     roomSeats = r.seats; applySeatNames(); // 牌桌昵称（联机中 room 不再来，故这里抓住）
-    // 重连凭据：带本座真实昵称（联机用；单机不存，刷新=开新局）
-    if (typeof r.you === 'number' && !solo) session.saveRoom(r.code, r.you, r.seats[r.you]?.nick ?? session.nick);
-    if (r.status === 'waiting' && !solo) showRoom(r.code, r.seats, r.you); // 单机不显示房间页（start 已发）
+    if (typeof r.you === 'number') session.saveRoom(r.code, r.you, r.seats[r.you]?.nick ?? session.nick); // 重连凭据：带本座真实昵称
+    if (r.status === 'waiting') showRoom(r.code, r.seats, r.you);
   });
   session.on('spectating', (m) => {
     mySeat = 'spectator';
@@ -152,19 +147,9 @@ function onlineMount(root: HTMLElement, opts: { solo?: boolean } = {}): () => vo
 }
 
 function mount(root: HTMLElement): () => void {
-  let active: (() => void) | null = null;
-
-  // ?debug：一键直挂单机(联机 1人+3AI，自动建私房+开打)，跳过昵称/大厅——开发快捷入口(隐藏 URL 参数，非可见入口)
-  if (new URLSearchParams(location.search).has('debug')) {
-    primeAudio(); // 借进入手势解锁音频（WebKit 须真实手势才能放报牌语音）
-    active = onlineMount(root, { solo: true });
-    return () => { active?.(); active = null; };
-  }
-
-  // 正门：直接进联机大厅（昵称→大厅：建房/随机匹配/输房号加入/观战）。单机已并入联机——
-  // 想一个人打就建房→开打，空座自动补 AI；界面不再有单独的「单机 / 联机」二选一入口。
-  active = onlineMount(root);
-  return () => { active?.(); active = null; };
+  // 进掼蛋直接进联机大厅（昵称→大厅：建房/随机匹配/输房号加入/观战）。单机已并入联机——
+  // 想一个人打就建房→开打，空座自动补 AI；界面无单独「单机」入口，也无 ?debug 隐藏入口。
+  return onlineMount(root);
 }
 
 export const guandanModule: GameModule = {

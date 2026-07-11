@@ -17,7 +17,8 @@ import { makeDeck, deal } from '../src/games/guandan/engine/cards';
 import { isLegalPlay } from '../src/games/guandan/engine/legal';
 import { enumerateLeads } from '../src/games/guandan/engine/legal';
 import { createDeal, play as gamePlay, pass as gamePass } from '../src/games/guandan/engine/game';
-import { choosePlay, chooseReturn } from '../src/games/guandan/ai/ai';
+import { choosePlay, chooseReturn, heuristicChoose } from '../src/games/guandan/ai/ai';
+import { computeUnseen } from '../src/games/guandan/ai/counting';
 import { identify } from '../src/games/guandan/engine/combos';
 
 // ---- deterministic shuffle ------------------------------------------------
@@ -384,54 +385,61 @@ function followState(hand: Card[], byCards: Card[]): DealState {
   };
 }
 
+// 这些用例验证的是「跟牌启发式逻辑」(damage 度量 / 战略不要 / 配合)，即 heuristicChoose 层。
+// choosePlay = 启发式 + 残局 determinized rollout；rollout 在这些小手牌人工场景会触发，且其
+// 采样对手手牌与人工构造的废牌对不上，故对本层单测直接测 heuristicChoose（rollout 的净收益由
+// ai-improvement 基准 + 「200 随机局合法性」用例覆盖）。
+const heur = (s: DealState, seat: Seat): Card[] | null => heuristicChoose(s, seat, computeUnseen(s, seat));
+
 describe('choosePlay 跟牌', () => {
   it('对手出小单张：用零散单张压，不拆顺子', () => {
     // 手里一条顺子3-7 + 一张散K；对手出一张10 → 应用散K压，不拆顺子
-    // 老 FOLLOW：取 nonBombs 里最低 key（散K key=13 > 顺子内最低单张 key=3），
-    // 老 AI 若枚举到拆顺子里单张3-7（key 更低），会错误选它们而非散K。
-    // 新 AI damage 度量：拆顺子中单张 damage>0（破坏结构），散K damage=0 → 选散K。
+    // damage 度量：拆顺子中单张 damage>0（破坏结构），散K damage=0 → 选散K。
     const hand = [n(3, 'S'), n(4, 'H'), n(5, 'C'), n(6, 'D'), n(7, 'S'), n(13, 'C')];
-    const out = choosePlay(followState(hand, [n(10, 'D')]), 0 as Seat);
+    const out = heur(followState(hand, [n(10, 'D')]), 0 as Seat);
     expect(out).not.toBeNull();
     expect(out!.length).toBe(1);
     const played = out![0]!;
     expect(played.kind === 'normal' && played.rank).toBe(13); // 散K，不是顺子里的牌
   });
 
-  it('唯一能压的牌会拆掉关键结构、且非残局 → 战略不要(pass)', () => {
-    // 手里只有一对8(成对) + 一条顺子；对手出单张7，能压的最小是拆一张8，
-    // 但拆8会破坏对子结构（damage > 0）且非残局 → 期望 pass。
-    // 老 FOLLOW：nonBombs 取最低 key 直接出，会错误地拆对出单8。
+  it('便宜抢节奏：唯一能压的是拆一张的小牌(≤2张, damage≤1) → 抢下领出权（tempo-grab）', () => {
+    // 手里一对8 + 一条顺子；对手出单张7，能压的最小是拆一张8（damage=1, 1 张）。
+    // 增强 AI 的「便宜抢节奏」：损伤≤1 的小牌(≤2)拿下这轮领出权帮自己更快走完——
+    // 经 ai-improvement 基准验证为净正（头游胜率 +）。故此微观场景由旧「战略不要」改为出牌。
     const hand = [n(8, 'S'), n(8, 'H'), n(9, 'C'), n(10, 'D'), n(11, 'S'), n(12, 'C'), n(13, 'D')];
-    const out = choosePlay(followState(hand, [n(7, 'D')]), 0 as Seat);
+    const out = heur(followState(hand, [n(7, 'D')]), 0 as Seat);
+    expect(out).not.toBeNull();
+    expect(out!.length).toBe(1);
+    expect(out![0]!.kind === 'normal' && out![0]!.rank).toBe(8); // 拆一张 8 压
+  });
+
+  it('大代价拆结构、且非残局 → 战略不要(pass)（tempo-grab 不覆盖 >2 张的牺牲）', () => {
+    // 手里钢板 10-10-10-J-J-J(consecTriples, 1 手) + 两张散牌；对手出三张9。
+    // 唯一能压的是拆钢板出三张10/三张J（length=3, damage=1）——tempo-grab 只抢 ≤2 张，不适用 → pass。
+    const hand = [n(10, 'S'), n(10, 'H'), n(10, 'C'), n(11, 'S'), n(11, 'H'), n(11, 'C'), n(3, 'D'), n(5, 'D')];
+    const out = heur(followState(hand, [n(9, 'D'), n(9, 'H'), n(9, 'C')]), 0 as Seat);
     expect(out).toBeNull();
   });
 
-  it('spare(damage=0) 与结构内牌(damage>0)都能压 → 选 spare 不拆顺子【真 RED：覆盖 damage 主路径】', () => {
-    // 探针实测确认拆解结构（decompose([8S,9H,10C,11D,12S,14C], L3)）：
-    //   handCount=2 → straight 8-12 + single A(14)。A 是结构外 spare、8-12 是顺子。
-    //   A(14) 接不进 8-12 顺子 → decompose 必然把 A 留作单张，无歧义。
-    // 对手出单张10 → 合法跟牌只有 J(11)、Q(12)、散A(14)（探针：follows vs single-10）。
-    //   J(11)、Q(12) 都在顺子内：拆掉 → handCount 2→6，damage=(1+5)-2=4 (>0)。
-    //   散A(14) 是 spare：拿掉 → handCount 2→1，damage=(1+1)-2=0。
-    // 真 RED 论证：老 FOLLOW 取 nonBombs 最低 key → J(key=11) < Q(12) < A(14)，
-    //   会错误地拆顺子出 J。新 AI 按 (damage, key) 排序 → A 的 damage=0 最优，选散A。
+  it('spare(damage=0) 与结构内牌(damage>0)都能压 → 选 spare 不拆顺子【damage 主路径】', () => {
+    // decompose([8S,9H,10C,11D,12S,14C], L3): handCount=2 → straight 8-12 + single A(14)。
+    // 对手出单张10 → 合法跟牌 J(11)/Q(12)（顺子内, damage=4）、散A(14)（spare, damage=0）。
+    // 按 (damage, key) 排序 → 选 damage=0 的散A，不拆顺子。
     const hand = [n(8, 'S'), n(9, 'H'), n(10, 'C'), n(11, 'D'), n(12, 'S'), n(14, 'C')];
-    const out = choosePlay(followState(hand, [n(10, 'D')]), 0 as Seat);
+    const out = heur(followState(hand, [n(10, 'D')]), 0 as Seat);
     expect(out).not.toBeNull();
     expect(out!.length).toBe(1);
     const played = out![0]!;
-    // 应是结构外的 spare 散A(14)，不是顺子里的 J(11)/Q(12)
-    expect(played.kind === 'normal' && played.rank).toBe(14);
+    expect(played.kind === 'normal' && played.rank).toBe(14); // 结构外 spare 散A
   });
 
   it('队友领先 → 默认不要', () => {
-    // 老 FOLLOW 对 partner 也是直接 return null，新旧行为一致；
-    // 此条作为"配合逻辑不退化"防回归守卫。
+    // 配合逻辑：队友领先时默认让队友走（不能一手走完则 pass）。
     const hand = [n(5, 'S'), n(6, 'H')];
     const st = followState(hand, [n(4, 'D')]);
     st.current!.by = 2 as Seat; // 改为队友领先
-    expect(choosePlay(st, 0 as Seat)).toBeNull();
+    expect(heur(st, 0 as Seat)).toBeNull();
   });
 });
 

@@ -48,6 +48,11 @@ export interface DealState {
   finished: Seat[];
   /** The level rank ("打 2" → 2). */
   level: Rank;
+  /**
+   * 本局已打出的所有牌（累计，出牌顺序）。AI 记牌用：仅含公开出过的牌，不含任何手牌信息。
+   * 引擎 createDeal/play/pass 全程维护；可选以兼容旧的 DealState 字面量构造（缺省视作空）。
+   */
+  played?: Card[];
 }
 
 const SEATS: Seat[] = [0, 1, 2, 3];
@@ -122,6 +127,7 @@ export function createDeal(hands: Card[][], firstLeader: Seat, level: Rank): Dea
     passesInRow: 0,
     finished: [],
     level,
+    played: [],
   };
 }
 
@@ -186,6 +192,8 @@ export function play(s: DealState, seat: Seat, cards: Card[]): DealState {
   const justFinished = newHand.length === 0;
   if (justFinished) finished.push(seat);
 
+  const played = [...(s.played ?? []), ...cards]; // 记牌累计：把本手加入已出牌
+
   // Build an interim state to reason about who acts next.
   const interim: DealState = {
     hands,
@@ -207,6 +215,7 @@ export function play(s: DealState, seat: Seat, cards: Card[]): DealState {
       passesInRow: 0,
       finished,
       level: s.level,
+      played,
     };
   }
 
@@ -220,6 +229,7 @@ export function play(s: DealState, seat: Seat, cards: Card[]): DealState {
     passesInRow: 0,
     finished,
     level: s.level,
+    played,
   };
 }
 
@@ -257,6 +267,7 @@ export function pass(s: DealState, seat: Seat): DealState {
       passesInRow: 0,
       finished: s.finished,
       level: s.level,
+      played: s.played,
     };
   }
 
@@ -269,6 +280,7 @@ export function pass(s: DealState, seat: Seat): DealState {
     passesInRow,
     finished: s.finished,
     level: s.level,
+    played: s.played,
   };
 }
 

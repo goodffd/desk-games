@@ -210,8 +210,9 @@ describe('LocalDriver — 语音/结算/进贡', () => {
     expect(p.changes).toBeGreaterThan(changesBefore);     // resolve 触发 onChange
     const fresh = snap(p);
     expect(isDealOver(fresh.state)).toBe(false);          // 新局开始
-    expect(fresh.state.hands.flat().length).toBe(108);    // 重新发满
-    expect(fresh.lastActor).toBeNull();                   // 新局桌面清空
+    // 重新发满全牌：手里 + 已出 == 108（守恒不变量）。进贡后首攻若是 AI，immediate 调度下它已
+    // 打出开局一手，故手里可能 < 108（差额在 played）；用守恒判断"发满且不丢牌"，不假设无人出牌。
+    expect(fresh.state.hands.flat().length + (fresh.state.played?.length ?? 0)).toBe(108);
     expect(fresh.phase).toBe('playing');                  // 回到 playing
   });
 

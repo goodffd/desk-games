@@ -251,7 +251,19 @@ function record(out: Map<string, Combo>, cards: Card[], wantType: ComboType, lev
  * All legal combos a hand can LEAD with (current == null), de-duplicated.
  * Generated structurally per combo type with wildcard placement; never by 2^27 subsets.
  */
+const LEADS_CACHE_CAP = 4000;
+const leadsCache = new Map<string, Combo[]>();
+function leadsKey(hand: Card[], level: Rank): string {
+  return level + '|' + hand.map((c) => c.id).sort((a, b) => a - b).join(',');
+}
+
+/** 纯函数结果缓存(id 集签名)：enumerateFollows/decompose/isControl 会对同一手牌反复枚举
+ *  (如 isControl 每个 combo 都 enumerateFollows(unseen)→enumerateLeads(unseen))，缓存令输出
+ *  逐字不变而免重算。返回的 Combo 只读、调用方不改，共享安全。 */
 export function enumerateLeads(hand: Card[], level: Rank): Combo[] {
+  const ck = leadsKey(hand, level);
+  const cached = leadsCache.get(ck);
+  if (cached) return cached;
   const idx = indexHand(hand, level);
   const W = idx.wilds.length; // 0..2
   const out = new Map<string, Combo>();
@@ -355,7 +367,10 @@ export function enumerateLeads(hand: Card[], level: Rank): Combo[] {
     );
   }
 
-  return [...out.values()];
+  const result = [...out.values()];
+  if (leadsCache.size >= LEADS_CACHE_CAP) leadsCache.clear(); // 简单有界：满即清
+  leadsCache.set(ck, result);
+  return result;
 }
 
 /**

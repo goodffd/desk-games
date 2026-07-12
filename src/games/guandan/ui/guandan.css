@@ -488,17 +488,26 @@
   .gd-btn--pass:not(:disabled):hover { background: #1f3318; }
 }
 
-/* --- 提示信息 --- */
+/* --- 提示信息：绝对定位贴近底部出牌按钮(玩家操作处)，不再飘在手牌上方空档/中上部；
+   nowrap 防窄容器(尤其手机整页旋转后)把中文竖排堆成一列；半透明胶囊底压在牌/头像上也读得清 --- */
 .gd-hint {
+  position: absolute;
+  bottom: 13%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  white-space: nowrap;
   text-align: center;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(16, 26, 12, 0.78);
   color: var(--text-dim);
-  min-height: 1.2em;
-  padding: 0.15rem;
-  flex-shrink: 0;
+  pointer-events: none;
 }
+.gd-hint:empty { display: none; }   /* 无提示时不显示胶囊底 */
 
-.gd-hint--error { color: #e07050; }
+.gd-hint--error { color: #ff9068; }
 .gd-hint--info  { color: var(--gold); }
 
 /* --- 开始游戏遮罩（点一下解锁 iOS 音频，首轮语音才响） --- */

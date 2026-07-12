@@ -382,6 +382,11 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     if (sel) { selectedIds.add(id); ce?.classList.add('is-selected'); }
     else { selectedIds.delete(id); ce?.classList.remove('is-selected'); }
   }
+  /** 清空选中（集合 + 视觉 is-selected 一并清，保持两者同步）。 */
+  function clearSelection(): void {
+    selectedIds.clear();
+    handEl.querySelectorAll('.gd-card.is-selected').forEach((ce) => ce.classList.remove('is-selected'));
+  }
   /** 屏幕坐标下的手牌 id（滑动经过判定，鼠标/触摸通用） */
   function cardIdAtPoint(x: number, y: number): number | null {
     const t = document.elementFromPoint(x, y);
@@ -557,11 +562,13 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     const cards = getSelectedCards();
     if (cards.length === 0) { showHint('请先选择要出的牌', 'error'); return; }
     if (!driver.play(cards)) { showHint('所选牌不合法，请重新选择', 'error'); return; }
-    selectedIds.clear();
+    // 不在此乐观清选中：联机 play 只是发包(返 true)、服务端可能判不合规。清选中交给"出牌被接受→
+    // 新状态重渲手牌"(打出的牌已离手、自然不再选中)；被拒时保留选中，玩家可直接再点出牌重试(而非提示请选牌)。
     showHint('', 'info');
   }
 
   function handlePass(): void {
+    clearSelection(); // 不要时清掉已选的牌，否则选中态一直留到下次轮到我
     driver.pass(); // 领出(current=null)时 driver 返回 false，等价原 early-return
   }
 

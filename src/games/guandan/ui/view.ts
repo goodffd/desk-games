@@ -401,6 +401,7 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     const ce = cardEl(card, state.level);
     if (selectedIds.has(card.id)) ce.classList.add('is-selected');
     ce.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;            // 只响应左键/触摸(button 0)；右键留给"右键出牌"，不误切选中
       if (state.turn !== HUMAN_SEAT || isDealOver(state)) return;
       e.preventDefault();                    // 防文本选择/触摸滚动
       dragging = true;

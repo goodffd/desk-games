@@ -112,7 +112,11 @@ export class MatchDriver {
     const hands = dealHands(this.shuffle);
     const plan = planTribute(this.pendingResult!.finished, hands, dealLevel(this.match));
     this.pendingDeal = { hands, plan };
-    if (plan.resist) return this.beginDeal(hands, plan.firstLeader);
+    if (plan.resist) {
+      // 抗贡：应进贡方持双大王、免进贡，直接开局(head 首攻)。给全场一条通知，否则玩家困惑为何没进贡还贡。
+      const started = this.beginDeal(hands, plan.firstLeader);
+      return [{ to: 'all', msg: { t: 'notice', text: '本局抗贡：应进贡方持双大王，免进贡还贡' } }, ...started];
+    }
     this.phase = 'tribute';
     this.tributeReturns = new Map();
     const out: Outbound[] = [];

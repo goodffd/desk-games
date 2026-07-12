@@ -182,4 +182,21 @@ describe('MatchDriver — 进贡/还贡', () => {
     // 双下两收贡=头游0+二游2（除非抗贡）；至少 0 或 2 收到（依发牌是否抗贡）
     expect(needs.every((o: any) => o.seat === 0 || o.seat === 2)).toBe(true);
   });
+
+  it('抗贡：末游持双大王 → nextDeal 发 notice 通知、无 need-tribute、直接开局', () => {
+    // 强制发牌：两张大王(deck id 105/107)都进座 3 手牌(shuffled 位置 3、7 满足 %4===3 → hands[3])
+    const forced = (n: number) => {
+      const perm = Array.from({ length: n }, (_, i) => i);
+      [perm[3], perm[105]] = [perm[105]!, perm[3]!];
+      [perm[7], perm[107]] = [perm[107]!, perm[7]!];
+      return perm;
+    };
+    const d = new MatchDriver({ shuffle: forced });
+    d.start(); for (let s = 0; s < 4; s++) d.setAI(s as any, true); d.driveAI();
+    d.pendingResult = { finished: [0, 1, 2, 3], settle: { match: d.match } } as any; // 座3=末游(单贡)
+    const out = d.nextDeal();
+    expect(out.some((o: any) => o.msg.t === 'notice' && /抗贡/.test(o.msg.text))).toBe(true);
+    expect(out.some((o: any) => o.msg.t === 'need-tribute')).toBe(false); // 抗贡免进贡还贡
+    expect(d.phase).toBe('playing');                                       // 直接开局
+  });
 });

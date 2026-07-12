@@ -225,6 +225,19 @@ describe('OnlineDriver — 进贡还贡', () => {
   });
 });
 
+describe('OnlineDriver — 通知(notice)', () => {
+  it("收到 'notice'(如抗贡) → 经 onHint 显示为 info 提示", () => {
+    const io = mockIO();
+    const d = new OnlineDriver(io, 0);
+    let hint: { text: string; kind: string } | null = null;
+    d.onHint((text, kind) => { hint = { text, kind }; });
+    io.emit('notice', { t: 'notice', text: '本局抗贡：应进贡方持双大王，免进贡还贡' });
+    expect(hint).not.toBeNull();
+    expect(hint!.text).toContain('抗贡');
+    expect(hint!.kind).toBe('info');
+  });
+});
+
 describe('OnlineDriver — dispose', () => {
   it('dispose 后不再 fire 事件', () => {
     const io = mockIO();

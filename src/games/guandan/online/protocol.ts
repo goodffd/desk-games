@@ -85,6 +85,7 @@ export type S2CMessage =
   | { t: 'spectating'; code: string; seats: (SeatInfo | null)[] }
   | { t: 'rejoined'; seat: Seat }
   | { t: 'seat-token'; seat: Seat; token: string } // 落座后私发本座会话令牌(仅本人收)，客户端存作重连凭据
+  | { t: 'notice'; text: string }                  // 通用信息提示(如抗贡)，客户端显示在游戏内提示条
   | { t: 'peer-offline'; seat: Seat }
   | { t: 'peer-back'; seat: Seat }
   | { t: 'hand'; cards: Card[] }

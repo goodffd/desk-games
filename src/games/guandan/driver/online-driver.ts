@@ -72,6 +72,7 @@ export class OnlineDriver implements GameDriver {
       ['state', (m) => { if (!this.disposed) this.onState(m as PublicState); }],
       ['hand', (m) => { if (!this.disposed) this.onHand(m as { cards: Card[] }); }],
       ['need-tribute', (m) => { if (!this.disposed) this.onNeedTribute(m as { options: Card[] }); }],
+      ['notice', (m) => { if (!this.disposed) this.emitHint((m as { text: string }).text, 'info'); }], // 抗贡等通知 → 游戏内提示条
     ];
     for (const [t, cb] of this.subs) io.on(t, cb);
   }

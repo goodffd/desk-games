@@ -142,6 +142,8 @@ function onlineMount(root: HTMLElement): () => void {
       pendingRejoin = false;
       session.clearRoom();
       showNickname();
+    } else if (onTable && driver) {
+      driver.emitHint(msg, 'warn'); // 牌桌内错误(如出牌不合规)走游戏内提示条：贴近出牌按钮、随牌桌旋转，不用屏幕顶 toast(那个在 .gd-game 外、不旋转、飘到顶)
     } else {
       toast(msg);
     }

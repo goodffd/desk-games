@@ -807,6 +807,11 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
   // ── 绑定 + 初次渲染 ────────────────────────────────────────
   playBtn.addEventListener('click', handlePlay);
   passBtn.addEventListener('click', handlePass);
+  // 右键出牌：牌桌区单击鼠标右键 = 出牌(等同点出牌按钮)，仅我回合且已选牌时触发；一律屏蔽浏览器右键菜单
+  gameEl.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (!playBtn.disabled && getSelectedCards().length > 0) handlePlay();
+  });
 
   // ── driver 事件 → view 渲染/弹层/语音/提示 ──────────────
   // onChange：拷快照进镜像变量 + 顶栏级别 + 整屏渲染（renderAll 等渲染函数体不变）。

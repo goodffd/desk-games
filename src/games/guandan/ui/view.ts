@@ -800,8 +800,8 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     hintEl.textContent = msg;
     hintEl.className = `gd-hint gd-hint--${type}`;
     if (hintTimer !== null) { window.clearTimeout(hintTimer); hintTimer = null; }
-    // 错误提示(如出牌不合规)几秒后自动消失，像 toast；info(进贡摘要等)保持不动直到下次动作清除
-    if (msg && type === 'error') hintTimer = window.setTimeout(() => { hintEl.textContent = ''; hintEl.className = 'gd-hint'; hintTimer = null; }, 3500);
+    // 提示几秒后自动消失(像 toast，不再一直挂到下次出牌)：错误 3.5s；进贡摘要等 info 给 6s 便于看清谁贡给谁
+    if (msg) hintTimer = window.setTimeout(() => { hintEl.textContent = ''; hintEl.className = 'gd-hint'; hintTimer = null; }, type === 'error' ? 3500 : 6000);
   }
   function clearHint(): void { if (hintTimer !== null) { window.clearTimeout(hintTimer); hintTimer = null; } hintEl.textContent = ''; hintEl.className = 'gd-hint'; }
 

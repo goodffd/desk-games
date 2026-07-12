@@ -14,6 +14,7 @@ import { navigate } from '../../../shell/nav';
 import type { Card, Seat, Combo, Rank } from '../engine/types';
 import { sortHand, rankValue } from '../engine/cards';
 import { isDealOver, ranking } from '../engine/game';
+import { enumerateFollows } from '../engine/legal';
 import { cardEl, rankName } from './render';
 import { sortComboCards } from './combo-order';
 import { VOICE_CLIPS } from './voice-clips';
@@ -475,7 +476,10 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
   function renderButtons(): void {
     const isHumanTurn = !spectator && started && state.turn === HUMAN_SEAT && !isDealOver(state);
     actionsEl.style.display = isHumanTurn ? 'flex' : 'none'; // 途游式：仅轮到我时显示按钮
-    playBtn.disabled = !isHumanTurn;
+    // 跟牌(current!=null)时手里没有能压当前牌的(含炸弹)→出牌禁用、只能不要，对称于"领出时不能不要"
+    const mustPass = isHumanTurn && state.current !== null
+      && enumerateFollows(state.hands[HUMAN_SEAT]!, state.current.combo, state.level).length === 0;
+    playBtn.disabled = !isHumanTurn || mustPass;
     passBtn.disabled = !isHumanTurn || state.current === null; // 自己领出时不能"不要"
   }
 

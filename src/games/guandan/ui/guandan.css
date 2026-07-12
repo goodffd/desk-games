@@ -652,7 +652,7 @@
   .gd-card--small .gd-card__pip { height: 18px; }
   /* 小丑图跟着牌缩小，别超出牌边界 */
   .gd-joker-fig { width: 27px; height: 46px; }
-  .gd-card--small .gd-joker-fig { width: 24px; height: 38px; } /* 出牌区小丑图放大、不蹭 JOKER 字 */
+  .gd-card--small .gd-joker-fig { width: 21px; height: 38px; right: 2px; } /* 出牌区小丑图收窄+右边距对齐左JOKER(2px)：跟 JOKER 字留一点间隙、又不贴右边 */
   .gd-joker-word { font-size: 0.40rem; top: 3px; left: 2px; }
   .gd-card--small .gd-joker-word { font-size: 0.36rem; }
   .gd-player-hand { min-height: 60px; padding: 4px 0.3rem 4px; }

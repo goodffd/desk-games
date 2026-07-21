@@ -71,3 +71,17 @@ desk-games/
 - **固定文字用内嵌字体子集**：新增要显示的固定汉字必须重跑子集化(`/tmp` pyftsubset)，否则掉系统字体、各端不一致；玩家昵称等任意文本走系统无衬线。
 - **公网信息脱敏**：desk-games 大厅自身的公网部署信息（域名/端口/内网 IP）绝不入库（象棋现与大厅同源部署）。
 - 分期（掼蛋）：一期单局对 AI；二期升级/进贡整局；三期联机（联机服务端已上线）。象棋作为内置联机模块已并入并上线。每期单测全绿+真机冒烟才进下一期。
+
+## Agent skills
+
+### Issue tracker
+
+Issue 与 PRD 走 GitHub Issues（仓库 `goodffd/desk-games`，用 `gh` CLI）；外部 PR 暂不进 triage 队列。见 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+用五个规范角色的默认标签名：`needs-triage` / `needs-info` / `ready-for-agent` / `ready-for-human` / `wontfix`。见 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+单上下文（single-context）：根 `CONTEXT.md` + `docs/adr/`，两者按需由 `/domain-modeling` 惰性创建，不存在时静默跳过。见 `docs/agents/domain.md`。

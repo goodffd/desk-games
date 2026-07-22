@@ -15,12 +15,19 @@ export type Card =
 /** 座位号 0..seatCount-1，按出牌顺序排；下一位 = (i+1) % seatCount。 */
 export type Seat = number;
 
-/** 本期支持的牌型。炸弹与王炸是 #6，带王的牌型是 #7。 */
-export type ComboType = 'single' | 'pair' | 'run' | 'pairRun';
+/**
+ * 牌型。带王的百搭牌型是 #7。
+ *
+ * 描述炸弹只用两个正交属性：**张数**（`length`）与**是否含王**。
+ * 术语表把「软炸 / 硬炸」列为禁用词——两地定义完全相反（一说按张数分、一说按含不含王分），
+ * 用哪个都必然被误解。
+ */
+export type ComboType = 'single' | 'pair' | 'run' | 'pairRun' | 'bomb' | 'jokerBomb';
 
 /**
  * 一手打出去的牌。
- * `key` = 关键点数：单张/对子取该点的**权重**，顺子/连对取最高位的**自然点数**。
+ * `key` = 关键点数：单张/对子/炸弹取该点的**权重**，顺子/连对取最高位的**自然点数**；
+ * 王炸没有点数可言，`key` 固定为 0 且不参与任何比较。
  * `牌型标识`（CONTEXT.md）= `type | length | key` 三元组，花色不进标识。
  */
 export interface Combo {
@@ -29,6 +36,9 @@ export interface Combo {
   length: number;
   key: number;
 }
+
+/** 一个炸最多几张：一副牌里同点只有 4 张，王当替身（#7）也不许突破。 */
+export const MAX_BOMB_SIZE = 4;
 
 /** A 的自然点数，也是大一链条的顶。 */
 export const RANK_A = 14;

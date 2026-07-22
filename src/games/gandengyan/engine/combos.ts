@@ -1,25 +1,30 @@
 import type { Card, Combo, Rank } from './types';
-import { POWER_TWO, RANK_A, power } from './types';
+import { MAX_BOMB_SIZE, POWER_TWO, RANK_A, power } from './types';
 
 /**
- * 牌型识别与大一法则。engine 是规则唯一真相，UI 与 AI 不得另写一套判定。
+ * 牌型识别与压制判定。engine 是规则唯一真相，UI 与 AI 不得另写一套判定。
  *
- * 本期（#5）只认四种普通牌型：单张 / 对子 / 顺子 / 连对。
- * 炸弹与逃生口在 #6，王的百搭与显式指派在 #7 —— 在那之前，
- * **任何含王的组合一律不成牌型**，三张同点也不成牌型（它将来是炸弹，不是「三张」）。
+ * 大一法则是主干：跟牌须**同牌型、同张数、关键点数正好大一级**。
+ * 上家出 5，你手里握着 K 和 A 也只能干瞪眼——只能出 6。
+ *
+ * 例外只有三个逃生口，它们**不走大一那条链**：
+ *   ① 单张 2 压任意单张   ② 对 2 压任意对子   ③ 炸弹压任意非炸牌型
+ *
+ * 尚未实现：王的百搭与显式指派（#7）。在那之前，除了「大王 + 小王 = 王炸」，
+ * 任何含王的组合都不成牌型。
  */
 
-/** 按自然点数升序，王排最后（本期只用于识别，王一律导致识别失败）。 */
+/** 取出各张的自然点数并升序；遇到王直接判失败（王只在 `identifyJokerBomb` 里另行处理）。 */
 function naturalRanks(cards: readonly Card[]): Rank[] | null {
   const rs: Rank[] = [];
   for (const c of cards) {
-    if (c.kind !== 'normal') return null; // 带王：本期不成牌型（#7 再开）
+    if (c.kind !== 'normal') return null;
     rs.push(c.rank);
   }
   return rs.sort((a, b) => a - b);
 }
 
-/** 连续递增且不含 2（2 不入顺、也不入连对；A 只当最高位，故自然序 3..14 天然满足）。 */
+/** 连续递增且不含 2（2 不入顺、也不入连对；A 只当最高位，自然序 3..14 天然满足）。 */
 function isConsecutive(ranks: readonly Rank[]): boolean {
   if (ranks.some((r) => r === 2)) return false;
   for (let i = 1; i < ranks.length; i++) {
@@ -28,15 +33,31 @@ function isConsecutive(ranks: readonly Rank[]): boolean {
   return true;
 }
 
+/** 王炸：恰好一张大王 + 一张小王。单张王出不去，两张王也只有这一种用法。 */
+function identifyJokerBomb(cards: readonly Card[]): Combo | null {
+  if (cards.length !== 2) return null;
+  const jokers = cards.filter((c) => c.kind === 'joker');
+  if (jokers.length !== 2) return null;
+  const big = jokers.filter((c) => c.kind === 'joker' && c.big).length;
+  if (big !== 1) return null; // 一副牌里大小王各一张，两张同色王不成王炸
+  return { type: 'jokerBomb', cards: [...cards], length: 2, key: 0 };
+}
+
 /**
  * 认这一组牌是什么牌型；认不出来返回 `null`。
  *
- * 干瞪眼的顺子与连对都走**自然序**且封顶在 A：`2` 不参与，`A` 只当最高位，
+ * 顺子与连对走**自然序**且封顶在 A：`2` 不参与，`A` 只当最高位，
  * 所以 `A23`、`KA2`、`A2345` 全部不成立。顺子长度不限，连对 2 对起。
+ * 炸弹 3 或 4 张同点，**同一个炸最多 4 张**。
  */
 export function identify(cards: readonly Card[]): Combo | null {
+  if (cards.length === 0) return null;
+
+  const jokerBomb = identifyJokerBomb(cards);
+  if (jokerBomb) return jokerBomb;
+
   const ranks = naturalRanks(cards);
-  if (!ranks || ranks.length === 0) return null;
+  if (!ranks) return null;
   const cs = [...cards];
 
   if (ranks.length === 1) {
@@ -45,6 +66,14 @@ export function identify(cards: readonly Card[]): Combo | null {
 
   if (ranks.length === 2 && ranks[0] === ranks[1]) {
     return { type: 'pair', cards: cs, length: 2, key: power(ranks[0]!) };
+  }
+
+  // 炸弹：3~4 张同点。超过 4 张一律不认——一副牌里同点只有 4 张，
+  // 别让「张数越多越大」自然延伸出 5 张、6 张炸（#7 的王当替身时尤其危险）。
+  const allSame = ranks.every((r) => r === ranks[0]);
+  if (allSame && ranks.length >= 3) {
+    if (ranks.length > MAX_BOMB_SIZE) return null;
+    return { type: 'bomb', cards: cs, length: ranks.length, key: power(ranks[0]!) };
   }
 
   // 顺子：≥3 张、点数互不相同且连续
@@ -67,26 +96,44 @@ export function identify(cards: readonly Card[]): Combo | null {
   return null;
 }
 
-/**
- * 大一法则：`next` 能不能压住 `prev`。
- *
- * 三个条件缺一不可：**同牌型、同张数、关键点数正好大一级**。
- * 上家出 5，你手里握着 K 和 A 也只能干瞪眼——只能出 6。
- *
- * 第四个条件 `next.key <= RANK_A` 是这套规则里最容易写错的一处：
- * 它把大一链条**封死在 A**，于是
- *   ① A 上面接不了普通单张（2 的权重是 15，但 2 是特权牌，不是「A+1」）；
- *   ② 顶格顺子 `QKA` 之上没有普通顺子可接（2 不入顺，A 已封顶）。
- * 2 与炸弹要出手，只能走 #6 的逃生口，不走这条链。
- */
-export function beats(prev: Combo, next: Combo): boolean {
-  return next.type === prev.type
-    && next.length === prev.length
-    && next.key === prev.key + 1
-    && next.key <= RANK_A;
-}
-
-/** 这一手是不是「2」（单张 2 或对 2）——#6 的逃生口会用到，这里先给个诚实的判据。 */
+/** 这一手是不是「2」（单张 2 或对 2）——两个逃生口的判据。 */
 export function isTwo(combo: Combo): boolean {
   return (combo.type === 'single' || combo.type === 'pair') && combo.key === POWER_TWO;
+}
+
+/** 炸弹类（含王炸）。 */
+export function isBomb(combo: Combo): boolean {
+  return combo.type === 'bomb' || combo.type === 'jokerBomb';
+}
+
+/**
+ * `next` 能不能压住 `prev`。
+ *
+ * 判定顺序就是规则的优先级，从最硬的往下走：
+ *   1. 王炸压一切，且没有东西压得住它
+ *   2. 炸弹压任意非炸牌型；炸弹之间**先比张数、同张数比点数且「大就行」**（不受大一约束）
+ *   3. 普通牌型之间：先看逃生口（单张 2 压任意单张、对 2 压任意对子），
+ *      再走大一法则——同牌型、同张数、关键点数正好大一级
+ *
+ * 注意大一那条链**只在 3..A 之间**：2 的权重虽然是 15，但它不是「A+1」，
+ * 它出手靠的是自己的特权。顺子与连对没有特权，所以顶格顺子 `QKA` 之上
+ * 真的接不了任何普通顺子（2 不入顺，A 已封顶），只能炸。
+ */
+export function beats(prev: Combo, next: Combo): boolean {
+  // 1. 王炸
+  if (next.type === 'jokerBomb') return prev.type !== 'jokerBomb';
+  if (prev.type === 'jokerBomb') return false;
+
+  // 2. 炸弹
+  if (next.type === 'bomb') {
+    if (prev.type !== 'bomb') return true;                            // 炸弹压任意非炸
+    if (next.length !== prev.length) return next.length > prev.length; // 先比张数
+    return next.key > prev.key;                                        // 同张数比点数，大就行
+  }
+  if (prev.type === 'bomb') return false;                              // 普通牌压不住炸弹
+
+  // 3. 普通牌型
+  if (next.type !== prev.type || next.length !== prev.length) return false;
+  if (isTwo(next) && !isTwo(prev)) return true;                        // 逃生口：2 的特权
+  return next.key === prev.key + 1 && next.key <= RANK_A;              // 大一法则，链条封顶在 A
 }

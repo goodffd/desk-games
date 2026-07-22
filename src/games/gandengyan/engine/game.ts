@@ -1,5 +1,5 @@
 import type { Card, Combo, Seat } from './types';
-import { beats, identify } from './combos';
+import { beats, identify, isBomb } from './combos';
 import { MAX_SEATS, MIN_SEATS } from './cards';
 
 /**
@@ -9,15 +9,17 @@ import { MAX_SEATS, MIN_SEATS } from './cards';
  *   庄领出 → 各家按大一法则跟牌或过牌 → 一轮全过 → **只有该轮赢家摸 1 张** →
  *   由他领出下一轮 → 牌堆见底后不再补 → 先打完手牌者赢，本局立刻结束。
  *
- * 本期（#5）范围：单张 / 对子 / 顺子 / 连对。尚未实现，按票号排队：
- * - #6 炸弹族与三个逃生口（单张 2 压任意单张、对 2 压任意对子、炸弹压任意非炸）
- * - #7 王的百搭与显式指派 —— 在那之前**王是打不出去的死牌**
+ * 已实现：单张 / 对子 / 顺子 / 连对（#5），炸弹 / 王炸 / 三个逃生口（#6）。
+ * 尚未实现，按票号排队：
+ * - #7 王的百搭与显式指派 —— 在那之前，王**只能凑王炸**（大王+小王），
+ *      单张王与「王 + 普通牌」都出不去
  * - #8 僵局收场（领出方无牌可出时出牌权顺延；全圈无人能动则本局终止）
+ * - #9 完整结算（炸弹倍数连乘、个人倍数逐张、春天）
  *
- * 因为 #8 还没到，本期存在一个**已知的未覆盖状态**：轮到某人领出、而他手里只剩王。
- * 那种局面下 `pass` 会拒绝（领出不能过牌）、`play` 也会拒绝（王不成牌型），状态机卡住。
+ * 因为 #8 还没到，存在一个**已知的未覆盖状态**：轮到某人领出、而他手里只剩一张王。
+ * 那种局面下 `pass` 会拒绝（领出不能过牌）、`play` 也会拒绝（单张王不成牌型），状态机卡住。
  * 这不是可以静默吞掉的边角——`play`/`pass` 的报错信息会直说是哪种情况，
- * 本期的测试用构造手牌绕开它，等 #8 补上正式规则。
+ * 现有测试用构造手牌绕开它，等 #8 补上正式规则。
  */
 export interface DealState {
   /** 本局人数 2~5 */
@@ -70,6 +72,27 @@ function nextSeat(s: DealState, seat: Seat): Seat {
   return (seat + 1) % s.seatCount;
 }
 
+/**
+ * 出牌被拒时，说清楚**这一种情况**为什么压不住。
+ *
+ * 别把「关键点数正好大一级」这句话套到炸弹身上——炸弹根本不走大一那条链，
+ * 那样的报错会把人往错的方向带。
+ */
+function whyCannotBeat(prev: Combo, next: Combo): string {
+  if (prev.type === 'jokerBomb') return '桌面是王炸，压一切，没有东西压得住它';
+  if (prev.type === 'bomb') {
+    return next.type === 'bomb'
+      ? `桌面是 ${prev.length} 张炸(点数 ${prev.key})，要压它得张数更多，或同张数而点数更大`
+      : `桌面是 ${prev.length} 张炸，只有更大的炸弹或王炸压得住`;
+  }
+  if (isBomb(next)) return '内部错误：炸弹本应压得住任意非炸牌型';
+  if (next.type !== prev.type || next.length !== prev.length) {
+    return `桌面是 ${prev.type}(${prev.length} 张)，跟牌必须同牌型、同张数`;
+  }
+  return `桌面是 ${prev.type}(关键点数 ${prev.key})，跟牌的关键点数须正好大一级`
+    + `（2 与炸弹另有特权，不走这条链）`;
+}
+
 function assertActionable(s: DealState, seat: Seat): void {
   if (isDealOver(s)) throw new Error('本局已结束，不能再出牌或过牌');
   if (seat !== s.turn) throw new Error(`还没轮到座 ${seat}，当前是座 ${s.turn} 的回合`);
@@ -99,10 +122,7 @@ export function play(s: DealState, seat: Seat, cards: readonly Card[]): DealStat
   }
 
   if (s.current && !beats(s.current.combo, combo)) {
-    throw new Error(
-      `压不住：桌面是 ${s.current.combo.type}(${s.current.combo.length}张, 关键点数 ${s.current.combo.key})，`
-      + `跟牌须同牌型同张数且关键点数正好大一级`,
-    );
+    throw new Error(`压不住：${whyCannotBeat(s.current.combo, combo)}`);
   }
 
   const rest = hand.filter((c) => !playIds.has(c.id));

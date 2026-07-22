@@ -219,6 +219,75 @@ describe('settleBySize — 本期的最小结算：底分 × 剩牌张数', () =
   });
 });
 
+describe('含炸弹的一整局：三个逃生口都走一遍，再打到局终', () => {
+  it('单张 2 压单张 → 小炸压 2 → 大炸压小炸 → 局终', () => {
+    const s0 = deal(
+      ['S3 H4 D6 C7 S8 H9', 'S2 H2 S5 H5 D5', 'SA HA DA C9 CT'],
+      { dealer: 0, deck: 'CJ CQ CK' },
+    );
+    const total = totalCards(s0);
+    let s = s0;
+
+    s = play(s, 0, pick(s, 0, 'S3'));                       // 领出单张 3
+    s = play(s, 1, pick(s, 1, 'S2'));                       // 逃生口②：单张 2 压任意单张
+    expect(s.current!.combo).toMatchObject({ type: 'single' });
+
+    // 逃生口③：炸弹压任意非炸——连 2 都压得住
+    s = play(s, 2, pick(s, 2, 'SA HA DA'));
+    expect(s.current!.combo).toMatchObject({ type: 'bomb', length: 3, key: 14 });
+
+    // 座 0 手里没有炸，压不住；报错必须说清是炸弹的规矩，不能拿大一法则搪塞
+    expect(() => play(s, 0, pick(s, 0, 'H9'))).toThrow(/张炸/);
+    s = pass(s, 0);
+
+    // 座 1 有 3 张炸，但点数 5 压不住点数 14——同张数比点数
+    expect(() => play(s, 1, pick(s, 1, 'S5 H5 D5'))).toThrow(/点数更大/);
+    s = pass(s, 1);
+
+    expect(s.turn).toBe(2);                                  // 座 2 赢下这轮
+    expect(s.hands[2]).toHaveLength(3);                      // 出 3 张、摸回 1 张
+    expect(totalCards(s)).toBe(total);
+
+    // 收尾：随便打到局终，全程守恒
+    let steps = 0;
+    while (!isDealOver(s) && steps++ < 200) {
+      const seat = s.turn;
+      const hand = s.hands[seat]!;
+      if (s.current === null) {
+        s = play(s, seat, [hand[0]!]);
+      } else {
+        let moved = false;
+        for (const c of hand) {
+          try { s = play(s, seat, [c]); moved = true; break; } catch { /* 压不住就试下一张 */ }
+        }
+        if (!moved) s = pass(s, seat);
+      }
+      expect(totalCards(s)).toBe(total);
+    }
+    expect(isDealOver(s)).toBe(true);
+    expect(s.hands[s.winner!]).toHaveLength(0);
+  });
+
+  it('王炸压得住 4 张炸，且没人压得住王炸', () => {
+    // 座 1 给 5 张，出掉 4 张之后手里还有牌，本局才不会提前结束
+    const s0 = deal(['jB jS S3', 'SA HA DA CA C9', 'S9 H9 D9 S4'], { dealer: 0, deck: 'CT' });
+    let s = play(s0, 0, pick(s0, 0, 'S3'));
+    s = play(s, 1, pick(s, 1, 'SA HA DA CA'));               // 4 张炸
+    expect(s.hands[1]).toHaveLength(1);                      // 没打空，局还在
+
+    // 座 2 的 3 张炸压不住 4 张炸——张数优先
+    expect(() => play(s, 2, pick(s, 2, 'S9 H9 D9'))).toThrow(/张数更多/);
+    s = pass(s, 2);
+
+    // 座 0 用王炸压 4 张炸，正好打空手牌
+    const jokers = s.hands[0]!.filter((c) => c.kind === 'joker');
+    expect(jokers).toHaveLength(2);
+    s = play(s, 0, jokers);
+    expect(s.current!.combo.type).toBe('jokerBomb');
+    expect(s.winner).toBe(0);
+  });
+});
+
 describe('打完一整局：构造手牌，从头走到底', () => {
   it('3 人局全流程：跟牌 / 过牌 / 摸牌 / 局终，全程守恒且轮次合法', () => {
     // 座 0 庄（6 张），座 1、2 各 5 张；牌堆 3 张

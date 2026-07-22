@@ -9,7 +9,7 @@ function id(spec: string) {
   return combo;
 }
 
-describe('identify — 牌型识别（本期只有单张/对子/顺子/连对）', () => {
+describe('identify — 普通牌型：单张 / 对子 / 顺子 / 连对', () => {
   it('单张：关键点数按权重，2 最大', () => {
     expect(id('S3')).toMatchObject({ type: 'single', length: 1, key: 3 });
     expect(id('SA')).toMatchObject({ type: 'single', length: 1, key: 14 });
@@ -66,14 +66,12 @@ describe('identify — 牌型识别（本期只有单张/对子/顺子/连对）
     expect(identify(cards('S3 H3 D5 C5'))).toBeNull();
   });
 
-  it('三张同点在本期不成牌型（炸弹是 #6 的事）', () => {
-    expect(identify(cards('S5 H5 D5'))).toBeNull();
-  });
-
-  it('带王的任何组合在本期都不成牌型（王是 #7 的事）', () => {
+  // 三张同点是炸弹、双王是王炸，都归 bombs.test.ts 管；这里只守住「王还不能百搭」这条线。
+  it('王的百搭还没开：单张王与「王 + 普通牌」都不成牌型（是 #7 的事）', () => {
     expect(identify(cards('jB'))).toBeNull();
-    expect(identify(cards('jB jS'))).toBeNull();
+    expect(identify(cards('jS'))).toBeNull();
     expect(identify(cards('jB S5'))).toBeNull();
+    expect(identify(cards('jB S5 H5'))).toBeNull();
   });
 
   it('空牌不成牌型', () => {
@@ -108,17 +106,14 @@ describe('beats — 大一法则', () => {
     expect(beats(id('S3 H3 D4 C4'), id('S4 H4 D5 C5 S6 H6'))).toBe(false);
   });
 
-  it('A 上面接不了普通单张：2 是特权，不是「A+1」', () => {
-    // 逃生口（单张 2 压任意单张）是 #6 的事；本期 2 只是最大的单张，进不了大一链条。
-    expect(beats(id('SA'), id('H2'))).toBe(false);
-    expect(beats(id('SK'), id('HA'))).toBe(true); // K→A 仍在链条内，只有 A→2 断开
+  it('大一链条封顶在 A：K→A 走得通，A 之上没有下一级', () => {
+    expect(beats(id('SK'), id('HA'))).toBe(true);
+    // A 之上唯一能出的单张是 2，而它走的是逃生口不是大一（见 bombs.test.ts）。
+    // 这里只钉一件事：链条本身到 A 为止，没有第 15 级的普通牌型。
+    expect(id('H2').key).toBeGreaterThan(id('SA').key);
   });
 
-  it('对 A 上面也接不了普通对子', () => {
-    expect(beats(id('SA HA'), id('D2 C2'))).toBe(false);
-  });
-
-  it('2 出了之后没有普通牌接得上（本期没有炸弹）', () => {
+  it('2 出了之后没有普通牌接得上（只有炸弹能压，见 bombs.test.ts）', () => {
     const two = id('S2');
     for (const spec of ['H3', 'HA', 'H2']) expect(beats(two, id(spec))).toBe(false);
   });

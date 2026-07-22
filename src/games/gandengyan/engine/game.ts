@@ -1,4 +1,4 @@
-import type { Card, Combo, Seat } from './types';
+import type { Card, Combo, Seat, WildAssign } from './types';
 import { beats, identify, isBomb } from './combos';
 import { MAX_SEATS, MIN_SEATS } from './cards';
 
@@ -102,7 +102,12 @@ function assertActionable(s: DealState, seat: Seat): void {
  * 出牌。非法一律抛错，绝不返回一个"看起来还行"的状态——
  * 规则错误必须当场炸出来，不能顺着往下走。
  */
-export function play(s: DealState, seat: Seat, cards: readonly Card[]): DealState {
+export function play(
+  s: DealState,
+  seat: Seat,
+  cards: readonly Card[],
+  assign: readonly WildAssign[] = [],
+): DealState {
   assertActionable(s, seat);
 
   const hand = s.hands[seat]!;
@@ -113,12 +118,15 @@ export function play(s: DealState, seat: Seat, cards: readonly Card[]): DealStat
     if (!handIds.has(c.id)) throw new Error(`座 ${seat} 手里没有这张牌（id=${c.id}）`);
   }
 
-  const combo = identify(cards);
+  const combo = identify(cards, assign);
   if (!combo) {
-    const hasJoker = cards.some((c) => c.kind === 'joker');
-    throw new Error(hasJoker
-      ? '这手牌不合法：王还不能出（百搭与显式指派见 #7）'
-      : '这手牌不合法：认不出牌型');
+    const jokers = cards.filter((c) => c.kind === 'joker').length;
+    throw new Error(
+      jokers === 0 ? '这手牌不合法：认不出牌型'
+        : cards.length === 1 ? '这手牌不合法：王不能单独打出'
+          : assign.length !== jokers ? `这手牌不合法：${jokers} 张王要 ${jokers} 条指派，收到 ${assign.length} 条`
+            : '这手牌不合法：按你给的指派认不出牌型（王不能替 2；指派须指向本次打出的王）',
+    );
   }
 
   if (s.current && !beats(s.current.combo, combo)) {

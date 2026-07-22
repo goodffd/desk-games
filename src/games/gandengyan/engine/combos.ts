@@ -141,13 +141,14 @@ export function comboIdentity(c: Combo): string {
  * 要 567 才接得上——哪个更难被接取决于对手手牌，**不存在支配解**。
  * 自动定案等于替玩家做了一个实打实影响胜负的决定。
  */
-export function enumerateIdentities(cards: readonly Card[]): Play[] {
+export function enumerateIdentities(cards: readonly Card[], current: Combo | null = null): Play[] {
   const jokers = cards.filter((c) => c.kind === 'joker');
   const found = new Map<string, Play>();
 
   const tryAssign = (assign: WildAssign[]): void => {
     const combo = identify(cards, assign);
     if (!combo) return;
+    if (current && !beats(current, combo)) return; // 跟牌语境：压不住的解释不算数
     const key = comboIdentity(combo);
     if (!found.has(key)) found.set(key, { cards: [...cards], assign, combo });
   };
@@ -172,9 +173,15 @@ export function enumerateIdentities(cards: readonly Card[]): Play[] {
   return [...found.values()];
 }
 
-/** 这一组牌有没有歧义：存在一种以上**牌型标识不同**的合法解释。 */
-export function isAmbiguous(cards: readonly Card[]): boolean {
-  return enumerateIdentities(cards).length > 1;
+/**
+ * 这一组牌在**当前语境下**有没有歧义：存在多于一种牌型标识的合法解释。
+ *
+ * `current` 为 `null` 表示领出（全部合法解释都算）；给了桌面牌就表示跟牌
+ * （只算压得住它的那些解释）。**领出与跟牌一视同仁**，这是 owner 2026-07-22 拍板的
+ * 唯一一条规则——原先「歧义只发生在领出」的设想已被证伪，见 ADR-0002 修订一节。
+ */
+export function isAmbiguous(cards: readonly Card[], current: Combo | null = null): boolean {
+  return enumerateIdentities(cards, current).length > 1;
 }
 
 /** 这一手是不是「2」（单张 2 或对 2）——两个逃生口的判据。 */

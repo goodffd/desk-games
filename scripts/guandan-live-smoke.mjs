@@ -1,5 +1,5 @@
 /**
- * 掼蛋联机真机冒烟：一条命令跑完 建房 / 加入 / 入座 / 开打 / 断线重连 的真路径。
+ * 掼蛋联机真机冒烟：一条命令跑完 建房 / 加入 / 入座 / 开打 / 观战 / 断线重连 的真路径。
  *
  *   npm run smoke:guandan
  *
@@ -98,14 +98,25 @@ async function runSmoke(browser) {
   await b.locator('.gd-game').waitFor({ timeout: 20000 });
   log('甲乙都在牌桌上');
 
+  step('丙：从大厅观战这一局');
+  const ctxC = await browser.newContext();
+  const c = await enterLobby(ctxC, '冒烟丙');
+  await c.getByRole('button', { name: '刷新' }).click();
+  const watch = c.getByRole('button', { name: '观战' }).first();
+  await watch.waitFor({ timeout: 15000 });
+  await watch.click();
+  await c.locator('.gd-game').waitFor({ timeout: 20000 });
+  log('丙作为观众看到了牌桌');
+
   step('乙：断线重连（刷新页面走会话令牌自动 rejoin）');
   await b.reload({ waitUntil: 'domcontentloaded' });
   await b.locator('.gd-game').waitFor({ timeout: 20000 });
   log('乙重连后回到了牌桌');
 
-  step('甲：牌桌仍在，未被对方断线拖垮');
+  step('甲与观众：牌桌仍在，未被对方断线拖垮');
   if (!(await a.locator('.gd-game').isVisible())) throw new Error('甲的牌桌没了');
-  log('甲的牌桌还在');
+  if (!(await c.locator('.gd-game').isVisible())) throw new Error('观众的牌桌没了');
+  log('甲和观众的牌桌都还在');
 }
 
 requireBuilt();
@@ -137,4 +148,4 @@ if (failure) {
   if (serverLog.trim()) console.error('--- 服务端输出 ---\n' + serverLog.trim());
   process.exit(1);
 }
-console.log('\n✓ 冒烟通过：建房 / 加入 / 入座 / 开打 / 断线重连 全程真路径');
+console.log('\n✓ 冒烟通过：建房 / 加入 / 入座 / 开打 / 观战 / 断线重连 全程真路径');

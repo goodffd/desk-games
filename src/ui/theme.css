@@ -1,0 +1,27 @@
+/*
+ * 共享设计 token —— 牌类游戏（掼蛋 / 干瞪眼）与 shell 共用的一套颜色/卡纸/金线变量。
+ * 由 src/main.ts 最早 import，确保所有游戏 CSS 之前就位。
+ *
+ * 从 guandan/ui/guandan.css 的 :root 提取而来（值一字不改）。提到这里的动机：
+ * 干瞪眼的共享牌面组件要用 --bg-card / --red / --black / --gold，token 若还锁在
+ * guandan.css 里，别的游戏就拿不到。此前三屏（昵称/大厅/房间）页面根本不加载 guandan.css，
+ * 一直靠 lobby.css 里的 var(--x, 兜底值) 兜着——提到全局后它们才真正拿到 :root。
+ *
+ * 象棋不吃这套：它在 .xq-root 作用域下另有一套同名不同值的变量（--gold 更暖），
+ * 作用域覆盖全局，互不干扰。
+ *
+ * --font-ui 里的 'DGFont' 目前加载不到会 fallback 到 system-ui；让它真正上线是 #23。
+ */
+:root {
+  --font-ui: 'DGFont', system-ui, sans-serif;
+  --gold: #c9a84c;
+  --gold-dim: #8a6e2a;
+  --bg-table: #1a3a1a;
+  --bg-card: #f5f0e8;
+  --bg-card-selected: #fff9e8;
+  --red: #c0392b;
+  --black: #1a1208;
+  --text-light: #e8d9b0;
+  --text-dim: #a89070;
+  --border-card: #d6d4cf;   /* 中性浅灰，去掉金色描边 */
+}

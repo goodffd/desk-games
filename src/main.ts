@@ -1,3 +1,4 @@
+import './ui/theme.css';        // 共享设计 token，须在所有游戏 CSS 之前
 import './shell/shell.css';
 import { buildRegistry } from './shell/registry';
 import { route } from './shell/router';

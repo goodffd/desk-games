@@ -1,19 +1,6 @@
 /* ===== 掼蛋游戏样式 — 途游风格 v2 ===== */
 
-/* --- 变量 --- */
-:root {
-  --font-ui: 'DGFont', system-ui, sans-serif;
-  --gold: #c9a84c;
-  --gold-dim: #8a6e2a;
-  --bg-table: #1a3a1a;
-  --bg-card: #f5f0e8;
-  --bg-card-selected: #fff9e8;
-  --red: #c0392b;
-  --black: #1a1208;
-  --text-light: #e8d9b0;
-  --text-dim: #a89070;
-  --border-card: #d6d4cf;   /* 中性浅灰，去掉金色描边 */
-}
+/* 设计 token 已提到 src/ui/theme.css（共享），此处不再定义 */
 
 /* --- 游戏根容器（flex 列，topbar + table(撑满) + bottomArea(固定高度贴底)） --- */
 .gd-game {

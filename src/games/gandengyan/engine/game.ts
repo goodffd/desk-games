@@ -1,5 +1,6 @@
 import type { Card, Combo, Seat, WildAssign } from './types';
 import { beats, identify, isBomb } from './combos';
+import { hasAnyPlay } from './legal';
 import { MAX_SEATS, MIN_SEATS } from './cards';
 
 /**
@@ -13,13 +14,16 @@ import { MAX_SEATS, MIN_SEATS } from './cards';
  * 尚未实现，按票号排队：
  * - #7 王的百搭与显式指派 —— 在那之前，王**只能凑王炸**（大王+小王），
  *      单张王与「王 + 普通牌」都出不去
- * - #8 僵局收场（领出方无牌可出时出牌权顺延；全圈无人能动则本局终止）
- * - #9 完整结算（炸弹倍数连乘、个人倍数逐张、春天）
+ * 僵局收场（#8）：领出方确实一张也出不了时允许过、出牌权顺延；绕一圈无人能动则本局终止，
+ * 剩牌张数最少者为赢家、并列则无人收分。这条同时是模糊测试的终止性保证。
  *
- * 因为 #8 还没到，存在一个**已知的未覆盖状态**：轮到某人领出、而他手里只剩一张王。
- * 那种局面下 `pass` 会拒绝（领出不能过牌）、`play` 也会拒绝（单张王不成牌型），状态机卡住。
- * 这不是可以静默吞掉的边角——`play`/`pass` 的报错信息会直说是哪种情况，
- * 现有测试用构造手牌绕开它，等 #8 补上正式规则。
+ * 一个值得记住的结构性事实：**卡住的手牌有且只有「恰好一张王」**——领出可以出任意合法牌型，
+ * 而任何一张普通牌都是合法单张，所以有普通牌就卡不住；两张王能出王炸，也卡不住。
+ * 全场只有两张王，于是单副牌下**全圈卡死只可能发生在 2 人局、双方各剩一张王**，
+ * 3 人以上凑不出三个「只剩一张王」的人。这也意味着 `fewestCardsWinner` 的「不并列」那一支
+ * 在单副牌下走不到（能卡住的人手里必然都是 1 张）；留着它是为了忠于规格。
+ *
+ * 尚未实现：#9 完整结算（炸弹倍数连乘、个人倍数逐张、春天）。
  */
 export interface DealState {
   /** 本局人数 2~5 */
@@ -36,7 +40,17 @@ export interface DealState {
   readonly turn: Seat;
   /** 本轮连续过牌数；到了 `seatCount - 1` 就是一轮结束 */
   readonly passesInRow: number;
-  /** 赢家；`null` 表示本局还没结束 */
+  /**
+   * 连续有几家「轮到领出却无牌可出」而过掉。
+   * 攒到 `seatCount` 就是全圈无人能动 —— 僵局。任何人出牌都会把它清零。
+   */
+  readonly leadPassesInRow: number;
+  /** 本局是否以僵局收场（全圈无人能动） */
+  readonly stalemate: boolean;
+  /**
+   * 赢家。打空手牌者为赢家；僵局时为剩牌张数最少者，并列则为 `null`。
+   * `null` 且 `stalemate` 为假，表示本局还没结束。
+   */
   readonly winner: Seat | null;
 }
 
@@ -60,12 +74,14 @@ export function createDeal(init: {
     current: null,
     turn: init.dealer,
     passesInRow: 0,
+    leadPassesInRow: 0,
+    stalemate: false,
     winner: null,
   };
 }
 
 export function isDealOver(s: DealState): boolean {
-  return s.winner !== null;
+  return s.winner !== null || s.stalemate;
 }
 
 function nextSeat(s: DealState, seat: Seat): Seat {
@@ -91,6 +107,26 @@ function whyCannotBeat(prev: Combo, next: Combo): string {
   }
   return `桌面是 ${prev.type}(关键点数 ${prev.key})，跟牌的关键点数须正好大一级`
     + `（2 与炸弹另有特权，不走这条链）`;
+}
+
+/**
+ * 僵局时的赢家：剩牌张数最少的那一家；并列则没有赢家（本局无人收分）。
+ *
+ * 单副牌下这一支实际上总是并列——卡住的手牌有且只有「恰好一张王」
+ * （有普通牌就能领出，两张王能出王炸），而全场只有两张王，所以能卡住的人
+ * 手里必然都是 1 张。留着按张数比的逻辑是为了忠于规格：规则说的是
+ * 「剩牌最少者为赢家」，而不是「僵局一律不算分」。
+ */
+function fewestCardsWinner(s: DealState): Seat | null {
+  let best = Infinity;
+  let winner: Seat | null = null;
+  let tied = false;
+  for (let seat = 0; seat < s.seatCount; seat++) {
+    const n = s.hands[seat]!.length;
+    if (n < best) { best = n; winner = seat; tied = false; }
+    else if (n === best) tied = true;
+  }
+  return tied ? null : winner;
 }
 
 function assertActionable(s: DealState, seat: Seat): void {
@@ -144,6 +180,7 @@ export function play(
       played: [...s.played, ...cards],
       current: { combo, by: seat },
       passesInRow: 0,
+      leadPassesInRow: 0,
       winner: seat,
     };
   }
@@ -154,6 +191,7 @@ export function play(
     played: [...s.played, ...cards],
     current: { combo, by: seat },
     passesInRow: 0,
+    leadPassesInRow: 0, // 有人出牌 → 顺延计数清零，不会攒到误判僵局
     turn: nextSeat(s, seat),
   };
 }
@@ -166,8 +204,20 @@ export function play(
  */
 export function pass(s: DealState, seat: Seat): DealState {
   assertActionable(s, seat);
+
+  // 领出：能出就必须出；确实一张也出不了才允许过，出牌权顺延给下家。
+  // 「确实出不了」只可能是手里剩的全是打不出去的王（单张王不能出）。
   if (s.current === null) {
-    throw new Error('轮到你领出，桌面为空时必须出牌，不能过');
+    if (hasAnyPlay(s.hands[seat]!, null)) {
+      throw new Error('轮到你领出，桌面为空时必须出牌，不能过');
+    }
+    const leadPassesInRow = s.leadPassesInRow + 1;
+
+    // 绕一圈回来还是没人能动 → 本局终止，剩牌张数最少者为赢家，并列则无人收分。
+    if (leadPassesInRow >= s.seatCount) {
+      return { ...s, leadPassesInRow, stalemate: true, winner: fewestCardsWinner(s) };
+    }
+    return { ...s, leadPassesInRow, turn: nextSeat(s, seat) };
   }
 
   const passesInRow = s.passesInRow + 1;
@@ -197,9 +247,15 @@ export function pass(s: DealState, seat: Seat): DealState {
  * 完整结算（炸弹倍数连乘、个人倍数逐张、春天）是 #9 的事，这里只把「按张数算」这条骨架立住——
  * 全部来源一律按剩余**张数**计分，没有一家按牌面点数。
  */
-export function settleBySize(s: DealState, base: number): { winner: Seat; pay: number[]; gain: number } {
+export function settleBySize(s: DealState, base: number): { winner: Seat | null; pay: number[]; gain: number } {
   if (!isDealOver(s)) throw new Error('本局未结束，不能结算');
-  const winner = s.winner!;
+
+  // 僵局且剩牌张数并列最少 → 没有赢家，本局无人收分。
+  if (s.winner === null) {
+    return { winner: null, pay: s.hands.map(() => 0), gain: 0 };
+  }
+
+  const winner = s.winner;
   const pay = s.hands.map((h, i) => (i === winner ? 0 : base * h.length));
   return { winner, pay, gain: pay.reduce((a, b) => a + b, 0) };
 }

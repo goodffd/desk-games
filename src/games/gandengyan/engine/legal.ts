@@ -121,6 +121,20 @@ export function enumerateFollows(hand: readonly Card[], current: Combo): Play[] 
 }
 
 /**
+ * 这手牌在当前语境下还有没有牌可出。`current` 为 `null` 表示领出。
+ *
+ * 僵局判定就压在这一个函数上（见 game.ts 的 `pass`），所以它宁可慢也不能漏解：
+ * **漏解会让僵局被提前误判**——本局在还有人能出牌时就被判终止，而牌局看起来
+ * 一切正常、步数远不到上限，测试全绿而 bug 直达生产。
+ * 测试那边用独立的暴力穷举逐个对照它，不拿它验自己。
+ */
+export function hasAnyPlay(hand: readonly Card[], current: Combo | null): boolean {
+  return current === null
+    ? enumerateLeads(hand).length > 0
+    : enumerateFollows(hand, current).length > 0;
+}
+
+/**
  * 这一手出牌合不合法：牌都在手里、指派站得住、牌型认得出，且（跟牌时）压得住桌面。
  * 判定全部委托给 `identify` / `beats`，本函数只做归属校验。
  */

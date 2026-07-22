@@ -67,8 +67,9 @@ desk-games/
 
 **新增慢测试的判据**：单文件耗时上到十几秒、或本质是"跑 N 局看统计"的，命名成 `*.slow.test.ts` 即自动进慢轨（`vite.config.ts` 按此 glob 排除，`vitest.slow.config.ts` 按此 glob 收入）。
 
-**局数旋钮**（`tests/helpers/slow-knobs.ts`）：`FUZZ_GAMES`(1000) / `FUZZ_MATCHES`(50) / `BENCH_GAMES`(500)。**默认值就是提交基线**；调小只为本地冒烟"这条还跑得通吗"，调小时会打警告——那个规模下统计类门槛不具代表性，**绿灯不作数**，不可拿来当提交或发版依据。
-例：`FUZZ_GAMES=20 FUZZ_MATCHES=2 BENCH_GAMES=20 npm run test:slow`（约 10 秒）。
+**局数旋钮**（`tests/helpers/slow-knobs.ts`）：`FUZZ_GAMES`(1000) / `FUZZ_MATCHES`(50) / `BENCH_GAMES`(500) / `GDY_FUZZ_GAMES`(4000)。**默认值就是提交基线**；调小只为本地冒烟"这条还跑得通吗"，调小时会打警告——那个规模下统计类门槛不具代表性，**绿灯不作数**，不可拿来当提交或发版依据。
+例：`FUZZ_GAMES=20 FUZZ_MATCHES=2 BENCH_GAMES=20 GDY_FUZZ_GAMES=50 npm run test:slow`（约 10 秒）。
+注意干瞪眼的 fuzz 带**分支命中闸门**（出牌权顺延、王炸各须命中 ≥1 次）；局数调得太小会因为撞不到稀有分支而报红，那是设计如此，不是测试坏了。
 
 ## 双轨交接约束
 

@@ -6,9 +6,10 @@
  * 不具代表性，不能拿来当提交或发版依据，所以调小时会打一行醒目的警告。
  *
  * 现有旋钮：
- * - `FUZZ_GAMES`    单局模糊测试的局数（默认 1000）
- * - `FUZZ_MATCHES`  整盘模糊测试的盘数（默认 50）
- * - `BENCH_GAMES`   AI 对打基准的局数（默认 500，两个基准文件共用）
+ * - `FUZZ_GAMES`      掼蛋单局模糊测试的局数（默认 1000）
+ * - `FUZZ_MATCHES`    掼蛋整盘模糊测试的盘数（默认 50）
+ * - `BENCH_GAMES`     AI 对打基准的局数（默认 500，两个基准文件共用）
+ * - `GDY_FUZZ_GAMES`  干瞪眼单局模糊测试的局数（默认 4000）
  */
 export function slowCount(envName: string, fallback: number): number {
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;

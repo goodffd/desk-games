@@ -115,6 +115,7 @@ export class RoomRegistry extends CardRoomRegistry {
     disconnectGraceMs = 0,
     disconnectGraceMisses = 2,
     dealResultLingerMs = 0,
+    nicks = undefined,   // 传入则与其它游戏共用一套昵称占用表（全服唯一）
   ) {
     super({
       adapter: guandanAdapter(makeDriver, { tributeTimeoutMs, dealResultLingerMs }),
@@ -122,6 +123,7 @@ export class RoomRegistry extends CardRoomRegistry {
       turnTimeoutMs,
       disconnectGraceMs,
       disconnectGraceMisses,
+      ...(nicks ? { nicks } : {}),
     });
   }
 }

@@ -73,6 +73,7 @@ export class CardRoomRegistry {
     turnTimeoutMs = 0,
     disconnectGraceMs = 0,
     disconnectGraceMisses = 2,
+    aiDelayMs = null,   // AI 每手思考延迟；null=按原来的 1.2~2.5s 随机（观感），冒烟/测试可调小
   }) {
     this.adapter = adapter;
     this.codeGen = codeGen;
@@ -80,6 +81,7 @@ export class CardRoomRegistry {
     this.turnTimeoutMs = turnTimeoutMs;
     this.disconnectGraceMs = disconnectGraceMs;
     this.disconnectGraceMisses = disconnectGraceMisses;
+    this.aiDelayMs = aiDelayMs;
     this.rooms = new Map();   // code -> room（本注册表只装本游戏的房，大厅天然按游戏分桶）
     this.lobby = new Set();
     this.queue = [];
@@ -450,7 +452,7 @@ export class CardRoomRegistry {
       return;
     }
     if (room._aiTimer) return; // 已排一手，等它落子
-    const delay = 1200 + Math.floor(Math.random() * 1300);
+    const delay = this.aiDelayMs != null ? this.aiDelayMs : 1200 + Math.floor(Math.random() * 1300);
     room._aiTimer = setTimeout(() => {
       room._aiTimer = null;
       if (!room.runner) return;

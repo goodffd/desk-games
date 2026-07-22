@@ -24,6 +24,41 @@ export class RoomRegistry {
     this.lobby = new Set();             // 订阅大厅
     this.queue = [];                    // 随机匹配 FIFO 池（client）
   }
+  // ── 只读快照：给测试与运维用的稳定观察面 ────────────────────────────────
+  // 存在的理由：房间内部结构（seats 里的 client 引用、graceMisses 这类记账、
+  // 各种计时器句柄）随时会变，测试直接摸它们等于把自己焊在实现上——抽公共房间层时
+  // 那些名字必然改掉，测试跟着重写，重写后跑绿就证明不了零回归（改了尺子又用它量）。
+  // 所以这里划一条契约：**只暴露真·可观察状态**，内部记账一概不出去。
+
+  /** 房间快照；房间不存在返回 null。纯数据，不含任何引用与句柄。 */
+  roomSnapshot(code) {
+    const r = this.rooms.get(code);
+    if (!r) return null;
+    return {
+      code: r.code,
+      status: r.status,
+      isPrivate: r.isPrivate,
+      hostSeat: r.hostSeat,
+      seats: r.seats.map((s) => (s ? {
+        nick: s.nick,
+        online: !!s.online,
+        ai: !!s.ai,
+        disconnected: !!s.disconnected,
+        connected: !!s.client,   // 座上有真连接（AI 补位的空座为 false）
+      } : null)),
+      spectators: r.spectators.size,
+      hasDriver: !!r.driver,
+    };
+  }
+  /** 房间还在不在。 */
+  hasRoom(code) { return this.rooms.has(code); }
+  /** 大厅快照（就是发给客户端的那一份）。 */
+  lobbySnapshot() { return this._snapshot(); }
+  /** 某个连接现在在哪：`{ code, seat }`；`seat` 可能是数字、'spectator' 或 null（进房未落座）。 */
+  seatOf(client) { return client._room ? { code: client._room, seat: client._seat ?? null } : null; }
+  /** 随机匹配池里排着几个人。 */
+  matchQueueSize() { return this.queue.length; }
+
   _nickKey(n) { return String(n || '').trim().toLowerCase(); }
   handle(client, msg) {
     if (msg.t === 'hello' || msg.t === 'rename') {

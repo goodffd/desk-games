@@ -51,7 +51,9 @@ desk-games/
 - 安装：`npm install`
 - 开发：`npm run dev`（Vite dev server）
 - 构建：`npm run build`（`tsc --noEmit && vite build` → `dist/index.html` 单文件）
-- 真机冒烟：Playwright + 系统 Chrome（`channel:'chrome'`），掼蛋打完一整局验名次、象棋打完整局验胜负；联机走多 context 真路径（建房/加入/对弈/重连）。
+- **真机冒烟（掼蛋联机）**：`npm run smoke:guandan` —— 一条命令跑完 建房 / 加入 / 入座 / 开打 / 断线重连 的真路径（自己起服务、自己收摊，失败退非零码）。跑之前要有构建产物：`npm run build && npm run build:server`，缺了会提示。`SMOKE_HEADED=1` 开有头浏览器肉眼看，`SMOKE_PORT` 换端口。
+  **动了房间层 / 联机协议 / 会话重连，必须跑它**——单测替代不了：房间层三层各自绿、合起来仍可能坏，只有真浏览器 + 真 WebSocket 能证明「两个人真的能坐到一张桌上打，断了还能回来」。
+- 其它真机冒烟：Playwright + 系统 Chrome（`channel:'chrome'`），掼蛋打完一整局验名次、象棋打完整局验胜负。
 
 ### 测试分快慢两轨
 

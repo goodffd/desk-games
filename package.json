@@ -9,6 +9,7 @@
     "test": "vitest run",
     "test:slow": "vitest run --config vitest.slow.config.ts",
     "test:all": "npm run test && npm run test:slow",
+    "smoke:guandan": "node scripts/guandan-live-smoke.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.xiangqi.json",
     "build:server": "node server/build.mjs"
   },

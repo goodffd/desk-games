@@ -19,23 +19,8 @@ import { choosePlay } from '../src/games/guandan/ai/ai';
 import {
   startMatch, settleDeal, planTribute, autoReturn, applyTribute, dealLevel,
 } from '../src/games/guandan/engine/match';
+import { makeLCG, seededShuffle } from './helpers/rng';
 import type { Card, Rank, Seat } from '../src/games/guandan/engine/types';
-
-function makeLCG(seed: number): () => number {
-  let state = seed >>> 0;
-  return (): number => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state; };
-}
-function seededShuffle(seed: number): (n: number) => number[] {
-  return (n: number): number[] => {
-    const next = makeLCG(seed);
-    const perm = Array.from({ length: n }, (_, i) => i);
-    for (let i = n - 1; i > 0; i--) {
-      const j = next() % (i + 1);
-      [perm[i], perm[j]] = [perm[j]!, perm[i]!];
-    }
-    return perm;
-  };
-}
 
 /** AI 自对局把一局打完，返回名次（头→末）。带合法性 + 步数守卫。 */
 function playDealToEnd(hands: Card[][], firstLeader: Seat, level: Rank, label: string): Seat[] {

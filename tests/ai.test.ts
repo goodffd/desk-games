@@ -20,28 +20,10 @@ import { createDeal, play as gamePlay, pass as gamePass } from '../src/games/gua
 import { choosePlay, chooseReturn, heuristicChoose } from '../src/games/guandan/ai/ai';
 import { computeUnseen } from '../src/games/guandan/ai/counting';
 import { identify } from '../src/games/guandan/engine/combos';
-
-// ---- deterministic shuffle ------------------------------------------------
-
-function seededShuffle(seed: number) {
-  return function (n: number): number[] {
-    // Mulberry32 PRNG
-    let s = seed >>> 0;
-    function rand(): number {
-      s |= 0;
-      s = (s + 0x6d2b79f5) | 0;
-      let t = Math.imul(s ^ (s >>> 15), 1 | s);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    }
-    const arr = Array.from({ length: n }, (_, i) => i);
-    for (let i = n - 1; i > 0; i--) {
-      const j = Math.floor(rand() * (i + 1));
-      [arr[i], arr[j]] = [arr[j]!, arr[i]!];
-    }
-    return arr;
-  };
-}
+// seed 语义变更记录（issue #3）：本文件原先自带一份 Mulberry32 洗牌，迁到共用模块后
+// 同一 seed 发到的牌不同。这里的断言只用随机局面验合法性与统计倾向，不依赖任何具体牌面；
+// 迁移后 22 条断言（含两条 ≥70% 的倾向断言）全部仍绿。
+import { seededShuffle } from './helpers/rng';
 
 /** Build a fresh DealState with a given seed (firstLeader = 0). */
 function makeDeal(seed: number): DealState {

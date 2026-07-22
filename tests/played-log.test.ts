@@ -6,17 +6,8 @@ import { describe, it, expect } from 'vitest';
 import { makeDeck, deal } from '../src/games/guandan/engine/cards';
 import { createDeal, play, pass, isDealOver } from '../src/games/guandan/engine/game';
 import { choosePlay } from '../src/games/guandan/ai/ai';
+import { seededShuffle } from './helpers/rng';
 import type { Seat } from '../src/games/guandan/engine/types';
-
-function seededShuffle(seed: number) {
-  let st = seed >>> 0;
-  const next = () => (st = (Math.imul(st, 1664525) + 1013904223) >>> 0);
-  return (n: number): number[] => {
-    const p = Array.from({ length: n }, (_, i) => i);
-    for (let i = n - 1; i > 0; i--) { const j = next() % (i + 1); [p[i], p[j]] = [p[j]!, p[i]!]; }
-    return p;
-  };
-}
 
 describe('DealState.played 记牌日志', () => {
   it('createDeal → played 为空', () => {

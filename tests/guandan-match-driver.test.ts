@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MatchDriver } from '../server/guandan-match-driver';
+import { seededShuffleStream } from './helpers/rng';
 
 // 不洗牌：固定顺序发牌，便于断言（shuffle 返回 0..n-1 原序）
 const noShuffle = (n: number) => Array.from({ length: n }, (_, i) => i);
@@ -88,12 +89,17 @@ describe('MatchDriver — 局终结算', () => {
     if (lastState.phase === 'dealResult') expect(lastState.result.ranking).toHaveLength(4);
   });
 });
-// 可复现洗牌：Fisher-Yates with 固定 LCG 种子（测试确定性，不用 Math.random）
+/**
+ * 可复现洗牌：走共用的 `seededShuffleStream`（tests/helpers/rng.ts）。
+ *
+ * 必须用 stream 变体：MatchDriver 每开一局都调一次 shuffle，若用「每次调用重置」的
+ * `seededShuffle`，连打数局会发到同一副牌，多局覆盖静默归零（断言弱，抓不住）。
+ *
+ * seed 语义变更记录（issue #3）：改造前这里是 glibc 式 LCG（1103515245/12345），
+ * 迁到共用模块后牌面不同。本文件不依赖任何具体牌面，只依赖「连发多局各不相同」这条性质。
+ */
 function defaultShuffleSeeded() {
-  let seed = 12345;
-  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-  return (n: number) => { const a = Array.from({ length: n }, (_, i) => i);
-    for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = a[i]!; a[i] = a[j]!; a[j] = t; } return a; };
+  return seededShuffleStream(12345);
 }
 
 describe('MatchDriver — AI 接管', () => {
@@ -146,13 +152,24 @@ describe('MatchDriver — AI 接管', () => {
 
 describe('MatchDriver — 进贡/还贡', () => {
   it('全 AI 自对局：连打数局不卡死，每局 ranking 合法（进贡/还贡走 autoReturn）', () => {
-    const d = new MatchDriver({ shuffle: defaultShuffleSeeded() });
+    // 记录每次发牌真正用到的排列。不从 hand 消息反推——每出一手牌都会补发一次剩余手牌，
+    // 那个集合天然就不止一种，拿它当多样性证据是个假闸门。
+    const inner = defaultShuffleSeeded();
+    const perms: string[] = [];
+    const recordingShuffle = (n: number): number[] => { const p = inner(n); perms.push(p.join(',')); return p; };
+
+    const d = new MatchDriver({ shuffle: recordingShuffle });
     const out = d.start();
     for (let s = 0; s < 4; s++) out.push(...d.setAI(s as any, true));
     out.push(...d.driveAI());
     let guard = 0;
     while (!d.match.over && guard++ < 30) { out.push(...d.nextDeal()); for (let s = 0; s < 4; s++) out.push(...d.setAI(s as any, true)); out.push(...d.driveAI()); }
     expect(d.match.over || guard >= 30).toBeTruthy(); // 不死循环
+
+    // 连打多局必须发到不同的牌。洗牌若退化成「每局同一副」，上面的断言照绿而多局覆盖归零 ——
+    // 抽 tests/helpers/rng.ts 时真的踩过一次（错用了每次重置的 seededShuffle 而非 stream 变体）。
+    expect(perms.length).toBeGreaterThan(1);        // 确实发了多次牌，下一条才有意义
+    expect(new Set(perms).size).toBe(perms.length); // 每次发牌各不相同
   });
 
   it('收贡座位是真人 → 发 need-tribute；该人 tribute-return 后开下一局', () => {

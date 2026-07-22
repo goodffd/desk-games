@@ -5,25 +5,13 @@
  */
 import { makeDeck, deal } from '../../src/games/guandan/engine/cards';
 import { createDeal, play, pass, isDealOver, ranking, type DealState } from '../../src/games/guandan/engine/game';
+import { makeLCG, seededShuffle } from './rng';
 import type { Card, Rank, Seat } from '../../src/games/guandan/engine/types';
 
 export type Policy = (s: DealState, seat: Seat) => Card[] | null;
 
 const LEVEL: Rank = 2;
 const MAX_STEPS = 4000;
-
-export function makeLCG(seed: number): () => number {
-  let st = seed >>> 0;
-  return () => (st = (Math.imul(st, 1664525) + 1013904223) >>> 0);
-}
-export function seededShuffle(seed: number) {
-  return (n: number): number[] => {
-    const next = makeLCG(seed);
-    const p = Array.from({ length: n }, (_, i) => i);
-    for (let i = n - 1; i > 0; i--) { const j = next() % (i + 1); [p[i], p[j]] = [p[j]!, p[i]!]; }
-    return p;
-  };
-}
 
 /** 跑一整局，按座位策略出牌，返回 ranking（头游→末游）。 */
 export function playDeal(seed: number, policyOf: (seat: Seat) => Policy): Seat[] {

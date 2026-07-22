@@ -13,6 +13,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { makeLCG, seededShuffle } from './helpers/rng';
 import { makeDeck, deal } from '../src/games/guandan/engine/cards';
 import {
   createDeal,
@@ -25,41 +26,6 @@ import {
 import { isLegalPlay } from '../src/games/guandan/engine/legal';
 import { choosePlay } from '../src/games/guandan/ai/ai';
 import type { Rank, Seat } from '../src/games/guandan/engine/types';
-
-// ---------------------------------------------------------------------------
-// Seeded deterministic RNG (LCG) + Fisher-Yates shuffle
-// ---------------------------------------------------------------------------
-
-/**
- * Linear congruential generator — Numerical Recipes constants.
- * Returns a mutable `next()` function yielding integers in [0, 2^32).
- */
-function makeLCG(seed: number): () => number {
-  // LCG parameters: modulus 2^32, multiplier 1664525, increment 1013904223
-  let state = seed >>> 0; // 32-bit unsigned
-  return (): number => {
-    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
-    return state;
-  };
-}
-
-/**
- * Return a Fisher-Yates permutation of [0..n-1] seeded by `seed`.
- * Every game gets its own independent LCG state via a per-game seed.
- */
-function seededShuffle(seed: number): (n: number) => number[] {
-  return (n: number): number[] => {
-    const next = makeLCG(seed);
-    const perm = Array.from({ length: n }, (_, i) => i);
-    for (let i = n - 1; i > 0; i--) {
-      const j = next() % (i + 1);
-      const tmp = perm[i]!;
-      perm[i] = perm[j]!;
-      perm[j] = tmp;
-    }
-    return perm;
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Conservation check helpers

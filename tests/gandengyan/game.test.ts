@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createDeal, play, pass, isDealOver, settleBySize } from '../../src/games/gandengyan/engine/game';
+import { createDeal, play, pass, isDealOver, settle } from '../../src/games/gandengyan/engine/game';
 import type { DealState } from '../../src/games/gandengyan/engine/game';
 import type { Card, Seat } from '../../src/games/gandengyan/engine/types';
 import { cards } from './mk';
@@ -198,24 +198,26 @@ describe('局终：先打完手牌者赢，本局立刻结束', () => {
   });
 });
 
-describe('settleBySize — 本期的最小结算：底分 × 剩牌张数', () => {
+// 结算的完整规则（炸弹倍数、个人倍数、春天）见 settle.test.ts；这里只守状态机这一侧：
+// 局终能算、未终止不能算、底分等比。注意这两局里输家从头到尾没出过牌 → 都吃春天 ×2。
+describe('settle — 与状态机的接线', () => {
   it('输家按剩牌张数赔，赢家收各家之和', () => {
     const s0 = deal(['S5', 'S6 H8', 'SK HQ DJ']);
     const s1 = play(s0, 0, pick(s0, 0, 'S5'));
-    const r = settleBySize(s1, 1);
+    const r = settle(s1, 1);
     expect(r.winner).toBe(0);
-    expect(r.pay).toEqual([0, 2, 3]);
-    expect(r.gain).toBe(5);
+    expect(r.pay).toEqual([0, 2 * 2, 3 * 2]);   // 两家都没出过牌 → 各吃春天 ×2
+    expect(r.gain).toBe(10);
   });
 
   it('底分可调', () => {
     const s0 = deal(['S5', 'S6 H8']);
     const s1 = play(s0, 0, pick(s0, 0, 'S5'));
-    expect(settleBySize(s1, 10)).toMatchObject({ pay: [0, 20], gain: 20 });
+    expect(settle(s1, 10)).toMatchObject({ pay: [0, 40], gain: 40 }); // 2 张 × 春天 2 × 底分 10
   });
 
   it('本局没结束就结算 → 抛错', () => {
-    expect(() => settleBySize(deal(['S5 H9', 'S6 H8']), 1)).toThrow(/未结束/);
+    expect(() => settle(deal(['S5 H9', 'S6 H8']), 1)).toThrow(/未结束/);
   });
 });
 
@@ -328,7 +330,7 @@ describe('打完一整局：构造手牌，从头走到底', () => {
     expect(s.hands[s.winner!]).toHaveLength(0);
     expect(totalCards(s)).toBe(total);
 
-    const r = settleBySize(s, 1);
+    const r = settle(s, 1);
     expect(r.pay[s.winner!]).toBe(0);
     expect(r.gain).toBe(r.pay.reduce((a, b) => a + b, 0));
   });

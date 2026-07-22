@@ -23,7 +23,10 @@ import { MAX_SEATS, MIN_SEATS } from './cards';
  * 3 人以上凑不出三个「只剩一张王」的人。这也意味着 `fewestCardsWinner` 的「不并列」那一支
  * 在单副牌下走不到（能卡住的人手里必然都是 1 张）；留着它是为了忠于规格。
  *
- * 尚未实现：#9 完整结算（炸弹倍数连乘、个人倍数逐张、春天）。
+ * 结算（#9）：底分 × 剩牌张数 × 2^炸弹数 × 个人倍数（每张王 ×2、每张 2 ×2、春天 ×2），
+ * 赢家收各输家之和。不封顶。详见 `settle`。
+ *
+ * 至此单局引擎的规则面已合拢，剩下的是模糊测试（#10）与服务端接线（#12 起）。
  */
 export interface DealState {
   /** 本局人数 2~5 */
@@ -47,6 +50,13 @@ export interface DealState {
   readonly leadPassesInRow: number;
   /** 本局是否以僵局收场（全圈无人能动） */
   readonly stalemate: boolean;
+  /**
+   * 本局打出过几个炸（含王炸）。只为喂结算而存在——**别在测试里断言它**，
+   * 一律穿过 `settle()` 断言最终倍数，否则就是把测试焊在内部表示上。
+   */
+  readonly bombsPlayed: number;
+  /** 各家整局有没有打出过牌。只为判「春天」而存在，同样别直接断言。 */
+  readonly hasPlayed: readonly boolean[];
   /**
    * 赢家。打空手牌者为赢家；僵局时为剩牌张数最少者，并列则为 `null`。
    * `null` 且 `stalemate` 为假，表示本局还没结束。
@@ -76,6 +86,8 @@ export function createDeal(init: {
     passesInRow: 0,
     leadPassesInRow: 0,
     stalemate: false,
+    bombsPlayed: 0,
+    hasPlayed: Array.from({ length: seatCount }, () => false),
     winner: null,
   };
 }
@@ -171,6 +183,8 @@ export function play(
 
   const rest = hand.filter((c) => !playIds.has(c.id));
   const hands = s.hands.map((h, i) => (i === seat ? rest : h));
+  const bombsPlayed = s.bombsPlayed + (isBomb(combo) ? 1 : 0);
+  const hasPlayed = s.hasPlayed.map((p, i) => (i === seat ? true : p));
 
   // 打空手牌即胜，本局立刻结束——不排后面的名次，也不摸牌。
   if (rest.length === 0) {
@@ -178,6 +192,8 @@ export function play(
       ...s,
       hands,
       played: [...s.played, ...cards],
+      bombsPlayed,
+      hasPlayed,
       current: { combo, by: seat },
       passesInRow: 0,
       leadPassesInRow: 0,
@@ -189,6 +205,8 @@ export function play(
     ...s,
     hands,
     played: [...s.played, ...cards],
+    bombsPlayed,
+    hasPlayed,
     current: { combo, by: seat },
     passesInRow: 0,
     leadPassesInRow: 0, // 有人出牌 → 顺延计数清零，不会攒到误判僵局
@@ -242,12 +260,19 @@ export function pass(s: DealState, seat: Seat): DealState {
 }
 
 /**
- * 本期的最小结算：底分 × 剩牌张数，赢家收各输家之和。
+ * 本局结算。
  *
- * 完整结算（炸弹倍数连乘、个人倍数逐张、春天）是 #9 的事，这里只把「按张数算」这条骨架立住——
- * 全部来源一律按剩余**张数**计分，没有一家按牌面点数。
+ * ```
+ * 某输家赔付 = 底分 × 剩牌张数 × 2^(本局炸弹总数) × 个人倍数
+ * 个人倍数   = 每张王 ×2 · 每张 2 ×2（逐张相乘）· 春天 ×2
+ * 赢家得分   = 各输家赔付之和
+ * ```
+ *
+ * 计分一律按剩余**张数**，不按牌面点数——调研里全部来源无一例外。
+ * **不做**「手里剩炸弹加倍」（判定「剩几个炸」要先跑一层拆牌算法，且三张同点
+ * 已按 3 张计入张数），**不封顶**（owner 看过 5120 底分的极值后确认）。
  */
-export function settleBySize(s: DealState, base: number): { winner: Seat | null; pay: number[]; gain: number } {
+export function settle(s: DealState, base: number): { winner: Seat | null; pay: number[]; gain: number } {
   if (!isDealOver(s)) throw new Error('本局未结束，不能结算');
 
   // 僵局且剩牌张数并列最少 → 没有赢家，本局无人收分。
@@ -256,6 +281,20 @@ export function settleBySize(s: DealState, base: number): { winner: Seat | null;
   }
 
   const winner = s.winner;
-  const pay = s.hands.map((h, i) => (i === winner ? 0 : base * h.length));
+  const bombMultiplier = 2 ** s.bombsPlayed; // 全场共享，每个炸一律 ×2，不分大小
+
+  const pay = s.hands.map((hand, seat) => {
+    if (seat === winner) return 0;
+
+    // 个人倍数：只作用于该输家自己，且**逐张**相乘
+    let personal = 1;
+    for (const c of hand) {
+      if (c.kind === 'joker' || c.rank === 2) personal *= 2;
+    }
+    if (!s.hasPlayed[seat]) personal *= 2; // 春天：整局一张牌都没打出去过
+
+    return base * hand.length * bombMultiplier * personal;
+  });
+
   return { winner, pay, gain: pay.reduce((a, b) => a + b, 0) };
 }

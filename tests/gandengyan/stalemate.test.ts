@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createDeal, play, pass, isDealOver, settleBySize } from '../../src/games/gandengyan/engine/game';
+import { createDeal, play, pass, isDealOver, settle } from '../../src/games/gandengyan/engine/game';
 import type { DealState } from '../../src/games/gandengyan/engine/game';
 import { hasAnyPlay } from '../../src/games/gandengyan/engine/legal';
 import { identify, beats } from '../../src/games/gandengyan/engine/combos';
@@ -156,7 +156,7 @@ describe('全圈无人能动 → 本局终止', () => {
     let s = deal(['jB', 'jS'], { dealer: 0, deck: '' });
     s = pass(s, 0);
     s = pass(s, 1);
-    const r = settleBySize(s, 1);
+    const r = settle(s, 1);
     expect(r.winner).toBeNull();
     expect(r.pay).toEqual([0, 0]);
     expect(r.gain).toBe(0);

@@ -14,6 +14,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { makeLCG, seededShuffle } from './helpers/rng';
+import { slowCount } from './helpers/slow-knobs';
 import { makeDeck, deal } from '../src/games/guandan/engine/cards';
 import {
   createDeal,
@@ -85,7 +86,7 @@ function assertConservation(
 // ---------------------------------------------------------------------------
 
 const LEVEL: Rank = 2;
-const NUM_GAMES = 1000;
+const NUM_GAMES = slowCount('FUZZ_GAMES', 1000);
 const MAX_STEPS = 2000;
 
 describe('fuzz: 1000-game AI self-play', () => {

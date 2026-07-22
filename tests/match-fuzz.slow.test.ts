@@ -20,6 +20,7 @@ import {
   startMatch, settleDeal, planTribute, autoReturn, applyTribute, dealLevel,
 } from '../src/games/guandan/engine/match';
 import { makeLCG, seededShuffle } from './helpers/rng';
+import { slowCount } from './helpers/slow-knobs';
 import type { Card, Rank, Seat } from '../src/games/guandan/engine/types';
 
 /** AI 自对局把一局打完，返回名次（头→末）。带合法性 + 步数守卫。 */
@@ -42,7 +43,7 @@ function playDealToEnd(hands: Card[][], firstLeader: Seat, level: Rank, label: s
   return ranking(s);
 }
 
-const NUM_MATCHES = 50;
+const NUM_MATCHES = slowCount('FUZZ_MATCHES', 50);
 const MAX_DEALS = 400;
 
 describe('match fuzz: 整盘自对局', () => {

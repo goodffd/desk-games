@@ -4,10 +4,11 @@ import { createDeal, play, pass, isDealOver, ranking, type DealState } from '../
 import { choosePlay } from '../src/games/guandan/ai/ai';
 import { legacyChoosePlay } from './helpers/legacy-ai';
 import { makeLCG, seededShuffle } from './helpers/rng';
+import { slowCount } from './helpers/slow-knobs';
 import type { Rank, Seat } from '../src/games/guandan/engine/types';
 
 const LEVEL: Rank = 2;
-const GAMES = 500;
+const GAMES = slowCount('BENCH_GAMES', 500);
 const MAX_STEPS = 2000;
 type Policy = (s: DealState, seat: Seat) => ReturnType<typeof choosePlay>;
 

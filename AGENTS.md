@@ -25,10 +25,18 @@
 ## 验证命令
 
 ```bash
-npm test
+npm test          # 快轨：日常底线，秒级
 npm run typecheck
 npm run build
 ```
+
+**动了引擎 / AI / 洗牌，还必须补跑慢轨**——快轨绿不代表模糊测试绿：
+
+```bash
+npm run test:slow   # *.slow.test.ts：模糊测试 + AI 对打基准，约 7 分半
+```
+
+慢轨局数可用 `FUZZ_GAMES` / `FUZZ_MATCHES` / `BENCH_GAMES` 调小做本地冒烟，但**调小后绿灯不作数**，不能当提交依据。详见 `CLAUDE.md`《测试分快慢两轨》。
 
 涉及联机、房间、重连或 UI 流程时，还要做浏览器实测或 Playwright 截图验证。
 

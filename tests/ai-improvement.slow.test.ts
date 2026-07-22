@@ -7,10 +7,10 @@ import { describe, it, expect } from 'vitest';
 import { choosePlay } from '../src/games/guandan/ai/ai';
 import { baselineChoosePlay } from './helpers/baseline-ai';
 import { benchmark } from './helpers/deal-sim';
+import { slowCount } from './helpers/slow-knobs';
 
-// dev 提速：BENCH_GAMES=200 npx vitest run ...；默认 500 局（提交基线）
-const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
-const GAMES = Number(env?.['BENCH_GAMES'] ?? 500);
+// dev 提速：BENCH_GAMES=200 npm run test:slow；默认 500 局（提交基线）
+const GAMES = slowCount('BENCH_GAMES', 500);
 // 记牌+双下+残局rollout+便宜抢节奏 四件套实测 ~58% 头游 / 平均升级 ~1.33。
 // 门槛取稳健下界（AI 确定性、基准可复现，但保留余量当回归地板，非 flaky）：
 const WIN_FLOOR = 0.55;      // 头游胜率下界（基线自打≈50%，明显更强）

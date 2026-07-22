@@ -4,7 +4,7 @@ import { makeLCG, seededShuffle, seededShuffleStream } from './rng';
 /**
  * 黄金值回归锁。
  *
- * 这些数字是在「抽公共模块」之前，从 tests/fuzz.test.ts 里那份实现逐字照抄跑出来的
+ * 这些数字是在「抽公共模块」之前，从当时的 tests/fuzz.test.ts（现 fuzz.slow.test.ts）里那份实现逐字照抄跑出来的
  * （见 issue #3）。它们的作用不是描述算法，而是**钉死 seed 语义**：
  * 同一个种子在改造前后必须洗出同一副牌，否则掼蛋既有的所有 fuzz 复现记录全部作废。
  *

@@ -51,8 +51,24 @@ desk-games/
 - 安装：`npm install`
 - 开发：`npm run dev`（Vite dev server）
 - 构建：`npm run build`（`tsc --noEmit && vite build` → `dist/index.html` 单文件）
-- **验证**（对应全局"改完主动跑验证"）：`npm test`（vitest，引擎单测+模糊测试必须全绿）+ `npm run typecheck`。改规则必先加/改单测、红→绿。
 - 真机冒烟：Playwright + 系统 Chrome（`channel:'chrome'`），掼蛋打完一整局验名次、象棋打完整局验胜负；联机走多 context 真路径（建房/加入/对弈/重连）。
+
+### 测试分快慢两轨
+
+| 轨 | 命令 | 内容 | 什么时候跑 |
+|---|---|---|---|
+| **快轨** | `npm test` | 除慢轨外的全部测试（引擎穷举单测、协议、驱动、壳、象棋） | **每次改完都跑**，秒级返回 |
+| **慢轨** | `npm run test:slow` | `*.slow.test.ts`：模糊测试 + AI 对打基准 | 动了引擎 / AI / 洗牌时跑；**提交前跑一次**；发版必跑 |
+| 两轨 | `npm run test:all` | 先快后慢 | 发版前 |
+
+**验证**（对应全局"改完主动跑验证"）：`npm test` + `npm run typecheck` 是日常底线；改规则必先加/改单测、红→绿。**动了引擎 / AI / 洗牌就必须补跑 `npm run test:slow`**——快轨绿不代表模糊测试绿。
+
+分轨的理由：慢轨那 4 个文件占全量测试时间的 **94%**（单局模糊测试一个就 450s）。混在一起日常验证要等 7 分半，结果是没人愿意在提交前跑，测试等于白写。
+
+**新增慢测试的判据**：单文件耗时上到十几秒、或本质是"跑 N 局看统计"的，命名成 `*.slow.test.ts` 即自动进慢轨（`vite.config.ts` 按此 glob 排除，`vitest.slow.config.ts` 按此 glob 收入）。
+
+**局数旋钮**（`tests/helpers/slow-knobs.ts`）：`FUZZ_GAMES`(1000) / `FUZZ_MATCHES`(50) / `BENCH_GAMES`(500)。**默认值就是提交基线**；调小只为本地冒烟"这条还跑得通吗"，调小时会打警告——那个规模下统计类门槛不具代表性，**绿灯不作数**，不可拿来当提交或发版依据。
+例：`FUZZ_GAMES=20 FUZZ_MATCHES=2 BENCH_GAMES=20 npm run test:slow`（约 10 秒）。
 
 ## 双轨交接约束
 

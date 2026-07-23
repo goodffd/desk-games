@@ -514,6 +514,7 @@ export class CardRoomRegistry {
       out.push({
         code: r.code,
         status: r.status,
+        seatCount: r.seatCount,   // 桌子容量：大厅列表显示「N 人桌」（干瞪眼 2-5 座才有意义）
         players: r.seats.filter((s) => s && s.nick).map((s) => s.nick), // 滤掉 AI 补位空座，别混进玩家名单
         spectators: r.spectators.size,
       });

@@ -264,3 +264,8 @@
   color: #1a1208; background: linear-gradient(180deg, #e2c163, #c9a84c 58%, #b08f38); border-color: transparent;
 }
 .cr-lobby__seatnote { margin: -2px 0 10px; font-size: 12px; color: var(--text-dim, #a89070); letter-spacing: 0.03em; }
+/* 大厅房行的「N 人桌」容量徽（干瞪眼才渲染；掼蛋恒 4 座不加，故此类掼蛋从不出现） */
+.cr-lobby__room-cap {
+  font-size: 12px; color: var(--gold, #c9a84c); background: rgba(201, 168, 76, 0.14);
+  padding: 1px 7px; border-radius: 999px; letter-spacing: 0.03em; white-space: nowrap;
+}

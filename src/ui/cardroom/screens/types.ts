@@ -10,6 +10,7 @@ export interface LobbyRoom {
   status: 'waiting' | 'playing';
   players: string[];
   spectators?: number;
+  seatCount?: number;   // 桌子容量；大厅在 seatChoice 存在时显示「N 人桌」
 }
 
 /** 房间页每座只需要昵称；空座为 null。两边的 SeatInfo[] 都可赋值。 */

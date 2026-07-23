@@ -117,6 +117,8 @@ export function renderLobby(root: HTMLElement, opts: LobbyOpts): LobbyHandle {
   wrap.appendChild(cols);
   root.appendChild(wrap);
 
+  const showSeatCount = !!(opts.seatChoice && opts.seatChoice.length);   // 干瞪眼才显示「N 人桌」
+
   function renderRooms(rooms: LobbyRoom[]): void {
     list.innerHTML = '';
     if (!rooms.length) {
@@ -126,6 +128,7 @@ export function renderLobby(root: HTMLElement, opts: LobbyOpts): LobbyHandle {
     for (const r of rooms) {
       const row = el('div', 'cr-lobby__room');
       row.appendChild(text('span', 'cr-lobby__room-code', r.code));
+      if (showSeatCount && r.seatCount) row.appendChild(text('span', 'cr-lobby__room-cap', `${r.seatCount} 人桌`));
       const meta = el('span', 'cr-lobby__room-meta');
       meta.textContent = `${r.players.length}人${r.players.length ? '：' + r.players.join('、') : ''}`;
       row.appendChild(meta);

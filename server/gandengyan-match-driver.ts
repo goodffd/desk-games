@@ -106,6 +106,8 @@ export class GandengyanDriver {
         winner: r.winner, pay: r.pay, gain: r.gain,
         stalemate: s.stalemate,
         hands: s.hands.map((h) => h.length),
+        base: r.base, bombsPlayed: r.bombsPlayed, bombMultiplier: r.bombMultiplier,
+        seats: r.seats,   // 逐座明细：剩牌张数 / 王数·2数 / 春天 / 个人倍数 / 赔付（#16 结算表逐项展开）
       };
     }
     return base;

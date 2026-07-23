@@ -364,23 +364,32 @@ function pass(s, seat) {
   }
   return { ...s, passesInRow, turn: nextSeat(s, seat) };
 }
+function seatDetail(s, seat, base, bombMultiplier, isZero) {
+  const hand = s.hands[seat];
+  let wildCount = 0, twoCount = 0;
+  for (const c of hand) {
+    if (c.kind === "joker") wildCount++;
+    else if (c.rank === 2) twoCount++;
+  }
+  const spring = !s.hasPlayed[seat];
+  let personalMultiplier = 2 ** (wildCount + twoCount);
+  if (spring) personalMultiplier *= 2;
+  const pay = isZero ? 0 : base * hand.length * bombMultiplier * personalMultiplier;
+  return { seat, handCount: hand.length, wildCount, twoCount, spring, personalMultiplier, pay };
+}
 function settle(s, base) {
   if (!isDealOver(s)) throw new Error("\u672C\u5C40\u672A\u7ED3\u675F\uFF0C\u4E0D\u80FD\u7ED3\u7B97");
+  const bombsPlayed = s.bombsPlayed;
+  const bombMultiplier = 2 ** bombsPlayed;
+  const meta = { base, bombsPlayed, bombMultiplier };
   if (s.winner === null) {
-    return { winner: null, pay: s.hands.map(() => 0), gain: 0 };
+    const seats2 = s.hands.map((_, seat) => seatDetail(s, seat, base, bombMultiplier, true));
+    return { winner: null, pay: seats2.map(() => 0), gain: 0, ...meta, seats: seats2 };
   }
   const winner = s.winner;
-  const bombMultiplier = 2 ** s.bombsPlayed;
-  const pay = s.hands.map((hand, seat) => {
-    if (seat === winner) return 0;
-    let personal = 1;
-    for (const c of hand) {
-      if (c.kind === "joker" || c.rank === 2) personal *= 2;
-    }
-    if (!s.hasPlayed[seat]) personal *= 2;
-    return base * hand.length * bombMultiplier * personal;
-  });
-  return { winner, pay, gain: pay.reduce((a, b) => a + b, 0) };
+  const seats = s.hands.map((_, seat) => seatDetail(s, seat, base, bombMultiplier, seat === winner));
+  const pay = seats.map((d) => d.pay);
+  return { winner, pay, gain: pay.reduce((a, b) => a + b, 0), ...meta, seats };
 }
 
 // src/games/gandengyan/ai/choose.ts
@@ -519,7 +528,12 @@ var GandengyanDriver = class {
         pay: r.pay,
         gain: r.gain,
         stalemate: s.stalemate,
-        hands: s.hands.map((h) => h.length)
+        hands: s.hands.map((h) => h.length),
+        base: r.base,
+        bombsPlayed: r.bombsPlayed,
+        bombMultiplier: r.bombMultiplier,
+        seats: r.seats
+        // 逐座明细：剩牌张数 / 王数·2数 / 春天 / 个人倍数 / 赔付（#16 结算表逐项展开）
       };
     }
     return base;

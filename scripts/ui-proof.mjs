@@ -96,7 +96,12 @@ server.stderr.on('data', (d) => { serverLog += d; });
 let browser; let result = null; let failure = null;
 try {
   await waitForServer();
-  browser = await chromium.launch({ channel: 'chrome', headless: true });
+  // 确定性渲染：关 GPU 光栅化 / 字体 hinting / 子像素 LCD 抗锯齿 / 固定色彩配置——
+  // 否则大号标题字（如昵称页 36px「掼蛋」）的抗锯齿会在两种子像素结果间抖动，哈希 flaky。
+  browser = await chromium.launch({
+    channel: 'chrome', headless: true,
+    args: ['--disable-gpu', '--font-render-hinting=none', '--disable-lcd-text', '--force-color-profile=srgb'],
+  });
   result = await capture(browser);
 } catch (e) { failure = e; } finally {
   if (browser) await browser.close().catch(() => {});

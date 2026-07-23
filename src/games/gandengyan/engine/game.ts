@@ -272,29 +272,56 @@ export function pass(s: DealState, seat: Seat): DealState {
  * **不做**「手里剩炸弹加倍」（判定「剩几个炸」要先跑一层拆牌算法，且三张同点
  * 已按 3 张计入张数），**不封顶**（owner 看过 5120 底分的极值后确认）。
  */
-export function settle(s: DealState, base: number): { winner: Seat | null; pay: number[]; gain: number } {
-  if (!isDealOver(s)) throw new Error('本局未结束，不能结算');
+/** 一座的结算明细——界面据此把「每一乘」摆开，玩家看得懂赔付怎么来的（#16）。 */
+export interface SettleSeat {
+  seat: Seat;
+  handCount: number;          // 剩牌张数（计分只按张数）
+  wildCount: number;          // 手里的王，每张个人倍数 ×2
+  twoCount: number;           // 手里的 2，每张个人倍数 ×2
+  spring: boolean;            // 春天：整局没出过牌，×2
+  personalMultiplier: number; // = 2^(wildCount+twoCount) · (spring?2:1)
+  pay: number;                // 该座赔付（赢家/僵局为 0）
+}
+export interface SettleResult {
+  winner: Seat | null;
+  pay: number[];
+  gain: number;               // 赢家得分 = 各输家赔付之和
+  base: number;               // 底分
+  bombsPlayed: number;        // 本局炸弹总数
+  bombMultiplier: number;     // = 2^bombsPlayed，全场共享
+  seats: SettleSeat[];        // 逐座明细（含赢家，其 pay=0）
+}
 
-  // 僵局且剩牌张数并列最少 → 没有赢家，本局无人收分。
+/** 逐座明细：把 settle 里那条乘法链拆成可展示的分量。isZero=赢家或僵局，赔付计 0。 */
+function seatDetail(s: DealState, seat: Seat, base: number, bombMultiplier: number, isZero: boolean): SettleSeat {
+  const hand = s.hands[seat]!;
+  let wildCount = 0, twoCount = 0;
+  for (const c of hand) {
+    if (c.kind === 'joker') wildCount++;
+    else if (c.rank === 2) twoCount++;
+  }
+  const spring = !s.hasPlayed[seat];
+  // 个人倍数：每张王/2 各 ×2、春天 ×2，逐张相乘（与原实现逐字节等价）
+  let personalMultiplier = 2 ** (wildCount + twoCount);
+  if (spring) personalMultiplier *= 2;
+  const pay = isZero ? 0 : base * hand.length * bombMultiplier * personalMultiplier;
+  return { seat, handCount: hand.length, wildCount, twoCount, spring, personalMultiplier, pay };
+}
+
+export function settle(s: DealState, base: number): SettleResult {
+  if (!isDealOver(s)) throw new Error('本局未结束，不能结算');
+  const bombsPlayed = s.bombsPlayed;
+  const bombMultiplier = 2 ** bombsPlayed; // 全场共享，每个炸一律 ×2，不分大小
+  const meta = { base, bombsPlayed, bombMultiplier };
+
+  // 僵局且剩牌张数并列最少 → 没有赢家，本局无人收分（明细仍逐座给出，pay 全 0）。
   if (s.winner === null) {
-    return { winner: null, pay: s.hands.map(() => 0), gain: 0 };
+    const seats = s.hands.map((_, seat) => seatDetail(s, seat, base, bombMultiplier, true));
+    return { winner: null, pay: seats.map(() => 0), gain: 0, ...meta, seats };
   }
 
   const winner = s.winner;
-  const bombMultiplier = 2 ** s.bombsPlayed; // 全场共享，每个炸一律 ×2，不分大小
-
-  const pay = s.hands.map((hand, seat) => {
-    if (seat === winner) return 0;
-
-    // 个人倍数：只作用于该输家自己，且**逐张**相乘
-    let personal = 1;
-    for (const c of hand) {
-      if (c.kind === 'joker' || c.rank === 2) personal *= 2;
-    }
-    if (!s.hasPlayed[seat]) personal *= 2; // 春天：整局一张牌都没打出去过
-
-    return base * hand.length * bombMultiplier * personal;
-  });
-
-  return { winner, pay, gain: pay.reduce((a, b) => a + b, 0) };
+  const seats = s.hands.map((_, seat) => seatDetail(s, seat, base, bombMultiplier, seat === winner));
+  const pay = seats.map((d) => d.pay);
+  return { winner, pay, gain: pay.reduce((a, b) => a + b, 0), ...meta, seats };
 }

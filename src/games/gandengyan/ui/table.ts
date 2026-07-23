@@ -31,7 +31,16 @@ export interface TableState {
   lastActor?: number | null;
   seats: SeatView[];
   turnRemainMs?: number;
-  result?: { winner: number | null; pay: number[]; gain: number; stalemate: boolean; hands: number[] };
+  result?: {
+    winner: number | null; pay: number[]; gain: number; stalemate: boolean; hands: number[];
+    base?: number; bombsPlayed?: number; bombMultiplier?: number;
+    seats?: SettleSeatView[];   // 逐座明细（#16 结算表逐项展开）
+  };
+}
+/** 一座的结算明细，与引擎 SettleSeat 同构（服务端下发）。 */
+export interface SettleSeatView {
+  seat: number; handCount: number; wildCount: number; twoCount: number;
+  spring: boolean; personalMultiplier: number; pay: number;
 }
 export interface TableApi {
   mySeat: number | 'spectator';
@@ -75,8 +84,7 @@ export function mountTable(root: HTMLElement, api: TableApi): {
   const actions = el('div', 'gy__actions');
   const playBtn = el('button', 'gy__btn gy__btn--play', '出牌') as HTMLButtonElement;
   const passBtn = el('button', 'gy__btn', '不要') as HTMLButtonElement;
-  const againBtn = el('button', 'gy__btn gy__btn--play', '再来一局') as HTMLButtonElement;
-  actions.append(playBtn, passBtn, againBtn);
+  actions.append(playBtn, passBtn);   // 「再来一局」在结算弹层里，不在这条动作栏
   wrap.append(bar, board, hintEl, chooserEl, handEl, actions);
   root.appendChild(wrap);
 
@@ -130,7 +138,6 @@ export function mountTable(root: HTMLElement, api: TableApi): {
 
   playBtn.addEventListener('click', attemptPlay);
   passBtn.addEventListener('click', () => { chooserEl.innerHTML = ''; api.onPass(); });
-  againBtn.addEventListener('click', () => api.onRestart());
 
   function render(state: TableState, hand: Card[]): void {
     latest = state;
@@ -208,27 +215,58 @@ export function mountTable(root: HTMLElement, api: TableApi): {
     const over = state.phase === 'dealResult';
     playBtn.style.display = over || !iAmSeat ? 'none' : '';
     passBtn.style.display = over || !iAmSeat ? 'none' : '';
-    againBtn.style.display = over && api.mySeat !== 'spectator' ? '' : 'none';
     // 领出确无合法出牌（手里只剩王）时允许过——服务端会顺延出牌权；跟牌时要得起也能过。
     const canLead = state.current !== null || enumerateLeads(myHand).length > 0;
     playBtn.disabled = !myTurn;
     passBtn.disabled = !myTurn || (state.current === null && canLead);
   }
 
+  /** 一座赔付的「每一乘」摆开：剩N张 · K炸×倍 · 个人×倍(几张王/2/春天)——玩家看得懂钱怎么来的。 */
+  function breakdownText(d: SettleSeatView, r: NonNullable<TableState['result']>): string {
+    const parts = [`剩 ${d.handCount} 张`];
+    if ((r.base ?? 1) !== 1) parts.unshift(`底 ${r.base}`);
+    if ((r.bombMultiplier ?? 1) > 1) parts.push(`${r.bombsPlayed} 炸 ×${r.bombMultiplier}`);
+    if (d.personalMultiplier > 1) {
+      const who = [];
+      if (d.wildCount) who.push(`${d.wildCount} 王`);
+      if (d.twoCount) who.push(`${d.twoCount} 个 2`);
+      if (d.spring) who.push('春天');
+      parts.push(`个人 ×${d.personalMultiplier}（${who.join('·')}）`);
+    }
+    return parts.join(' × ');
+  }
+
   function renderResult(r: NonNullable<TableState['result']>): void {
     wrap.querySelector('.gy__result')?.remove();
     const box = el('div', 'gy__result');
-    const title = r.winner === null ? '无人收分（并列僵局）' : `${nameOf(r.winner)} 赢了`;
-    box.appendChild(el('div', 'gy__result-title', title));
+    box.appendChild(el('div', 'gy__result-title', r.winner === null ? '无人收分（并列僵局）' : `${nameOf(r.winner)} 赢了`));
     const rows = el('div', 'gy__result-rows');
+    const detailOf = (i: number): SettleSeatView | undefined => r.seats?.find((d) => d.seat === i);
     r.pay.forEach((p, i) => {
-      const line = el('div', 'gy__result-row', '');
-      line.appendChild(el('span', 'gy__result-who', `${nameOf(i)}${i === r.winner ? '（赢）' : ''}`));
-      line.appendChild(el('span', 'gy__result-cards', `剩 ${r.hands[i]} 张`));
-      line.appendChild(el('span', 'gy__result-pay', i === r.winner ? `+${r.gain}` : (p ? `-${p}` : '—')));
+      const line = el('div', 'gy__result-row');
+      const head = el('div', 'gy__result-head');
+      head.appendChild(el('span', 'gy__result-who', `${nameOf(i)}${i === r.winner ? '（赢）' : ''}`));
+      head.appendChild(el('span', 'gy__result-pay', i === r.winner ? `+${r.gain}` : (p ? `-${p}` : '—')));
+      line.appendChild(head);
+      // 输家：逐项展开这笔赔付的乘法链（赢家无赔付、僵局无人收分，都不展开）
+      const d = detailOf(i);
+      if (r.winner !== null && i !== r.winner && p > 0 && d) {
+        line.appendChild(el('div', 'gy__result-calc', `${breakdownText(d, r)} = ${p}`));
+      } else if (d) {
+        line.appendChild(el('div', 'gy__result-calc', `剩 ${d.handCount} 张`));
+      }
       rows.appendChild(line);
     });
     box.appendChild(rows);
+    // AC2：赢家得分 = 各输家赔付之和，界面上对得上
+    if (r.winner !== null) {
+      box.appendChild(el('div', 'gy__result-sum', `赢家 +${r.gain} = 各输家赔付之和`));
+    }
+    if (api.mySeat !== 'spectator') {   // 观战者不给再来一局
+      const again = el('button', 'gy__btn gy__btn--play gy__result-again', '再来一局');
+      again.addEventListener('click', () => api.onRestart());
+      box.appendChild(again);
+    }
     wrap.appendChild(box);
   }
 

@@ -1,7 +1,8 @@
-import type { Card, Combo, Seat, WildAssign } from '../src/games/gandengyan/engine/types';
+import type { Card, Seat, WildAssign } from '../src/games/gandengyan/engine/types';
 import { makeDeck, dealHands, sortHand } from '../src/games/gandengyan/engine/cards';
 import { createDeal, play, pass, isDealOver, settle, type DealState } from '../src/games/gandengyan/engine/game';
-import { enumerateFollows, enumerateLeads, isLegalPlay } from '../src/games/gandengyan/engine/legal';
+import { isLegalPlay } from '../src/games/gandengyan/engine/legal';
+import { chooseGandengyanPlay } from '../src/games/gandengyan/ai/choose';
 
 /**
  * 干瞪眼服务端权威对局驱动。规则与结算全在 engine 里，这里只负责
@@ -167,17 +168,19 @@ export class GandengyanDriver {
     return this.afterAction();
   }
 
-  /** 回合超时托管 / AI 座代打：挑一手合法的出；实在没得出就过。
-   *  本期用「枚举里的第一手」这种确定性挑法，真正的启发式 AI 是 #14 的事。 */
+  /** 回合超时托管 / AI 座代打：走启发式+记牌 AI（#14）挑一手；返回 null（跟不上 / 领出只剩王 /
+   *  要得起但忍住留逃生口）就过。AI 只在 engine 枚举的合法候选里挑，故永不产出非法出牌。 */
   forceAutoPlay(): Outbound[] {
     if (this.phase !== 'playing') return [];
     const seat = this.state.turn;
-    const hand = this.state.hands[seat]!;
-    const cur = this.state.current?.combo ?? null;
-    const options = cur === null ? enumerateLeads(hand) : enumerateFollows(hand, cur as Combo);
-    if (options.length === 0) return this.handlePass(seat);
-    const p = options[0]!;
-    this.applyPlay(seat, p.cards, p.assign);
+    const pick = chooseGandengyanPlay({
+      hand: this.state.hands[seat]!,
+      current: this.state.current?.combo ?? null,
+      played: this.state.played,          // 公开已出牌，AI 记牌用；不给别家手牌/牌堆
+      seatCount: this.seatCount,
+    });
+    if (pick === null) return this.handlePass(seat);
+    this.applyPlay(seat, pick.cards, pick.assign);
     return this.afterAction();
   }
 

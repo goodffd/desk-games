@@ -6,6 +6,7 @@ import { makeDeck, dealHands } from '../../src/games/gandengyan/engine/cards';
 import type { Seat } from '../../src/games/gandengyan/engine/types';
 import { makeLCG, seededShuffle } from '../helpers/rng';
 import { slowCount } from '../helpers/slow-knobs';
+import { chooseGandengyanPlay } from '../../src/games/gandengyan/ai/choose';
 
 /**
  * 干瞪眼单局引擎的模糊测试：随机对局跑到底，用不变量罩住整个状态机。
@@ -206,5 +207,49 @@ describe('干瞪眼单局模糊测试', () => {
     // 「本局以僵局收场」只报不断言：它比顺延还稀有（要 2 人局双方同时只剩一张王），
     // 命中数会随局数变动，硬断言等于把默认局数变成载荷。这条路另有定向用例守着
     // （tests/gandengyan/stalemate.test.ts，在快轨）。
+  });
+
+  /**
+   * AC7：AI 永不产出非法出牌——不写独立的合法性测试文件，由这里兜底。全 AI 对局（真实
+   * 部署里空座补 AI、掉线接管都是多个 AI 同桌），逐手 isLegalPlay 断言，并确认对局必定终止、
+   * 全程守恒。AI 是确定性的，种子换即换牌局，覆盖到 2~5 人各档。
+   */
+  it(`跑 ${GAMES} 局全 AI 对局：AI 永不非法、必定终止、守恒`, () => {
+    let deals = 0, plays = 0, settled = 0, steps = 0;
+    for (let seed = 0; seed < GAMES; seed++) {
+      const seatCount = 2 + (seed % 4);
+      const dealer: Seat = seed % seatCount;
+      const { hands, deck } = dealHands(makeDeck(), seatCount, dealer, seededShuffle(seed ^ 0xa1));
+      let s = createDeal({ hands, deck, dealer });
+      const bound = stepBound(seatCount);
+      let step = 0;
+      const where = (): string => `seed=${seed} 步=${step} 座=${s.turn} 人数=${seatCount}`;
+
+      while (!isDealOver(s)) {
+        expect(step, `${where()}：全 AI 也没在步数上界内打完`).toBeLessThan(bound);
+        const seat = s.turn;
+        const hand = s.hands[seat]!;
+        const cur = s.current?.combo ?? null;
+        const pick = chooseGandengyanPlay({ hand, current: cur, played: s.played, seatCount });
+        if (pick === null) {
+          s = pass(s, seat);                       // AI 选择过；领出该出却过时 engine 会抛，等于替我们守着
+        } else {
+          expect(isLegalPlay(hand, pick.cards, pick.assign, cur), `${where()}：AI 出了非法的一手`).toBe(true);
+          s = play(s, seat, pick.cards, pick.assign);
+          plays++;
+        }
+        expect(totalCards(s), `${where()}：AI 对局牌数不守恒`).toBe(DECK_SIZE);
+        step++; steps++;
+      }
+      deals++;
+      if (!s.stalemate) settled++;
+      settle(s, 1);                                // 结算不抛即视为合法
+    }
+
+    // eslint-disable-next-line no-console
+    console.log(`干瞪眼 AI fuzz：${deals} 局全 AI｜出牌 ${plays} 手｜非僵局收场 ${settled} 局｜总步 ${steps}`);
+    expect(deals).toBe(GAMES);
+    expect(plays).toBeGreaterThan(0);              // AI 真出了牌，不是全程过
+    expect(settled).toBeGreaterThan(0);            // 真有对局被打到某家清空收场
   });
 });

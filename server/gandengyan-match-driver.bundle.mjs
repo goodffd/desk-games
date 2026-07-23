@@ -271,16 +271,16 @@ function whyCannotBeat(prev, next) {
   return `\u684C\u9762\u662F ${prev.type}(\u5173\u952E\u70B9\u6570 ${prev.key})\uFF0C\u8DDF\u724C\u7684\u5173\u952E\u70B9\u6570\u987B\u6B63\u597D\u5927\u4E00\u7EA7\uFF082 \u4E0E\u70B8\u5F39\u53E6\u6709\u7279\u6743\uFF0C\u4E0D\u8D70\u8FD9\u6761\u94FE\uFF09`;
 }
 function fewestCardsWinner(s) {
-  let best = Infinity;
+  let best2 = Infinity;
   let winner = null;
   let tied = false;
   for (let seat = 0; seat < s.seatCount; seat++) {
     const n = s.hands[seat].length;
-    if (n < best) {
-      best = n;
+    if (n < best2) {
+      best2 = n;
       winner = seat;
       tied = false;
-    } else if (n === best) tied = true;
+    } else if (n === best2) tied = true;
   }
   return tied ? null : winner;
 }
@@ -381,6 +381,71 @@ function settle(s, base) {
     return base * hand.length * bombMultiplier * personal;
   });
   return { winner, pay, gain: pay.reduce((a, b) => a + b, 0) };
+}
+
+// src/games/gandengyan/ai/choose.ts
+var RANKS2 = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+function unseenByRank(view) {
+  const seen = /* @__PURE__ */ new Map();
+  const bump = (cards) => {
+    for (const c of cards) if (c.kind === "normal") seen.set(c.rank, (seen.get(c.rank) ?? 0) + 1);
+  };
+  bump(view.hand);
+  bump(view.played);
+  const unseen = /* @__PURE__ */ new Map();
+  for (const r of RANKS2) unseen.set(r, Math.max(0, 4 - (seen.get(r) ?? 0)));
+  return unseen;
+}
+var isBomb2 = (t) => t === "bomb" || t === "jokerBomb";
+var spent2 = (cards) => cards.filter((c) => c.kind === "normal" && c.rank === 2).length;
+function score(p, view, unseen, lead) {
+  const { combo, cards, assign } = p;
+  const bomb = isBomb2(combo.type);
+  let s = 0;
+  s += 3 * cards.length;
+  if (bomb) s -= 5 * cards.length;
+  if (combo.type === "jokerBomb") s -= 20;
+  s -= 6 * spent2(cards);
+  if (bomb) s -= 8 * assign.length;
+  else s += 4 * assign.length;
+  const shedPower = cards.reduce((n, c) => n + (c.kind === "normal" ? power(c.rank) : 16), 0) / cards.length;
+  s += (15 - shedPower) * 0.4;
+  if (lead && combo.type === "single") {
+    const nextRank = combo.key + 1;
+    const followers = nextRank <= 14 ? unseen.get(nextRank) ?? 0 : 0;
+    s += (4 - followers) * 1.2;
+  }
+  return s;
+}
+function best(options, view, unseen, lead) {
+  let top = options[0];
+  let topScore = score(top, view, unseen, lead);
+  for (let i = 1; i < options.length; i++) {
+    const sc = score(options[i], view, unseen, lead);
+    if (sc > topScore) {
+      top = options[i];
+      topScore = sc;
+    }
+  }
+  return top;
+}
+function chooseGandengyanPlay(view) {
+  const unseen = unseenByRank(view);
+  if (view.current === null) {
+    const leads = enumerateLeads(view.hand);
+    if (leads.length === 0) return null;
+    return best(leads, view, unseen, true);
+  }
+  const follows = enumerateFollows(view.hand, view.current);
+  if (follows.length === 0) return null;
+  const pick = best(follows, view, unseen, false);
+  const urgent = view.hand.length <= 3;
+  if (!urgent && isBomb2(pick.combo.type)) {
+    const nonBomb = follows.filter((f) => !isBomb2(f.combo.type));
+    if (nonBomb.length === 0) return null;
+    return best(nonBomb, view, unseen, false);
+  }
+  return pick;
 }
 
 // server/gandengyan-match-driver.ts
@@ -508,17 +573,20 @@ var GandengyanDriver = class {
     this.ply++;
     return this.afterAction();
   }
-  /** 回合超时托管 / AI 座代打：挑一手合法的出；实在没得出就过。
-   *  本期用「枚举里的第一手」这种确定性挑法，真正的启发式 AI 是 #14 的事。 */
+  /** 回合超时托管 / AI 座代打：走启发式+记牌 AI（#14）挑一手；返回 null（跟不上 / 领出只剩王 /
+   *  要得起但忍住留逃生口）就过。AI 只在 engine 枚举的合法候选里挑，故永不产出非法出牌。 */
   forceAutoPlay() {
     if (this.phase !== "playing") return [];
     const seat = this.state.turn;
-    const hand = this.state.hands[seat];
-    const cur = this.state.current?.combo ?? null;
-    const options = cur === null ? enumerateLeads(hand) : enumerateFollows(hand, cur);
-    if (options.length === 0) return this.handlePass(seat);
-    const p = options[0];
-    this.applyPlay(seat, p.cards, p.assign);
+    const pick = chooseGandengyanPlay({
+      hand: this.state.hands[seat],
+      current: this.state.current?.combo ?? null,
+      played: this.state.played,
+      // 公开已出牌，AI 记牌用；不给别家手牌/牌堆
+      seatCount: this.seatCount
+    });
+    if (pick === null) return this.handlePass(seat);
+    this.applyPlay(seat, pick.cards, pick.assign);
     return this.afterAction();
   }
   setAI(seat, on) {

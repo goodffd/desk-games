@@ -271,3 +271,28 @@ describe('wire 层打完一整局', () => {
     expect(drv()).toBe(before);
   });
 });
+
+describe('AI 座真的出牌，不是只被标成 AI（#14 AC6）', () => {
+  it('把领出座标成 AI，stepAI 后它的手牌真的少一张（不是只置 online=false）', () => {
+    const { drv } = playing(3, 7);
+    const d = drv();
+    const seat = d.state.turn;                         // 开局=庄领出，current 为空 → AI 必出
+    d.setAI(seat, true);
+    expect(d.online[seat]).toBe(false);               // 座位确实被标成 AI
+    const before = d.state.hands[seat].length;
+    const plyBefore = d.ply;
+    const out = d.stepAI();                             // 房间层逐手驱动 AI 的真路径
+    expect(d.state.hands[seat].length, 'AI 座手牌没变少——它没真出牌，只是被标成了 AI').toBeLessThan(before);
+    expect(d.ply, 'ply 没往前——没产生一手真出牌').toBe(plyBefore + 1);
+    expect(d.lastPlays[seat], 'AI 领出却记成了过牌').not.toBe('pass');
+    expect(out.length, '没广播新公开态').toBeGreaterThan(0);
+  });
+
+  it('轮到人类座时 stepAI 不代打（只有非人类座才动）', () => {
+    const { drv } = playing(3, 7);
+    const d = drv();
+    const plyBefore = d.ply;
+    expect(d.stepAI(), '人类座被 AI 代打了').toEqual([]);
+    expect(d.ply).toBe(plyBefore);
+  });
+});

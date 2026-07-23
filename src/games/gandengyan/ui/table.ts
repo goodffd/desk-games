@@ -221,19 +221,19 @@ export function mountTable(root: HTMLElement, api: TableApi): {
     passBtn.disabled = !myTurn || (state.current === null && canLead);
   }
 
-  /** 一座赔付的「每一乘」摆开：剩N张 · K炸×倍 · 个人×倍(几张王/2/春天)——玩家看得懂钱怎么来的。 */
+  /**
+   * 一座赔付的「每一乘」摆开，每一乘写清是谁贡献的（不用「个人倍数」这种抽象标签，玩家看不懂）：
+   *   剩 5 张 · 春天 ×2 = 10
+   *   剩 5 张 · 1 炸 ×2 · 2 张王 ×4 · 1 张2 ×2 = 320
+   */
   function breakdownText(d: SettleSeatView, r: NonNullable<TableState['result']>): string {
     const parts = [`剩 ${d.handCount} 张`];
     if ((r.base ?? 1) !== 1) parts.unshift(`底 ${r.base}`);
     if ((r.bombMultiplier ?? 1) > 1) parts.push(`${r.bombsPlayed} 炸 ×${r.bombMultiplier}`);
-    if (d.personalMultiplier > 1) {
-      const who = [];
-      if (d.wildCount) who.push(`${d.wildCount} 王`);
-      if (d.twoCount) who.push(`${d.twoCount} 个 2`);
-      if (d.spring) who.push('春天');
-      parts.push(`个人 ×${d.personalMultiplier}（${who.join('·')}）`);
-    }
-    return parts.join(' × ');
+    if (d.wildCount) parts.push(`${d.wildCount} 张王 ×${2 ** d.wildCount}`);
+    if (d.twoCount) parts.push(`${d.twoCount} 张2 ×${2 ** d.twoCount}`);
+    if (d.spring) parts.push('春天 ×2');
+    return parts.join(' · ');
   }
 
   function renderResult(r: NonNullable<TableState['result']>): void {

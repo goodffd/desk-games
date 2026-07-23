@@ -38,33 +38,36 @@ const calcTexts = (root: HTMLElement): string =>
   Array.from(root.querySelectorAll('.gy__result-calc')).map((e) => e.textContent).join(' | ');
 
 describe('#16 结算表逐项展开', () => {
-  it('输家赔付逐项展开：剩牌×炸弹×个人(哪几张牌) = 赔付', () => {
+  it('输家赔付逐项展开：剩牌·炸弹·各张王/2 逐一摆开 = 赔付', () => {
     const { root, table } = setup();
+    // 底1 × 剩5张 × 1炸(×2) × 1王(×2) × 1个2(×2) = 40，数字自洽
     const result = {
       winner: 0, pay: [0, 40], gain: 40, stalemate: false, hands: [0, 5],
       base: 1, bombsPlayed: 1, bombMultiplier: 2,
-      seats: [seat(0, {}), seat(1, { handCount: 5, wildCount: 2, twoCount: 1, personalMultiplier: 8, pay: 40 })],
+      seats: [seat(0, {}), seat(1, { handCount: 5, wildCount: 1, twoCount: 1, personalMultiplier: 4, pay: 40 })],
     };
     table.render(dealResult(result), []);
     expect(text(root, '.gy__result-title')).toContain('赢了');
     const calc = calcTexts(root);
     expect(calc).toContain('剩 5 张');
     expect(calc).toContain('1 炸 ×2');          // 炸弹倍数（几个炸）
-    expect(calc).toContain('个人 ×8');          // 个人倍数
-    expect(calc).toContain('2 王');             // 由哪几张牌贡献
-    expect(calc).toContain('1 个 2');
+    expect(calc).toContain('1 张王 ×2');        // 每张王逐一摆开（不再用「个人」抽象标签）
+    expect(calc).toContain('1 张2 ×2');         // 每张 2 逐一摆开
+    expect(calc).not.toContain('个人');         // 「个人」这个看不懂的标签已去掉
     expect(calc).toContain('= 40');             // 乘得出赔付
   });
 
   it('春天命中在明细里点名', () => {
     const { root, table } = setup();
+    // 剩5张 × 春天(×2) = 10
     const result = {
-      winner: 0, pay: [0, 20], gain: 20, stalemate: false, hands: [0, 5],
+      winner: 0, pay: [0, 10], gain: 10, stalemate: false, hands: [0, 5],
       base: 1, bombsPlayed: 0, bombMultiplier: 1,
-      seats: [seat(0, {}), seat(1, { handCount: 5, spring: true, personalMultiplier: 2, pay: 20 })],
+      seats: [seat(0, {}), seat(1, { handCount: 5, spring: true, personalMultiplier: 2, pay: 10 })],
     };
     table.render(dealResult(result), []);
-    expect(calcTexts(root)).toContain('春天');
+    expect(calcTexts(root)).toContain('春天 ×2');
+    expect(calcTexts(root)).toContain('剩 5 张 · 春天 ×2 = 10');
   });
 
   it('AC2：界面写明「赢家得分 = 各输家赔付之和」', () => {

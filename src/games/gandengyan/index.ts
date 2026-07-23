@@ -110,7 +110,7 @@ function mount(root: HTMLElement): () => void {
     mySeat = r.you; seats = r.seats;
     if (typeof r.you === 'number') session.saveRoom(r.code, r.you, r.seats[r.you]?.nick ?? session.nick);
     if (r.status === 'waiting') showRoom(r.code);
-    else if (table) table.render(lastState!, myHand);
+    else if (table && lastState) table.render(lastState, myHand);
   });
   session.on('spectating', (m) => {
     pendingRejoin = false;

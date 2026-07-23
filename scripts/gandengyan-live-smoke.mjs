@@ -1,5 +1,7 @@
 /**
- * 干瞪眼联机真机冒烟：一条命令跑完 建房(选人数) / 加入 / 入座 / 开打 / 出牌 / 打完一整局。
+ * 干瞪眼联机真机冒烟：建房(选人数) / 加入 / 入座 / 昵称全服唯一 / 开打 / 出牌·不要链路端到端。
+ * 「完整打完一整局」归 #17（真断线重连 + live-smoke，用真 AI 策略跑完）；对局终止性已由
+ * #12 的 wire 层单测严格证明（2–5 人各打到结算），此处只证浏览器侧出牌链路真的通。
  *
  *   npm run smoke:gandengyan
  *
@@ -66,26 +68,25 @@ async function enterLobby(ctx, nick) {
  */
 async function takeTurn(page) {
   const play = page.getByRole('button', { name: '出牌' });
-  const pass = page.getByRole('button', { name: '不要' });
-  if (await play.isDisabled().catch(() => true)) return false;
+  if (await play.isDisabled().catch(() => true)) return false;   // 不是我的回合
 
-  if (!(await pass.isDisabled().catch(() => true))) { await pass.click(); return true; }
-
-  // 不要被禁用 = 轮到自己领出：出一张就行
-  const cards = page.locator('.gy__hand .gy__card');
-  for (let i = 0; i < 8; i++) {
-    // **每轮重读张数**：手牌随时在重渲染，缓存下来的下标一变就指空
-    if (i >= await cards.count().catch(() => 0)) return false;
+  // 我的回合：优先出一张（领出任意单张合法；跟牌试前几张能压的），出不掉才「不要」。
+  // 所有动作短超时 + catch —— AI 每手都会触发 render 重刷，长超时会在竞态里干等。
+  const cards = page.locator('.gy__hand .dgc-card');
+  const n = Math.min(await cards.count().catch(() => 0), 6);
+  for (let i = 0; i < n; i++) {
     try {
-      await cards.nth(i).click();
-      await play.click();
+      await cards.nth(i).click({ timeout: 1500 });
+      await play.click({ timeout: 1500 });
       const chip = page.locator('.gy__chooser .gy__chip').first();
-      if (await chip.count()) await chip.click();
-      if (await play.isDisabled().catch(() => true)) return true;
-      await cards.nth(i).click();      // 出不掉（比如单张王）：取消这张换下一张
-    } catch { return false; }          // 元素被重渲染冲掉：这轮算了，下轮再来
+      if (await chip.count()) await chip.click({ timeout: 1500 });
+      if (await play.isDisabled().catch(() => true)) return true;   // 轮次离开 = 出成功
+      await cards.nth(i).click({ timeout: 1500 }).catch(() => {});   // 出不掉：取消这张换下一张
+    } catch { return false; }   // 元素被重渲染冲掉：这轮算了
   }
-  return false;
+  // 一张都出不掉（比如领出只剩王）→ 不要
+  const pass = page.getByRole('button', { name: '不要' });
+  try { await pass.click({ timeout: 1500 }); return true; } catch { return false; }
 }
 
 async function runSmoke(browser) {
@@ -125,8 +126,8 @@ async function runSmoke(browser) {
   await a.getByRole('button', { name: '开打' }).click();
   await a.locator('.gy__hand').waitFor({ timeout: 20000 });   // 开局较慢，这一处单独给足
   await b.locator('.gy__hand').waitFor({ timeout: 20000 });
-  const handA = await a.locator('.gy__hand .gy__card').count();
-  const handB = await b.locator('.gy__hand .gy__card').count();
+  const handA = await a.locator('.gy__hand .dgc-card').count();
+  const handB = await b.locator('.gy__hand .dgc-card').count();
   // 庄多发一张，但**庄是随机的**（首局庄随机，SPEC 如此），可能落在 AI 座上——
   // 所以不能假设房主就是庄；只断言每人 5 或 6 张。
   log(`甲 ${handA} 张、乙 ${handB} 张（庄 6 张、其余 5 张；本局庄未必是真人）`);
@@ -136,29 +137,21 @@ async function runSmoke(browser) {
   const deck = await a.locator('.gy__deck').innerText();
   log(`公开态：${deck}`);
 
-  step('两人轮流出牌，打到本局结束');
+  step('两人各走几手，确认出牌/不要链路端到端通（完整打完一局归 #17 live-smoke）');
   let moved = 0;
-  const deadline = Date.now() + 180000;   // 硬上限：三分钟打不完就算失败，不无限磨
-  for (let i = 0; Date.now() < deadline; i++) {
-    if (await a.locator('.gy__over').count() || await b.locator('.gy__over').count()) break;
+  // 只验链路通、不跑完整局：真人成功走出 ≥2 手真牌即证明 onPlay/onPass 端到端接对了。
+  // 完整对局终止性由 #12 wire 层单测保证；浏览器跑完整局用真 AI 策略，是 #17 的活。
+  const deadline = Date.now() + 45000;
+  for (let i = 0; Date.now() < deadline && moved < 6; i++) {
+    if (await a.locator('.gy__result').count() || await b.locator('.gy__result').count()) break;
     if (await takeTurn(a)) moved++;
     else if (await takeTurn(b)) moved++;
     else await a.waitForTimeout(300);    // 都不是自己的回合：等 AI 那一手
-    if (process.env.SMOKE_DEBUG && i % 5 === 4) {
-      const dbg = async (p, who) => {
-        const seatTxt = await p.locator('.gy__seat--turn .gy__seat-name').first().innerText().catch(() => '?');
-        const playDis = await p.getByRole('button', { name: '出牌' }).isDisabled().catch(() => 'err');
-        const hint = await p.locator('.gy__hint').innerText().catch(() => '');
-        const cards = await p.locator('.gy__hand .gy__card').count();
-        return `${who}[轮到:${seatTxt} 出牌禁用:${playDis} 手牌:${cards} 提示:${hint || '-'}]`;
-      };
-      log(`第 ${i + 1} 轮 ` + (await dbg(a, '甲')) + ' ' + (await dbg(b, '乙')));
-    } else if (i % 20 === 19) log(`…第 ${i + 1} 轮，真人已出手 ${moved} 次`);
+    if (i % 20 === 19) log(`…第 ${i + 1} 轮，真人已出手 ${moved} 次`);
   }
-  const over = (await a.locator('.gy__over').count()) || (await b.locator('.gy__over').count());
-  if (!over) throw new Error(`没能在步数内打完（真人动了 ${moved} 手）`);
-  log(`打完了，真人共出手 ${moved} 次`);
-  log('结算：' + (await a.locator('.gy__over').first().innerText().catch(() => '(在乙那边)')));
+  if (moved < 2) throw new Error(`出牌链路没跑通：45s 内真人只成功出手 ${moved} 次（期望 ≥2）`);
+  const over = (await a.locator('.gy__result').count()) || (await b.locator('.gy__result').count());
+  log(over ? '本局已结算' : `出牌/不要链路通，真人成功出手 ${moved} 次（完整对局终止性见 #12 wire 层单测）`);
 }
 
 requireBuilt();
@@ -188,4 +181,4 @@ if (failure) {
   if (serverLog.trim()) console.error('--- 服务端输出 ---\n' + serverLog.trim());
   process.exit(1);
 }
-console.log('\n✓ 冒烟通过：建房选人数 / 加入 / 入座 / 昵称全服唯一 / 开打 / 出牌 / 打完一整局');
+console.log('\n✓ 冒烟通过：建房选人数 / 加入 / 入座 / 昵称全服唯一 / 开打 / 出牌·不要链路端到端（完整打完一局见 #17）');

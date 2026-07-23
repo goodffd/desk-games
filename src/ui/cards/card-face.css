@@ -175,3 +175,12 @@
   .dgc-card--small .dgc-joker-word { font-size: 0.36rem; }
   .dgc-card--small .dgc-card__suit--wild { font-size: 0.46rem; }
 }
+
+/* 王被指派成某点数：牌底金色药丸（干瞪眼用；掼蛋不产生此 DOM）。只写数字，GDRank 子集含 0-9。 */
+.dgc-card__assign {
+  position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%);
+  background: linear-gradient(135deg, #e6c667, #c9a84c); color: #3a2a10;
+  font: 700 12px 'GDRank', serif; border-radius: 8px; padding: 1px 7px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.4); z-index: 2;
+}
+.dgc-card--small .dgc-card__assign { font-size: 10px; padding: 0 5px; bottom: 2px; }

@@ -1,68 +1,112 @@
-/* 干瞪眼界面：先求能打、看得懂，精修留给后面的票 */
+/*
+ * 干瞪眼牌桌样式。复用 theme.css 的设计 token（金线/卡纸/绿毡）与共享牌面 .dgc-card，
+ * 座位沿 seatRing 环形绝对定位。掼蛋牌桌一行不动——这套是干瞪眼自己的几何。
+ */
 .gy {
-  min-height: 100vh; box-sizing: border-box; padding: 16px 18px 28px;
-  display: flex; flex-direction: column; gap: 12px;
-  background: #101c16; color: #e8f0ea;
+  min-height: 100vh; box-sizing: border-box; padding: 12px 16px 20px;
+  display: flex; flex-direction: column; gap: 10px;
+  background: radial-gradient(ellipse at 50% 40%, #24512f 0%, var(--bg-table, #1a3a1a) 78%);
+  color: var(--text-light, #e8d9b0);
   font: 15px/1.5 system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 .gy--center { align-items: center; justify-content: center; gap: 14px; }
 
 .gy__bar { display: flex; align-items: center; gap: 12px; }
-.gy__title { font-size: 20px; font-weight: 700; letter-spacing: .05em; }
-.gy__sub, .gy__note { color: #8fa89a; font-size: 13px; }
-.gy__deck { margin-left: auto; color: #8fa89a; font-size: 13px; }
+.gy__title { font-size: 19px; font-weight: 700; letter-spacing: .06em; color: var(--gold, #c9a84c); }
+.gy__sub, .gy__note { color: var(--text-dim, #a89070); font-size: 13px; }
+.gy__deck { margin-left: auto; color: var(--text-dim, #a89070); font-size: 13px; }
 .gy__back, .gy__btn {
-  border: 1px solid #33574a; background: #172b22; color: #d8e6dd;
-  border-radius: 8px; padding: 6px 14px; font-size: 14px; cursor: pointer;
+  border: 1px solid var(--gold-dim, #8a6e2a); background: rgba(0,0,0,.18); color: var(--text-light, #e8d9b0);
+  border-radius: 8px; padding: 7px 16px; font-size: 14px; cursor: pointer;
 }
-.gy__btn:hover:not(:disabled), .gy__back:hover { background: #1f3a2e; }
-.gy__btn:disabled { opacity: .4; cursor: not-allowed; }
-.gy__btn--play { background: #2c6b4f; border-color: #3d8c68; color: #f2fbf6; }
+.gy__btn:hover:not(:disabled), .gy__back:hover { border-color: var(--gold, #c9a84c); }
+.gy__btn:disabled { opacity: .38; cursor: not-allowed; }
+.gy__btn--play { background: linear-gradient(135deg, #2f7a56, #24603f); border-color: #3d8c68; color: #f2fbf6; }
 
-.gy__row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.gy__label { color: #8fa89a; font-size: 14px; }
+/* 牌桌台面：相对定位容器，座位环 + 中央出牌区都在里面 */
+.gy__board {
+  position: relative; flex: 1; min-height: 340px;
+  border-radius: 50% / 44%;
+  background: radial-gradient(ellipse at 50% 46%, #2c6242 0%, #1f4a30 70%, #1a3f29 100%);
+  border: 2px solid var(--gold-dim, #8a6e2a);
+  box-shadow: inset 0 0 60px rgba(0,0,0,.35);
+}
+.gy__board .gy__seats { position: absolute; inset: 0; }
+.gy__board .gy__seat {
+  position: absolute; transform: translate(-50%, -50%);
+  min-width: 84px; padding: 6px 10px; border-radius: 10px;
+  background: rgba(12, 24, 18, .62); border: 1px solid transparent;
+  display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center;
+}
+.gy__board .gy__seat--turn { border-color: var(--gold, #c9a84c); box-shadow: 0 0 0 2px rgba(201,168,76,.3); }
+.gy__board .gy__seat-name { font-size: 13px; color: var(--text-light, #e8d9b0); }
+.gy__board .gy__seat-meta { font-size: 12px; color: var(--text-dim, #a89070); }
+.gy__board .gy__seat-tag { color: #d9a441; }
+.gy__board .gy__seat-play { display: flex; gap: 3px; margin-top: 3px; }
+.gy__board .gy__seat-pass { font-size: 12px; color: var(--text-dim, #a89070); margin-top: 3px; }
+
+/* 中央出牌区 */
+.gy__center {
+  position: absolute; left: 50%; top: 47%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 120px;
+}
+.gy__cur-by { color: var(--text-dim, #a89070); font-size: 13px; }
+.gy__cur { display: flex; gap: 5px; }
+.gy__clock { color: var(--gold, #c9a84c); font-size: 15px; font-weight: 700; }
+
+/* 提示 + 歧义选择器 */
+.gy__hint { min-height: 20px; color: #e0b26a; font-size: 13px; text-align: center; }
+.gy__chooser { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: center; }
+.gy__chooser-label { color: var(--text-dim, #a89070); font-size: 13px; }
+.gy__chip {
+  display: flex; align-items: center; gap: 5px;
+  border: 1px solid #3d8c68; background: rgba(28,59,45,.8); color: #dff2e7;
+  border-radius: 12px; padding: 5px 10px; font-size: 13px; cursor: pointer;
+}
+.gy__chip:hover { border-color: var(--gold, #c9a84c); }
+.gy__chip-name { font-weight: 600; }
+
+/* 自己的手牌：共享牌面 .dgc-card，一排；选中上浮 */
+.gy__hand { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; min-height: 118px; align-items: flex-end; }
+.gy__hand .dgc-card { cursor: pointer; transition: transform .12s; }
+.gy__hand .dgc-card.gy-card--on { transform: translateY(-12px); box-shadow: 0 0 0 2px var(--gold, #c9a84c); }
+
+.gy__actions { display: flex; gap: 12px; justify-content: center; }
+
+/* 结算弹层 */
+.gy__result {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 30;
+  min-width: 280px; padding: 20px 24px; border-radius: 14px;
+  background: #14211a; border: 1px solid var(--gold-dim, #8a6e2a);
+  box-shadow: 0 8px 40px rgba(0,0,0,.5);
+}
+.gy__result-title { font-size: 18px; font-weight: 700; color: var(--gold, #c9a84c); text-align: center; margin-bottom: 12px; }
+.gy__result-rows { display: flex; flex-direction: column; gap: 6px; }
+.gy__result-row { display: flex; align-items: center; gap: 12px; font-size: 14px; }
+.gy__result-who { flex: 1; }
+.gy__result-cards { color: var(--text-dim, #a89070); font-size: 13px; }
+.gy__result-pay { min-width: 48px; text-align: right; font-weight: 600; }
+
+/* 前置屏（昵称/大厅/房间）—— #21 会切到共享三屏，这里先留最小样式 */
 .gy__input, .gy__select {
-  border: 1px solid #33574a; background: #0c1712; color: #e8f0ea;
+  border: 1px solid var(--gold-dim, #8a6e2a); background: #0c1712; color: var(--text-light, #e8d9b0);
   border-radius: 8px; padding: 7px 10px; font-size: 15px; min-width: 160px;
 }
 .gy__input--code { min-width: 120px; letter-spacing: .2em; text-transform: uppercase; }
 .gy__err { color: #e08c7a; font-size: 13px; min-height: 18px; }
-
+.gy__row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gy__label { color: var(--text-dim, #a89070); font-size: 14px; }
 .gy__list { display: flex; flex-direction: column; gap: 6px; }
-.gy__list-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: #17241d; border-radius: 8px; }
-.gy__code { font-family: ui-monospace, Menlo, monospace; font-size: 17px; letter-spacing: .18em; }
-
-.gy__seats { display: flex; gap: 10px; flex-wrap: wrap; }
-.gy__seat {
-  min-width: 96px; padding: 8px 10px; border-radius: 10px;
-  background: #17241d; border: 1px solid transparent; display: flex; flex-direction: column; gap: 4px;
-}
-.gy__seat--turn { border-color: #4fae82; box-shadow: 0 0 0 2px rgba(79, 174, 130, .25); }
-.gy__seat-name { font-size: 14px; }
-.gy__seat-count { color: #8fa89a; font-size: 13px; }
-.gy__seat-tag { color: #d9a441; font-size: 12px; }
-
-.gy__table { min-height: 84px; padding: 10px 12px; background: #14211a; border-radius: 12px; }
-.gy__cur-label { color: #8fa89a; font-size: 13px; margin-bottom: 6px; }
-.gy__cur { display: flex; gap: 6px; flex-wrap: wrap; }
-.gy__over { font-size: 18px; font-weight: 700; }
-.gy__over-detail { color: #8fa89a; font-size: 13px; margin-top: 6px; }
-
-.gy__hint { min-height: 20px; color: #e0b26a; font-size: 13px; }
-.gy__chooser { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.gy__chooser-label { color: #8fa89a; font-size: 13px; }
-.gy__chip { border: 1px solid #3d8c68; background: #1c3b2d; color: #dff2e7; border-radius: 999px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
-
-.gy__hand { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; }
-.gy__card {
-  border: 1px solid #3b6353; background: #eaf3ee; color: #16281f;
-  border-radius: 8px; padding: 10px 12px; font-size: 16px; cursor: pointer; min-width: 46px;
-}
-.gy__card--on { background: #4fae82; color: #06140d; transform: translateY(-6px); }
-.gy__card--played { cursor: default; background: #dfe9e3; }
-
-.gy__actions { display: flex; gap: 10px; }
+.gy__list-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: rgba(23,36,29,.7); border-radius: 8px; }
+.gy__code { font-family: ui-monospace, Menlo, monospace; font-size: 17px; letter-spacing: .18em; color: var(--gold, #c9a84c); }
 .gy__toast {
   position: fixed; left: 50%; top: 18px; transform: translateX(-50%);
-  background: #1f3a2e; color: #e8f0ea; padding: 8px 16px; border-radius: 8px; font-size: 14px; z-index: 20;
+  background: #1f3a2e; color: var(--text-light, #e8d9b0); padding: 8px 16px; border-radius: 8px; font-size: 14px; z-index: 40;
+}
+
+/* 房间页座位（screens.ts，非牌桌）——横排卡片，与牌桌 .gy__board .gy__seat 互不干扰。#21 切共享三屏后移除 */
+.gy > .gy__seats { display: flex; gap: 10px; flex-wrap: wrap; }
+.gy > .gy__seats .gy__seat {
+  min-width: 96px; padding: 10px; border-radius: 10px;
+  background: rgba(23,36,29,.7); display: flex; flex-direction: column; gap: 6px; align-items: center;
 }

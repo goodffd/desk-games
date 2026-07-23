@@ -1,53 +1,57 @@
-import type { Card, Play } from '../engine/types';
-import { comboIdentity, enumerateIdentities } from '../engine/combos';
+import type { Card, Combo, ComboType, Play, WildAssign } from '../engine/types';
+import { enumerateIdentities } from '../engine/combos';
+import { enumerateLeads } from '../engine/legal';
 import { sortHand } from '../engine/cards';
+import { cardFace } from '../../../ui/cards/card-face';
+import type { CardRank, FaceCard } from '../../../ui/cards/types';
+import { seatRing } from '../../../ui/cards/layout';
+import '../../../ui/cards/card-face.css';
+import '../../../ui/cards/joker-img.css';
+import '../../../ui/cards/rank-font.css';
+import './gandengyan.css';
 
-/** 干瞪眼牌桌。规则判定一律走 engine，这里不另写一套。 */
+/**
+ * 干瞪眼牌桌。用共享牌面（cardFace）+ 环形座位（seatRing）自成一套，掼蛋牌桌一行不动。
+ * 规则判定一律走 engine（歧义 enumerateIdentities）；界面不猜。
+ */
+
+const COMBO_CN: Record<string, string> = {
+  single: '单张', pair: '对子', run: '顺子', pairRun: '连对', bomb: '炸弹', jokerBomb: '王炸',
+};
 
 export interface SeatView {
   seat: number; count: number; online: boolean; ai: boolean; disconnected?: boolean;
-  lastPlay?: { cards: Card[] } | 'pass' | null;
+  lastPlay?: { cards: Card[]; assign?: WildAssign[] } | 'pass' | null;
 }
 export interface TableState {
   phase: 'playing' | 'dealResult';
   turn: number;
   deckCount: number;
-  current: { type: string; length: number; key: number; cards: Card[]; assign: { jokerId: number; rank: number }[]; by: number } | null;
+  current: { type: string; length: number; key: number; cards: Card[]; assign: WildAssign[]; by: number } | null;
+  lastActor?: number | null;
   seats: SeatView[];
   turnRemainMs?: number;
-  result?: { winner: number | null; pay: number[]; gain: number; stalemate: boolean };
+  result?: { winner: number | null; pay: number[]; gain: number; stalemate: boolean; hands: number[] };
 }
 export interface TableApi {
   mySeat: number | 'spectator';
   names: (string | null)[];
-  onPlay(cardIds: number[], assign: { jokerId: number; rank: number }[]): void;
+  onPlay(cardIds: number[], assign: WildAssign[]): void;
   onPass(): void;
   onRestart(): void;
   onLeave(): void;
 }
-
-const SUIT: Record<string, string> = { S: '♠', H: '♥', D: '♦', C: '♣' };
-const RANK: Record<number, string> = { 10: '10', 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
-
-export function cardLabel(c: Card): string {
-  if (c.kind === 'joker') return c.big ? '大王' : '小王';
-  return `${SUIT[c.suit] ?? ''}${RANK[c.rank] ?? String(c.rank)}`;
-}
-/** 打出去的牌带上「这张王算几点」，否则别人看不懂桌面 */
-function playedLabel(c: Card, assign: { jokerId: number; rank: number }[]): string {
-  if (c.kind !== 'joker') return cardLabel(c);
-  const a = assign.find((x) => x.jokerId === c.id);
-  return a ? `${cardLabel(c)}(=${RANK[a.rank] ?? a.rank})` : cardLabel(c);
-}
-const COMBO_CN: Record<string, string> = {
-  single: '单张', pair: '对子', run: '顺子', pairRun: '连对', bomb: '炸弹', jokerBomb: '王炸',
-};
 
 function el(tag: string, cls: string, text?: string): HTMLElement {
   const e = document.createElement(tag);
   e.className = cls;
   if (text !== undefined) e.textContent = text;
   return e;
+}
+/** 一张出过的牌的元素：王带上被指派的点数（药丸），别人才看得懂桌面 */
+function playedCard(c: Card, assign: WildAssign[] | undefined, small: boolean): HTMLElement {
+  const a = assign?.find((x) => x.jokerId === c.id);
+  return cardFace(c as FaceCard, { small, assignedRank: (a?.rank ?? null) as CardRank | null });
 }
 
 export function mountTable(root: HTMLElement, api: TableApi): {
@@ -58,25 +62,22 @@ export function mountTable(root: HTMLElement, api: TableApi): {
   root.innerHTML = '';
   const wrap = el('div', 'gy');
   const bar = el('div', 'gy__bar');
-  const title = el('div', 'gy__title', '干瞪眼');
-  const deckEl = el('div', 'gy__deck', '');
-  const back = el('button', 'gy__back', '返回大厅');
-  back.addEventListener('click', () => api.onLeave());
-  bar.append(title, deckEl, back);
-
+  bar.append(el('div', 'gy__title', '干瞪眼'), el('div', 'gy__deck', ''), (() => {
+    const b = el('button', 'gy__back', '返回大厅'); b.addEventListener('click', () => api.onLeave()); return b;
+  })());
+  const board = el('div', 'gy__board');       // 座位环 + 中央出牌区
   const seatsEl = el('div', 'gy__seats');
-  const tableEl = el('div', 'gy__table');
+  const centerEl = el('div', 'gy__center');
+  board.append(seatsEl, centerEl);
   const hintEl = el('div', 'gy__hint', '');
-  const handEl = el('div', 'gy__hand');
   const chooserEl = el('div', 'gy__chooser');
+  const handEl = el('div', 'gy__hand');
   const actions = el('div', 'gy__actions');
   const playBtn = el('button', 'gy__btn gy__btn--play', '出牌') as HTMLButtonElement;
   const passBtn = el('button', 'gy__btn', '不要') as HTMLButtonElement;
   const againBtn = el('button', 'gy__btn gy__btn--play', '再来一局') as HTMLButtonElement;
-  againBtn.style.display = 'none';
   actions.append(playBtn, passBtn, againBtn);
-
-  wrap.append(bar, seatsEl, tableEl, hintEl, chooserEl, handEl, actions);
+  wrap.append(bar, board, hintEl, chooserEl, handEl, actions);
   root.appendChild(wrap);
 
   let selected = new Set<number>();
@@ -84,39 +85,46 @@ export function mountTable(root: HTMLElement, api: TableApi): {
   let latest: TableState | null = null;
   let hintTimer = 0;
 
+  /** 座位显示名：有昵称用昵称，AI 空座显示「AI」，否则「座N」。render 与结算屏共用。 */
+  const nameOf = (seat: number): string =>
+    api.names[seat] ?? (latest?.seats.find((x) => x.seat === seat)?.ai ? 'AI' : `座${seat}`);
+
   const hint = (msg: string): void => {
     hintEl.textContent = msg;
     window.clearTimeout(hintTimer);
     hintTimer = window.setTimeout(() => { hintEl.textContent = ''; }, 4000);
   };
 
-  /** 出牌：含王且有多种打法时，先让玩家点一下选哪种（engine 说了算，界面不猜） */
+  /** 桌面当前牌整成 engine 认识的 Combo，供歧义判断时判「压不压得住」 */
+  function currentCombo(): Combo | null {
+    if (!latest?.current) return null;
+    const c = latest.current;
+    return { type: c.type as ComboType, cards: c.cards, length: c.length, key: c.key };
+  }
+
   function attemptPlay(): void {
     const picked = myHand.filter((c) => selected.has(c.id));
     if (!picked.length) { hint('先选牌'); return; }
-    const options: Play[] = enumerateIdentities(picked, latest?.current
-      ? ({ type: latest.current.type, cards: latest.current.cards, length: latest.current.length, key: latest.current.key } as never)
-      : null);
+    const options: Play[] = enumerateIdentities(picked, currentCombo());
     if (options.length === 0) { hint('这手牌出不了'); return; }
     if (options.length === 1) { commit(options[0]!); return; }
-    renderChooser(options);
+    renderChooser(options);          // 真有歧义（多种牌型标识）才让玩家选
   }
-
   function commit(p: Play): void {
     chooserEl.innerHTML = '';
     api.onPlay(p.cards.map((c) => c.id), p.assign);
     selected = new Set();
   }
-
   function renderChooser(options: Play[]): void {
     chooserEl.innerHTML = '';
     chooserEl.appendChild(el('span', 'gy__chooser-label', '这手牌有几种打法，选一种：'));
     for (const p of options) {
       const name = COMBO_CN[p.combo.type] ?? p.combo.type;
-      const detail = p.cards.map((c) => playedLabel(c, p.assign)).join(' ');
-      const b = el('button', 'gy__chip', `${name} ${detail}`);
-      b.addEventListener('click', () => commit(p));
-      chooserEl.appendChild(b);
+      const chip = el('button', 'gy__chip', '');
+      chip.appendChild(el('span', 'gy__chip-name', name));
+      for (const c of p.cards) chip.appendChild(playedCard(c, p.assign, true));
+      chip.addEventListener('click', () => commit(p));
+      chooserEl.appendChild(chip);
     }
   }
 
@@ -127,63 +135,101 @@ export function mountTable(root: HTMLElement, api: TableApi): {
   function render(state: TableState, hand: Card[]): void {
     latest = state;
     myHand = sortHand(hand);
-    const mine = typeof api.mySeat === 'number' ? api.mySeat : -1;
-    const myTurn = state.phase === 'playing' && state.turn === mine;
+    const n = state.seats.length;
+    const mine = typeof api.mySeat === 'number' ? api.mySeat : 0;   // 观战视角基准 0
+    const iAmSeat = typeof api.mySeat === 'number';
+    const myTurn = state.phase === 'playing' && iAmSeat && state.turn === mine;
 
-    deckEl.textContent = `牌堆 ${state.deckCount} 张`;
+    bar.querySelector('.gy__deck')!.textContent = `牌堆 ${state.deckCount} 张`;
 
+    // 座位环：把服务端座号转成视角座号（自己恒在底部），按 seatRing 定位
+    const ring = seatRing(n);
     seatsEl.innerHTML = '';
     for (const s of state.seats) {
-      const box = el('div', `gy__seat${s.seat === state.turn && state.phase === 'playing' ? ' gy__seat--turn' : ''}`);
-      const who = api.names[s.seat] ?? (s.ai ? 'AI' : `座${s.seat}`);
-      box.appendChild(el('div', 'gy__seat-name', s.seat === mine ? `${who}（你）` : who));
-      box.appendChild(el('div', 'gy__seat-count', `${s.count} 张`));
-      const tag = s.disconnected ? '掉线了' : (s.ai ? 'AI 接管' : '');
-      if (tag) box.appendChild(el('div', 'gy__seat-tag', tag));
+      const v = ((s.seat - mine) % n + n) % n;
+      const anchor = ring[v]!;
+      const box = el('div', `gy__seat gy__seat--${anchor.edge}${s.seat === state.turn && state.phase === 'playing' ? ' gy__seat--turn' : ''}`);
+      box.style.left = `${anchor.leftPct}%`;
+      box.style.top = `${anchor.topPct}%`;
+      const who = nameOf(s.seat);
+      box.appendChild(el('div', 'gy__seat-name', s.seat === mine && iAmSeat ? `${who}（你）` : who));
+      const meta = el('div', 'gy__seat-meta', `${s.count} 张`);
+      if (s.disconnected) meta.appendChild(el('span', 'gy__seat-tag', ' 掉线'));  // AI 座名字已是「AI」，不再重复标注
+      box.appendChild(meta);
+      // 座位最近出的一手（小牌）
+      if (s.lastPlay && s.lastPlay !== 'pass') {
+        const lp = el('div', 'gy__seat-play');
+        for (const c of s.lastPlay.cards) lp.appendChild(playedCard(c, s.lastPlay.assign, true));
+        box.appendChild(lp);
+      } else if (s.lastPlay === 'pass') {
+        box.appendChild(el('div', 'gy__seat-pass', '不要'));
+      }
       seatsEl.appendChild(box);
     }
 
-    tableEl.innerHTML = '';
-    if (state.phase === 'dealResult' && state.result) {
-      const r = state.result;
-      const who = r.winner === null ? '无人收分（并列僵局）' : `${api.names[r.winner] ?? `座${r.winner}`} 赢了`;
-      tableEl.appendChild(el('div', 'gy__over', who));
-      tableEl.appendChild(el('div', 'gy__over-detail',
-        r.pay.map((p, i) => `${api.names[i] ?? `座${i}`} ${p === 0 ? '—' : `-${p}`}`).join('   ')));
-      againBtn.style.display = '';
-      playBtn.style.display = 'none';
-      passBtn.style.display = 'none';
-    } else {
-      againBtn.style.display = 'none';
-      playBtn.style.display = '';
-      passBtn.style.display = '';
+    // 中央：当前桌面牌 + 倒计时
+    centerEl.innerHTML = '';
+    if (state.phase === 'playing') {
       if (state.current) {
         const c = state.current;
-        tableEl.appendChild(el('div', 'gy__cur-label',
-          `${api.names[c.by] ?? `座${c.by}`} 出了 ${COMBO_CN[c.type] ?? c.type}`));
+        centerEl.appendChild(el('div', 'gy__cur-by', `${nameOf(c.by)} 出了 ${COMBO_CN[c.type] ?? c.type}`));
         const row = el('div', 'gy__cur');
-        for (const card of c.cards) row.appendChild(el('span', 'gy__card gy__card--played', playedLabel(card, c.assign)));
-        tableEl.appendChild(row);
+        for (const card of c.cards) row.appendChild(playedCard(card, c.assign, false));
+        centerEl.appendChild(row);
       } else {
-        tableEl.appendChild(el('div', 'gy__cur-label', myTurn ? '轮到你领出' : '等待领出'));
+        centerEl.appendChild(el('div', 'gy__cur-by', myTurn ? '轮到你领出' : '等待领出'));
+      }
+      if (myTurn && state.turnRemainMs != null) {
+        centerEl.appendChild(el('div', 'gy__clock', `${Math.ceil(state.turnRemainMs / 1000)}s`));
       }
     }
 
+    // 结算弹层
+    if (state.phase === 'dealResult' && state.result) {
+      renderResult(state.result);
+    } else {
+      wrap.querySelector('.gy__result')?.remove();
+    }
+
+    // 自己的手牌
     handEl.innerHTML = '';
-    if (typeof api.mySeat === 'number') {
+    if (iAmSeat) {
       for (const c of myHand) {
-        const b = el('button', `gy__card${selected.has(c.id) ? ' gy__card--on' : ''}`, cardLabel(c));
-        b.addEventListener('click', () => {
+        const face = cardFace(c as FaceCard, { extraClass: selected.has(c.id) ? 'gy-card--on' : undefined });
+        face.addEventListener('click', () => {
           if (selected.has(c.id)) selected.delete(c.id); else selected.add(c.id);
           chooserEl.innerHTML = '';
           render(state, hand);
         });
-        handEl.appendChild(b);
+        handEl.appendChild(face);
       }
     }
 
+    const over = state.phase === 'dealResult';
+    playBtn.style.display = over || !iAmSeat ? 'none' : '';
+    passBtn.style.display = over || !iAmSeat ? 'none' : '';
+    againBtn.style.display = over && api.mySeat !== 'spectator' ? '' : 'none';
+    // 领出确无合法出牌（手里只剩王）时允许过——服务端会顺延出牌权；跟牌时要得起也能过。
+    const canLead = state.current !== null || enumerateLeads(myHand).length > 0;
     playBtn.disabled = !myTurn;
-    passBtn.disabled = !myTurn || state.current === null;   // 领出不能不要
+    passBtn.disabled = !myTurn || (state.current === null && canLead);
+  }
+
+  function renderResult(r: NonNullable<TableState['result']>): void {
+    wrap.querySelector('.gy__result')?.remove();
+    const box = el('div', 'gy__result');
+    const title = r.winner === null ? '无人收分（并列僵局）' : `${nameOf(r.winner)} 赢了`;
+    box.appendChild(el('div', 'gy__result-title', title));
+    const rows = el('div', 'gy__result-rows');
+    r.pay.forEach((p, i) => {
+      const line = el('div', 'gy__result-row', '');
+      line.appendChild(el('span', 'gy__result-who', `${nameOf(i)}${i === r.winner ? '（赢）' : ''}`));
+      line.appendChild(el('span', 'gy__result-cards', `剩 ${r.hands[i]} 张`));
+      line.appendChild(el('span', 'gy__result-pay', i === r.winner ? `+${r.gain}` : (p ? `-${p}` : '—')));
+      rows.appendChild(line);
+    });
+    box.appendChild(rows);
+    wrap.appendChild(box);
   }
 
   return {

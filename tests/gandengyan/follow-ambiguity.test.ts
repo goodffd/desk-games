@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { identify, beats, comboIdentity, enumerateIdentities } from '../../src/games/gandengyan/engine/combos';
+import { identify, comboIdentity, enumerateIdentities } from '../../src/games/gandengyan/engine/combos';
 import type { Card, Combo } from '../../src/games/gandengyan/engine/types';
 import { cards } from './mk';
 
@@ -15,9 +15,9 @@ import { cards } from './mk';
  * 能压住 C 的那些挑出来。如果剩下不止一种牌型标识，跟牌时就有歧义。
  */
 function followIdentities(current: Combo, cs: readonly Card[]): string[] {
-  const ids = enumerateIdentities(cs)
-    .filter((p) => beats(current, p.combo))
-    .map((p) => comboIdentity(p.combo));
+  // 直接走引擎真原语 enumerateIdentities(cards, current)——UI（table.ts:108）用的就是它：
+  // 内部按 beats 只保留能压住 current 的解释并去重。不再本地手动 filter，免得测的是重实现而非真代码。
+  const ids = enumerateIdentities(cs, current).map((p) => comboIdentity(p.combo));
   return [...new Set(ids)].sort();
 }
 

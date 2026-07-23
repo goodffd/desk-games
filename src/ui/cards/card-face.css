@@ -1,0 +1,177 @@
+/*
+ * 共享牌面样式 —— 掼蛋与干瞪眼共用。类名 dgc-*。
+ * 从 guandan.css 的纯牌面规则剥离而来（gd- → dgc-，规则体一字不改）；
+ * 牌×掼蛋容器耦合的规则（.gd-player-hand .dgc-card 等）留在 guandan.css。
+ * 图在 suits.ts / joker-img.css，字体在 rank-font.css，设计 token 在 theme.css。
+ */
+
+/* --- 牌卡组件（放大版：60×84px） --- */
+.dgc-card {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: 80px;
+  height: 112px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 8px;
+  padding: 4px 6px;
+  cursor: default;
+  user-select: none;
+  box-shadow: 1px 2px 5px rgba(0,0,0,0.3);
+  transition: transform 0.15s, box-shadow 0.15s;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* 出牌区及 AI 座位展示用小牌（比放大版稍小，保持可读） */
+.dgc-card--small {
+  width: 58px;
+  height: 81px;
+  font-size: 0.85rem;
+}
+
+.dgc-card--red { color: var(--red); }
+
+.dgc-card--black { color: var(--black); }
+
+/* --- 大小王牌面（全身 Q 版小丑 + 竖排 JOKER） --- */
+.dgc-card--joker {
+  position: relative;
+}
+
+.dgc-card--joker-big { background: linear-gradient(135deg, #fff8f0, #fdeede); }
+
+.dgc-card--joker-small { background: linear-gradient(135deg, #f6f6f8, #eaeaee); }
+
+/* 小丑图(背景 contain 见 joker-img.css)：缩小、靠右竖向居中，不压到左侧 JOKER 字 */
+.dgc-joker-fig {
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 56px;
+  height: 90px;
+}
+
+.dgc-card--small .dgc-joker-fig { width: 42px; height: 66px; }
+
+/* 出牌区小丑图放大，仍靠右不压左侧 JOKER 字、不超牌边 */
+.dgc-card--joker-small .dgc-joker-fig { filter: grayscale(1) brightness(1.06); }
+
+/* 小王转灰 */
+
+/* JOKER 竖排：逐字母 flex 竖列，用牌面同款 Besley(GDRank)；line-height<1 压缩字母竖向间距、不超牌边 */
+.dgc-joker-word {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: 'GDRank', serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;              /* 字母竖向留清楚空隙（牌高够，不挤） */
+  text-shadow: 0 0 2px #fff, 0 0 1px #fff;
+}
+
+.dgc-joker-word span { display: block; }
+
+.dgc-card--small .dgc-joker-word { font-size: 0.5rem; top: 3px; left: 2px; }
+
+/* --- 途游式牌面：左上角标(点数+花色) + 右下角大花色，靠这两处填满整张牌 --- */
+.dgc-card__corner {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  display: flex;
+  flex-direction: row;       /* 手牌：点数+花色横排紧挨（如「A♠」横着） */
+  align-items: center;
+  gap: 3px;                  /* 数字↔花色间距 */
+  line-height: 0.9;
+  z-index: 1;
+}
+
+.dgc-card--small .dgc-card__corner {  /* 出牌：点数+花色竖排，间距更大 */
+  flex-direction: column;
+  gap: 9px;                          /* 桌面：点数↔花色再拉开 */
+  align-items: center;
+  left: 4px;
+}
+
+.dgc-card__rank {
+  font-family: 'GDRank', serif;  /* Besley 板衬线(途游同款，Q 圈内出尾) */
+  font-size: 1.3rem;             /* 27 张挤一屏：角标需窄到露出量内，否则花色被下一张盖 */
+  font-weight: 700;
+  line-height: 1;
+  display: inline-block;
+  transform: scaleY(1.32);       /* 纵向拉长，复刻途游高窄感 */
+  transform-origin: top center;
+}
+
+/* 字母(J/Q/K/A)天生比数字宽，横向收窄跟数字看齐 */
+.dgc-card__rank--alpha { transform: scaleY(1.32) scaleX(0.85); }
+
+/* 「10」两位数太宽：横向压缩 + 缩小 1/0 间距 */
+.dgc-card__rank--ten { transform: scaleY(1.32) scaleX(0.82); letter-spacing: -0.03em; }
+
+.dgc-card__suit {            /* 角标花色图：按高缩放、自然宽度、四花色一致 */
+  height: 13px;
+  width: auto;
+  display: block;
+}
+
+/* 方块是菱形，等高下填充面积/宽度都比♠♥♣小，单独放大补偿（角标+大花色通用） */
+.dgc-suit-D { transform: scale(1.18); }
+
+/* 逢人配：花色位放金「配」字（真粗体） */
+.dgc-card__suit--wild {
+  font-family: 'GDWild', var(--font-ui);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--gold);
+}
+
+.dgc-card__pip {            /* 右下角大花色图（填满牌面） */
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  height: 42px;
+  width: auto;
+}
+
+/* 出牌区小牌同款缩小（竖排角标间距更大） */
+.dgc-card--small .dgc-card__rank { font-size: 1.12rem; }
+
+.dgc-card--small .dgc-card__suit { height: 13px; }
+
+.dgc-card--small .dgc-card__suit--wild { font-size: 0.78rem; }
+
+.dgc-card--small .dgc-card__pip { height: 26px; right: 2px; bottom: 2px; }
+
+@media (max-width: 520px), (max-height: 520px) {
+  .dgc-card { width: 42px; height: 60px; border-radius: 6px; padding: 3px 4px; }
+  /* 手机手牌再缩一圈 48→42 */
+  .dgc-card__corner { top: 2px; left: 3px; }
+  .dgc-card__rank { font-size: 0.92rem; }
+  /* 牌缩小后点数/字母放大一号，保证清晰 */
+  .dgc-card__suit { height: 10px; }
+  .dgc-card__suit--wild { font-size: 0.56rem; }
+  .dgc-card__pip { height: 22px; }
+  /* 手机牌高 60 → 露 ~20px */
+  .dgc-card--small { width: 36px; height: 50px; }
+  .dgc-card--small .dgc-card__corner { gap: 5px; }
+  /* 手机小牌矮，角标间距维持原样不拉大 */
+  .dgc-card--small .dgc-card__rank { font-size: 0.76rem; }
+  .dgc-card--small .dgc-card__suit { height: 9px; }
+  .dgc-card--small .dgc-card__pip { height: 18px; }
+  /* 小丑图跟着牌缩小，别超出牌边界 */
+  .dgc-joker-fig { width: 27px; height: 46px; }
+  .dgc-card--small .dgc-joker-fig { width: 21px; height: 38px; right: 2px; }
+  /* 出牌区小丑图收窄+右边距对齐左JOKER(2px)：跟 JOKER 字留一点间隙、又不贴右边 */
+  .dgc-joker-word { font-size: 0.40rem; top: 3px; left: 2px; }
+  .dgc-card--small .dgc-joker-word { font-size: 0.36rem; }
+  .dgc-card--small .dgc-card__suit--wild { font-size: 0.46rem; }
+}

@@ -7,8 +7,6 @@
  */
 
 import './guandan.css';
-import './joker-img.css';
-import './rank-font.css';
 import { navigate } from '../../../shell/nav';
 
 import type { Card, Seat, Combo, Rank } from '../engine/types';
@@ -379,19 +377,19 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
 
   /** 选/弃一张牌：更新集合 + 直接切类，不整屏重渲（保证滑动顺滑；选牌不影响按钮态） */
   function applyCardSelect(id: number, sel: boolean): void {
-    const ce = handEl.querySelector(`.gd-card[data-card-id="${id}"]`) as HTMLElement | null;
+    const ce = handEl.querySelector(`.dgc-card[data-card-id="${id}"]`) as HTMLElement | null;
     if (sel) { selectedIds.add(id); ce?.classList.add('is-selected'); }
     else { selectedIds.delete(id); ce?.classList.remove('is-selected'); }
   }
   /** 清空选中（集合 + 视觉 is-selected 一并清，保持两者同步）。 */
   function clearSelection(): void {
     selectedIds.clear();
-    handEl.querySelectorAll('.gd-card.is-selected').forEach((ce) => ce.classList.remove('is-selected'));
+    handEl.querySelectorAll('.dgc-card.is-selected').forEach((ce) => ce.classList.remove('is-selected'));
   }
   /** 屏幕坐标下的手牌 id（滑动经过判定，鼠标/触摸通用） */
   function cardIdAtPoint(x: number, y: number): number | null {
     const t = document.elementFromPoint(x, y);
-    const card = t && (t as HTMLElement).closest('.gd-card');
+    const card = t && (t as HTMLElement).closest('.dgc-card');
     if (!card || !handEl.contains(card)) return null;
     const id = (card as HTMLElement).dataset['cardId'];
     return id ? Number(id) : null;
@@ -448,8 +446,8 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
       // 列推进至少容下最宽角标(点数+花色)+缝，角标花色不被下一列盖。
       // 量点数宽(文字可靠)+按高估花色宽+间距——花色是图片宽度异步，直接量角标会漏掉它
       let maxRank = 0; // 视觉宽度(getBoundingClientRect 含 scaleX 压缩)，压缩后的「10」让列更紧凑
-      handEl.querySelectorAll('.gd-card__rank').forEach((c) => { maxRank = Math.max(maxRank, c.getBoundingClientRect().width); });
-      const suitH = ((handEl.querySelector('.gd-card__suit') as HTMLElement)?.offsetHeight) || 14;
+      handEl.querySelectorAll('.dgc-card__rank').forEach((c) => { maxRank = Math.max(maxRank, c.getBoundingClientRect().width); });
+      const suitH = ((handEl.querySelector('.dgc-card__suit') as HTMLElement)?.offsetHeight) || 14;
       const suitW = suitH * 1.15; // 花色按高度估宽(最宽红心≈1.08)，不依赖异步图片宽度
       const maxCorner = maxRank + 4 + suitW; // 点数 + 间距 + 花色
       const fitStep = (availW - colW) / (nc - 1);
@@ -492,7 +490,7 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     const pe = playEls[lastActor]!;
     if (!pe.classList.contains('has-play')) return false;
     const pr = pe.getBoundingClientRect();
-    for (const card of Array.from(handEl.querySelectorAll('.gd-card'))) {
+    for (const card of Array.from(handEl.querySelectorAll('.dgc-card'))) {
       const cr = card.getBoundingClientRect();
       const ix = Math.min(pr.right, cr.right) - Math.max(pr.left, cr.left);
       const iy = Math.min(pr.bottom, cr.bottom) - Math.max(pr.top, cr.top);

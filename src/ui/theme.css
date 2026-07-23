@@ -10,8 +10,17 @@
  * 象棋不吃这套：它在 .xq-root 作用域下另有一套同名不同值的变量（--gold 更暖），
  * 作用域覆盖全局，互不干扰。
  *
- * --font-ui 里的 'DGFont' 目前加载不到会 fallback 到 system-ui；让它真正上线是 #23。
+ * DGFont（思源黑体 Noto Sans SC 子集，OFL）保证四系统固定汉字字形一致。子集由
+ * scripts/font-subset.mjs 从 src/** 显示文案精确提取子集化（当前 512 码点），
+ * tests/font-subset.test.ts 守着不漏字。woff2 经 vite（assetsInlineLimit 4MB）内联进单文件。
  */
+@font-face {
+  font-family: 'DGFont';
+  src: url('./fonts/DGFont.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 :root {
   --font-ui: 'DGFont', system-ui, sans-serif;
   --gold: #c9a84c;

@@ -296,3 +296,32 @@ describe('AI 座真的出牌，不是只被标成 AI（#14 AC6）', () => {
     expect(d.ply).toBe(plyBefore);
   });
 });
+
+describe('掉线真人 vs AI 补位空座（#17 AC5 peer-offline 区分）', () => {
+  it('markDisconnected 的座：公开态 disconnected=true、ai=false（界面显示「掉线」不是「AI」）', () => {
+    const d = playing(3, 7).drv();
+    d.markDisconnected(0, true);
+    const st = d.publicState();
+    expect(st.seats[0].disconnected).toBe(true);
+    expect(st.seats[0].ai).toBe(false);        // 掉线真人不算 AI 补位空座
+    expect(st.seats[0].online).toBe(true);     // 宽限期 online 不动（只回合超时代打、不全速）
+  });
+
+  it('setAI 补位的空座：公开态 ai=true、disconnected=false（界面显示「AI」）', () => {
+    const d = playing(3, 7).drv();
+    d.setAI(1, true);
+    const st = d.publicState();
+    expect(st.seats[1].ai).toBe(true);
+    expect(st.seats[1].disconnected).toBe(false);
+    expect(st.seats[1].online).toBe(false);
+  });
+
+  it('重连撤销掉线标记：markDisconnected(false) 后 disconnected/ai 均 false（回到真人）', () => {
+    const d = playing(3, 7).drv();
+    d.markDisconnected(0, true);
+    d.markDisconnected(0, false);
+    const st = d.publicState();
+    expect(st.seats[0].disconnected).toBe(false);
+    expect(st.seats[0].ai).toBe(false);
+  });
+});

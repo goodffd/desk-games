@@ -52,6 +52,9 @@ export class GandengyanDriver {
   state: DealState;
   seatCount: number;
   online: boolean[];
+  /** 掉线的「真人」座（区别于「AI 补位空座」）：两者都由 AI 代打，但界面上一个显示「掉线」、
+   *  一个显示「AI」。宽限期 online 仍为 true（只回合超时代打、不全速），disconnected 独立标记。 */
+  disconnected: boolean[];
   shuffle: (n: number) => number[];
   base: number;
   lastPlays: (PlayedView | 'pass' | null)[];
@@ -67,6 +70,7 @@ export class GandengyanDriver {
     this.shuffle = opts.shuffle ?? defaultShuffle;
     this.base = opts.base ?? 1;
     this.online = Array.from({ length: this.seatCount }, () => true);
+    this.disconnected = Array.from({ length: this.seatCount }, () => false);
     this.lastPlays = Array.from({ length: this.seatCount }, () => null);
     const dealer = opts.dealer ?? 0;
     const dealt = dealHands(makeDeck(), this.seatCount, dealer, this.shuffle);
@@ -97,7 +101,9 @@ export class GandengyanDriver {
         count: s.hands[i]!.length,
         lastPlay: this.lastPlays[i] ?? null,
         online: this.online[i],
-        ai: !this.online[i],
+        // AI 补位空座（从来不是真人）= 非在线且非掉线真人；掉线真人单列 disconnected，界面显示「掉线」而非「AI」
+        ai: !this.online[i] && !this.disconnected[i],
+        disconnected: this.disconnected[i],
       })),
     };
     if (this.phase === 'dealResult') {
@@ -188,6 +194,13 @@ export class GandengyanDriver {
 
   setAI(seat: Seat, on: boolean): Outbound[] {
     this.online[seat] = !on;
+    return [this.broadcastState()];
+  }
+
+  /** 标记/取消某座为「掉线真人」——AI 代打但界面显示「掉线」，区别于 AI 补位空座。
+   *  房间层在真人宽限掉线时置 true、重连时置 false。不动 online（宽限期只回合超时代打）。 */
+  markDisconnected(seat: Seat, on: boolean): Outbound[] {
+    this.disconnected[seat] = on;
     return [this.broadcastState()];
   }
 

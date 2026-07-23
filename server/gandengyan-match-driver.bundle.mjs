@@ -485,6 +485,7 @@ var GandengyanDriver = class {
     this.shuffle = opts.shuffle ?? defaultShuffle;
     this.base = opts.base ?? 1;
     this.online = Array.from({ length: this.seatCount }, () => true);
+    this.disconnected = Array.from({ length: this.seatCount }, () => false);
     this.lastPlays = Array.from({ length: this.seatCount }, () => null);
     const dealer = opts.dealer ?? 0;
     const dealt = dealHands(makeDeck(), this.seatCount, dealer, this.shuffle);
@@ -518,7 +519,9 @@ var GandengyanDriver = class {
         count: s.hands[i].length,
         lastPlay: this.lastPlays[i] ?? null,
         online: this.online[i],
-        ai: !this.online[i]
+        // AI 补位空座（从来不是真人）= 非在线且非掉线真人；掉线真人单列 disconnected，界面显示「掉线」而非「AI」
+        ai: !this.online[i] && !this.disconnected[i],
+        disconnected: this.disconnected[i]
       }))
     };
     if (this.phase === "dealResult") {
@@ -605,6 +608,12 @@ var GandengyanDriver = class {
   }
   setAI(seat, on) {
     this.online[seat] = !on;
+    return [this.broadcastState()];
+  }
+  /** 标记/取消某座为「掉线真人」——AI 代打但界面显示「掉线」，区别于 AI 补位空座。
+   *  房间层在真人宽限掉线时置 true、重连时置 false。不动 online（宽限期只回合超时代打）。 */
+  markDisconnected(seat, on) {
+    this.disconnected[seat] = on;
     return [this.broadcastState()];
   }
   /** 玩一手 AI：轮到的是 AI 座才动，否则返回空（房间层据此逐手带延迟驱动）。 */

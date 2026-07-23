@@ -12,6 +12,7 @@
     "smoke:guandan": "node scripts/guandan-live-smoke.mjs",
     "smoke:gandengyan": "node scripts/gandengyan-live-smoke.mjs",
     "accept:gandengyan": "node scripts/gandengyan-accept.mjs",
+    "smoke:gandengyan:scenarios": "node scripts/gandengyan-scenarios.mjs",
     "ui-proof": "node scripts/ui-proof.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.xiangqi.json",
     "build:server": "node server/build.mjs"

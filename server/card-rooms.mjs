@@ -260,6 +260,7 @@ export class CardRoomRegistry {
     this.nicks.reclaim(client, msg.nick);               // 重登昵称维持判重一致，并清掉该连接的旧占用
     client.send({ t: 'rejoined', seat: idx });
     if (room.runner && room.runner.setAI) this._dispatch(room, room.runner.setAI(idx, false));
+    if (room.runner && room.runner.markDisconnected) this._dispatch(room, room.runner.markDisconnected(idx, false)); // 回来即撤「掉线」标记
     if (room.runner && room.runner.syncSeat) this._dispatch(room, room.runner.syncSeat(idx));
     for (const s of room.seats) if (s && s.client && s.online && s.client !== client) s.client.send({ t: 'peer-back', seat: idx });
     this._sendRoom(room);
@@ -353,6 +354,8 @@ export class CardRoomRegistry {
     seat.online = false; seat.client = null;
     if (grace) { seat.disconnected = true; seat.ai = false; seat.graceMisses = 0; }
     else { seat.disconnected = false; seat.ai = true; }
+    // 真人掉线（宽限或立即全速AI）：告诉运行器这座是「掉线真人」，公开态据此显示「掉线」而非「AI」补位空座
+    if (room.runner && room.runner.markDisconnected) this._dispatch(room, room.runner.markDisconnected(idx, true));
     for (const s of room.seats) if (s && s.client && s.online) s.client.send({ t: 'peer-offline', seat: idx });
     for (const sp of room.spectators) sp.send({ t: 'peer-offline', seat: idx });
 

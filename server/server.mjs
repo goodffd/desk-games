@@ -68,12 +68,22 @@ const realShuffle = (n) => {
   for (let i = n - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
 };
+// 冒烟专用：GY_DEAL_SEED 设了就用确定性洗牌 + 固定座 0 为庄，让 live-smoke 能复现「某家拿到歧义手」。
+// 仅当 env 显式设置时生效（同 GY_AI_DELAY），生产留空 = realShuffle + 随机庄。
+const dealSeed = process.env.GY_DEAL_SEED != null && process.env.GY_DEAL_SEED !== '' ? Number(process.env.GY_DEAL_SEED) : null;
+const seededShuffle = (seed) => (n) => {
+  let s = seed >>> 0;
+  const rnd = () => { s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const a = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+};
 const yReg = new GandengyanRooms(
   undefined,
   (room) => new GandengyanDriver({
-    shuffle: realShuffle,
+    shuffle: dealSeed != null ? seededShuffle(dealSeed) : realShuffle,
     seatCount: room.seatCount,
-    dealer: Math.floor(Math.random() * room.seatCount),   // 首局庄随机
+    dealer: dealSeed != null ? 0 : Math.floor(Math.random() * room.seatCount),   // 冒烟固定庄=座0 全确定性；生产随机
   }),
   TURN_TIMEOUT, DISCONNECT_GRACE, DISCONNECT_MISSES, nicks,
   process.env.GY_AI_DELAY ? Number(process.env.GY_AI_DELAY) : null,   // 冒烟可调小；生产留空=1.2~2.5s 观感延迟

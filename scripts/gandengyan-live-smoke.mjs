@@ -95,9 +95,9 @@ async function runSmoke(browser) {
 
   step('甲：进大厅 → 建 3 人房（真人只有 2 个，第 3 座补 AI）');
   const a = await enterLobby(ctxA, '干甲');
-  await a.locator('.gy__select').selectOption('3');
+  await a.getByRole('button', { name: '3', exact: true }).click();   // 座位数分段器选 3（共享大厅）
   await a.getByRole('button', { name: '建房', exact: true }).click();
-  const codeEl = a.locator('.gy__code').first();
+  const codeEl = a.locator('.cr-room__code').first();
   await codeEl.waitFor({ timeout: 15000 });
   const code = (await codeEl.innerText()).replace(/[^A-Z0-9]/g, '').slice(0, 6);
   if (!/^[A-Z0-9]{6}$/.test(code)) throw new Error(`房号读不出来：${JSON.stringify(code)}`);

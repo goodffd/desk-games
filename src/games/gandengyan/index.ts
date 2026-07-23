@@ -8,9 +8,12 @@ import type { GameModule } from '../../shell/types';
 import type { Card } from './engine/types';
 import { navigate } from '../../shell/nav';
 import { CardRoomSession } from '../../ui/cardroom/session';
-import { renderLobby, renderNickname, renderRoom, type LobbyRoom, type SeatInfo } from './ui/screens';
+import { renderLobby, renderNickname, renderRoom, type LobbyRoom } from '../../ui/cardroom/screens';
 import { mountTable, type TableState } from './ui/table';
 import './ui/gandengyan.css';
+
+/** 房间/牌桌用到的座位信息（原在 ui/screens.ts；三屏已迁公共层，此处自留一份）。 */
+interface SeatInfo { seat: number; nick: string | null; online: boolean; ai: boolean }
 
 function mount(root: HTMLElement): () => void {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -48,6 +51,9 @@ function mount(root: HTMLElement): () => void {
     clear();
     const h = renderNickname(root, {
       initial: session.nick,
+      brand: '干瞪眼',
+      subtitle: '大一法则：跟牌必须点数正好大一级',
+      placeholder: '起个名字',
       onSubmit: (n) => { session.setNick(n); session.send({ t: 'hello', nick: n }); },
     });
     screen = h;
@@ -60,7 +66,12 @@ function mount(root: HTMLElement): () => void {
     session.clearRoom();          // 在大厅=不在任何房；清凭据，免得下次刷新拿旧房号去撞
     lobbyH = renderLobby(root, {
       nick: session.nick,
-      onCreate: (n) => session.send({ t: 'create', seats: n }),
+      brand: '干瞪眼',
+      seatChoice: [2, 3, 4, 5],
+      defaultSeats: 3,
+      createLabel: '建房',
+      seatNote: '真人没凑齐也能开打，空座由服务端补 AI',
+      onCreate: (o) => session.send({ t: 'create', seats: o.seats }),
       onJoin: (code) => session.send({ t: 'join', code }),
       onSpectate: (code) => session.send({ t: 'spectate', code }),
       onRefresh: () => session.send({ t: 'lobby' }),
@@ -70,16 +81,16 @@ function mount(root: HTMLElement): () => void {
   }
 
   function showRoom(code: string): void {
-    if (roomH) { roomH.update(seats, mySeat, isHost); return; }
+    const st = { seats, you: mySeat, isHost };
+    if (roomH) { roomH.update(st); return; }
     clear();
     roomH = renderRoom(root, {
-      code,
+      code, initial: st, seatCount: seats.length, teams: false,
       onTakeSeat: (seat) => session.send({ t: 'take-seat', seat }),
       onStart: () => session.send({ t: 'start' }),
       onLeave: () => { session.clearRoom(); navigate('/'); },
     });
     screen = roomH;
-    roomH.update(seats, mySeat, isHost);
   }
 
   function ensureTable(): void {

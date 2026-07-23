@@ -72,7 +72,7 @@ async function runSmoke(browser) {
   step('甲：进大厅 → 建房');
   const a = await enterLobby(ctxA, '冒烟甲');
   await a.getByRole('button', { name: '建房邀请' }).click();
-  const codeEl = a.locator('.gd-room__codewrap');
+  const codeEl = a.locator('.cr-room__codewrap');
   await codeEl.waitFor({ timeout: 15000 });
   const code = (await codeEl.innerText()).replace(/[^A-Z0-9]/g, '').slice(0, 6);
   if (!/^[A-Z0-9]{6}$/.test(code)) throw new Error(`房号读不出来，拿到的是 ${JSON.stringify(code)}`);
@@ -81,15 +81,15 @@ async function runSmoke(browser) {
   step('乙：进大厅 → 输房号加入 → 入座');
   const b = await enterLobby(ctxB, '冒烟乙');
   await b.getByPlaceholder('6 位房号').fill(code);
-  await b.locator('.gd-lobby__joinrow button').click();
-  await b.locator('.gd-room__table').waitFor({ timeout: 15000 });
+  await b.locator('.cr-lobby__joinrow button').click();
+  await b.locator('.cr-room__table').waitFor({ timeout: 15000 });
   const take = b.getByRole('button', { name: '＋ 入座' }).first();
   await take.waitFor({ timeout: 15000 });
   await take.click();
   log('乙已入座');
 
   step('甲：确认看得到乙，然后开打');
-  await a.locator('.gd-room__table').getByText('冒烟乙').waitFor({ timeout: 15000 });
+  await a.locator('.cr-room__table').getByText('冒烟乙').waitFor({ timeout: 15000 });
   log('甲看到了乙');
   await a.getByRole('button', { name: '开打' }).click();
 

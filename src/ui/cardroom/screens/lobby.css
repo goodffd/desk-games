@@ -1,0 +1,266 @@
+/* ===== 掼蛋联机 · 前置 UI（昵称 / 大厅 / 房间）绿毡金线主题 =====
+ * 与牌桌(guandan.css)同调：复用 :root 的 --gold / --font-ui / 绿毡渐变，进房到开打无缝衔接。 */
+
+/* 全屏绿毡容器（同牌桌 radial-gradient）+ 内嵌金线晕边 */
+.cr-lobby {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 20px;
+  box-sizing: border-box;
+  background: radial-gradient(ellipse 96% 86% at 50% 40%, #2c6230 0%, #1b431d 56%, #112d12 100%);
+  color: var(--text-light, #e8d9b0);
+  font-family: var(--font-ui, system-ui, sans-serif);
+  overflow: auto;
+}
+/* 四周内描的暗金晕，强化"金线棋牌室"质感，不抢内容（absolute=跟 .cr-lobby 一起旋转） */
+.cr-lobby::before {
+  content: '';
+  position: absolute;
+  inset: 14px;
+  border: 1px solid rgba(201, 168, 76, 0.22);
+  border-radius: 18px;
+  pointer-events: none;
+}
+
+/* 品牌标题区 */
+.cr-lobby__brand { text-align: center; user-select: none; }
+.cr-lobby__title {
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  margin-right: -0.3em; /* 抵消末字 letter-spacing，视觉居中 */
+  color: var(--gold, #c9a84c);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 240, 200, 0.6);
+}
+.cr-lobby__subtitle {
+  margin-top: 8px;
+  font-size: 14px;
+  letter-spacing: 0.22em;
+  margin-right: -0.22em;
+  color: var(--text-dim, #a89070);
+}
+
+/* 金线卡片：暗底 + 双层金边（外实内虚），柔和投影 */
+.cr-lobby__card {
+  position: relative;
+  width: min(330px, 92%);
+  box-sizing: border-box;
+  padding: 18px 22px 20px;
+  background: linear-gradient(180deg, rgba(10, 24, 12, 0.66), rgba(6, 16, 8, 0.72));
+  border: 1px solid var(--gold-dim, #8a6e2a);
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(201, 168, 76, 0.16);
+}
+.cr-lobby__card-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-light, #e8d9b0);
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+/* 输入框 */
+.cr-lobby__field { display: flex; flex-direction: column; gap: 8px; }
+.cr-lobby__label { font-size: 13px; color: var(--text-dim, #a89070); letter-spacing: 0.04em; }
+.cr-lobby__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  font-size: 16px;
+  font-family: inherit;
+  text-align: center;
+  letter-spacing: 0.08em;
+  color: var(--text-light, #e8d9b0);
+  background: rgba(0, 0, 0, 0.34);
+  border: 1px solid var(--gold-dim, #8a6e2a);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.cr-lobby__input::placeholder { color: rgba(168, 144, 112, 0.55); letter-spacing: 0.04em; }
+.cr-lobby__input:focus {
+  border-color: var(--gold, #c9a84c);
+  box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.16);
+}
+
+/* 主按钮：金面暗字（与牌桌「下一局/再来一盘」一脉） */
+.cr-lobby__btn {
+  width: 100%;
+  margin-top: 14px;
+  padding: 11px 16px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  font-family: inherit;
+  color: #1a1208;
+  background: linear-gradient(180deg, #e2c163, #c9a84c 58%, #b08f38);
+  border: none;
+  border-radius: 11px;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 248, 220, 0.55);
+  transition: filter 0.15s, transform 0.05s;
+}
+.cr-lobby__btn:hover { filter: brightness(1.07); }
+.cr-lobby__btn:active { transform: translateY(1px); }
+.cr-lobby__btn:disabled { filter: grayscale(0.55) brightness(0.8); cursor: default; }
+
+/* 次按钮：透明金描边（返回/离开/刷新等） */
+.cr-lobby__btn--ghost {
+  color: var(--text-light, #e8d9b0);
+  background: transparent;
+  border: 1px solid var(--gold-dim, #8a6e2a);
+  box-shadow: none;
+}
+.cr-lobby__btn--ghost:hover { background: rgba(201, 168, 76, 0.12); border-color: var(--gold, #c9a84c); filter: none; }
+
+/* 错误/提示行 */
+.cr-lobby__err {
+  min-height: 14px;
+  margin-top: 8px;
+  font-size: 13px;
+  text-align: center;
+  color: #ec7361;
+  letter-spacing: 0.03em;
+}
+
+/* 前置 UI 含输入框(昵称/房号)，必须跟随手机真实方向——否则被 CSS rotate 后输入法方向对不上、没法打字。
+   横握手机=横屏(owner 要的,键盘也横屏)；竖握=竖屏(键盘竖屏,能正常输入)。牌桌无输入,仍由 guandan.css 竖握转横屏。
+   竖屏窄屏时大厅两栏改上下堆叠，不挤。 */
+@media (orientation: portrait) and (max-width: 720px) {
+  .cr-lobby--page { justify-content: flex-start; }
+  .cr-lobby__cols { flex-direction: column; overflow-y: auto; }
+  .cr-lobby__cols > .cr-lobby__panel:first-child,
+  .cr-lobby__cols > .cr-lobby__panel:last-child { flex: 0 0 auto; }
+  .cr-lobby__roomlist { max-height: 42vh; }
+}
+
+/* ===== 大厅/房间「页」变体：从居中弹窗改为顶部铺开的整页布局 ===== */
+.cr-lobby--page { justify-content: flex-start; align-items: stretch; gap: 12px; padding: 16px 20px; }
+
+.cr-lobby__header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  width: 100%; max-width: 760px; margin: 0 auto;
+}
+.cr-lobby__brand-sm { font-size: 22px; font-weight: 800; letter-spacing: 0.16em; color: var(--gold, #c9a84c); }
+.cr-lobby__hello { font-size: 14px; color: var(--text-dim, #a89070); }
+
+.cr-lobby__cols { display: flex; gap: 14px; flex: 1; min-height: 0; width: 100%; max-width: 760px; margin: 0 auto; }
+.cr-lobby__panel {
+  display: flex; flex-direction: column; min-height: 0;
+  background: linear-gradient(180deg, rgba(10, 24, 12, 0.62), rgba(6, 16, 8, 0.7));
+  border: 1px solid var(--gold-dim, #8a6e2a); border-radius: 13px; padding: 14px 16px;
+  box-shadow: inset 0 0 0 1px rgba(201, 168, 76, 0.14);
+}
+.cr-lobby__cols > .cr-lobby__panel:first-child { flex: 0 0 40%; }
+.cr-lobby__cols > .cr-lobby__panel:last-child { flex: 1; }
+.cr-lobby__panel-title { font-size: 14px; font-weight: 700; color: var(--text-light, #e8d9b0); letter-spacing: 0.04em; margin-bottom: 12px; }
+.cr-lobby__panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.cr-lobby__panel-head .cr-lobby__panel-title { margin-bottom: 0; }
+
+/* 面板内主按钮(建房/匹配)：去掉 base 的 margin-top，改用统一下间距。
+   排除 mini(刷新/加入/观战)——否则那 margin-bottom 让 mini 在 flex 居中里被顶高、跟徽章不齐。 */
+.cr-lobby__panel .cr-lobby__btn:not(.cr-lobby__mini) { margin-top: 0; margin-bottom: 10px; }
+.cr-lobby__match { margin-top: 4px; font-size: 13px; color: var(--gold, #c9a84c); text-align: center; letter-spacing: 0.04em; }
+
+/* 小按钮（刷新/观战）：非满宽 */
+.cr-lobby__mini { width: auto; padding: 6px 12px; font-size: 13px; margin: 0; letter-spacing: 0.04em; }
+
+.cr-lobby__roomlist { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.cr-lobby__room {
+  display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 9px;
+  background: rgba(0, 0, 0, 0.28); border: 1px solid rgba(201, 168, 76, 0.18);
+}
+.cr-lobby__room-code { font-weight: 800; letter-spacing: 0.08em; color: var(--gold, #c9a84c); font-size: 15px; }
+.cr-lobby__room-meta { flex: 1; font-size: 13px; color: var(--text-dim, #a89070); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-lobby__badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; letter-spacing: 0.04em; }
+.cr-lobby__badge--waiting { color: #e8d9b0; background: rgba(201, 168, 76, 0.18); }
+.cr-lobby__badge--playing { color: #1a1208; background: var(--gold, #c9a84c); font-weight: 700; }
+.cr-lobby__empty { margin: auto; padding: 24px 12px; font-size: 13px; color: var(--text-dim, #a89070); text-align: center; line-height: 1.6; }
+
+/* ===== 房间页（十字环桌）===== */
+.cr-room__codewrap { display: flex; align-items: baseline; gap: 8px; cursor: pointer; user-select: none; }
+.cr-room__codelabel { font-size: 13px; color: var(--text-dim, #a89070); }
+.cr-room__code { font-size: 24px; font-weight: 800; letter-spacing: 0.18em; color: var(--gold, #c9a84c); }
+.cr-room__copied { font-size: 12px; color: #7ec77e; transition: opacity 0.3s; }
+
+.cr-room__table {
+  flex: 1; min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  gap: 6px; align-items: center; justify-items: center;
+  width: 100%; max-width: 600px; margin: 0 auto;
+}
+.cr-room__seat--top { grid-column: 2; grid-row: 1; }
+.cr-room__seat--left { grid-column: 1; grid-row: 2; }
+.cr-room__seat--right { grid-column: 3; grid-row: 2; }
+.cr-room__seat--bottom { grid-column: 2; grid-row: 3; }
+.cr-room__center { grid-column: 2; grid-row: 2; }
+/* 角落格：干瞪眼 3/5 座用（掼蛋恒 4 座只走上/下/左/右，从不落到角落 → 像素零回归） */
+.cr-room__seat--tl { grid-column: 1; grid-row: 1; }
+.cr-room__seat--tr { grid-column: 3; grid-row: 1; }
+.cr-room__seat--bl { grid-column: 1; grid-row: 3; }
+.cr-room__seat--br { grid-column: 3; grid-row: 3; }
+
+/* 每个座=「头像+下方文字」一个单元，单元在格子里居中。网格对称 → 中央开打组落在 4 单元中心 */
+.cr-room__seat { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.cr-room__avatar {
+  width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(0, 0, 0, 0.3); border: 2px solid currentColor;
+}
+.cr-room__avatar svg { width: 30px; height: 30px; }
+.cr-room__avatar--team0 { color: #e0b84c; }
+.cr-room__avatar--team1 { color: #5b9bd5; }
+.cr-room__avatar.is-empty { color: #5a6a52; border-style: dashed; }
+.cr-room__seat.is-you .cr-room__avatar { box-shadow: 0 0 0 2px #fff, 0 0 12px 3px rgba(255, 224, 130, 0.7); }
+.cr-room__name { font-size: 14px; color: var(--text-light, #e8d9b0); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-room__take { width: auto; padding: 5px 12px; font-size: 13px; margin: 0; letter-spacing: 0.04em; }
+
+/* 让「开打按钮」本体对齐 4 单元的真实视觉中心(头像+名字像素中点,比格子盒中心低 ~7px)；
+   就座数浮上方、提示浮下方(绝对,不顶按钮)。 */
+.cr-room__center { position: relative; display: flex; align-items: center; justify-content: center; transform: translateY(11px); }
+.cr-room__center-count { position: absolute; bottom: calc(100% + 9px); left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 14px; color: var(--text-dim, #a89070); letter-spacing: 0.04em; }
+/* 开打：人齐了=牌桌「出牌」色(金底暗字)；人没齐=牌桌「不要」色(深绿浅字，不灰化) */
+.cr-room__start {
+  width: auto; padding: 10px 32px; font-size: 16px; margin: 0;
+  background: var(--gold, #c9a84c); color: #1a1208;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32);
+}
+.cr-room__start:disabled { filter: none; cursor: default; background: #14210e; color: var(--text-light, #e8d9b0); }
+.cr-room__hint { position: absolute; top: calc(100% + 7px); left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 12px; color: var(--text-dim, #a89070); }
+
+/* 输房号加入 */
+.cr-lobby__or { margin: 12px 0 8px; font-size: 12px; color: var(--text-dim, #a89070); text-align: center; letter-spacing: 0.04em; }
+.cr-lobby__joinrow { display: flex; gap: 8px; align-items: center; }
+.cr-lobby__joininput { flex: 1; padding: 8px 10px; font-size: 14px; letter-spacing: 0.16em; margin: 0; }
+/* margin:0 覆盖 .cr-lobby__panel .cr-lobby__btn 的 margin-bottom:10px（否则 flex 居中把加入按钮顶高 5px） */
+.cr-lobby__joinrow .cr-lobby__mini { white-space: nowrap; margin: 0; }
+
+/* 联机状态条/提示 toast（掉线·重连·错误） */
+.cr-toast {
+  position: fixed; left: 50%; top: 14px; transform: translateX(-50%); z-index: 9999;
+  background: rgba(10, 24, 12, 0.92); color: var(--text-light, #e8d9b0);
+  border: 1px solid var(--gold-dim, #8a6e2a); padding: 8px 16px; border-radius: 10px;
+  font-size: 14px; font-family: var(--font-ui, system-ui, sans-serif); letter-spacing: 0.03em;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4); pointer-events: none;
+}
+
+/* ===== 座位数分段选择器（干瞪眼建房选 2-5 人；掼蛋不传 seatChoice → 不渲染 → 像素零回归） ===== */
+.cr-lobby__seatchoice { display: flex; gap: 6px; margin-bottom: 10px; }
+.cr-lobby__seatchoice-btn {
+  flex: 1; padding: 8px 0; font-size: 15px; font-family: inherit; font-weight: 700;
+  color: var(--text-light, #e8d9b0); background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--gold-dim, #8a6e2a); border-radius: 9px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.cr-lobby__seatchoice-btn:hover { border-color: var(--gold, #c9a84c); }
+.cr-lobby__seatchoice-btn.is-on {
+  color: #1a1208; background: linear-gradient(180deg, #e2c163, #c9a84c 58%, #b08f38); border-color: transparent;
+}
+.cr-lobby__seatnote { margin: -2px 0 10px; font-size: 12px; color: var(--text-dim, #a89070); letter-spacing: 0.03em; }

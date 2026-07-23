@@ -10,11 +10,11 @@ import { navigate } from '../../shell/nav';
 import { OnlineDriver } from './driver/online-driver';
 import { OnlineSession } from './online/session';
 import { c2s, type LobbyRoom, type SeatInfo } from './online/protocol';
-import './online/ui/lobby.css';
 import { mountTable, primeAudio, setTableHost, setSeatNames, setSpectator } from './ui/view';
-import { renderNickname, type NicknameHandle } from './online/ui/nickname';
-import { renderLobby, type LobbyHandle } from './online/ui/lobby';
-import { renderRoom, type RoomHandle, type RoomState } from './online/ui/room';
+import {
+  renderNickname, renderLobby, renderRoom,
+  type NicknameHandle, type LobbyHandle, type RoomHandle, type RoomState,
+} from '../../ui/cardroom/screens';
 
 /** 掼蛋联机牌局：昵称→大厅(建房/匹配/加入/观战)→房间→牌桌。单人=建房→开打，空座服务端补 AI。 */
 function onlineMount(root: HTMLElement): () => void {
@@ -55,7 +55,7 @@ function onlineMount(root: HTMLElement): () => void {
 
   function toast(text: string): void {
     const t = document.createElement('div');
-    t.className = 'gd-toast';
+    t.className = 'cr-toast';
     t.textContent = text;
     root.appendChild(t);
     window.setTimeout(() => t.remove(), 3800);
@@ -74,7 +74,7 @@ function onlineMount(root: HTMLElement): () => void {
     session.clearRoom(); // 在大厅=不在任何房；清重连凭据，避免下次刷新拿旧房号去 rejoin 死房
     lobbyH = renderLobby(root, {
       nick: session.nick, rooms: [],
-      onCreate: () => session.send(c2s.create(false)),
+      onCreate: (o) => session.send(c2s.create(o.isPrivate ?? false)),
       onMatch: () => { lobbyH?.setMatching(true); session.send(c2s.match()); },
       onJoin: (code) => session.send(c2s.join(code)),
       onSpectate: (code) => session.send(c2s.spectate(code)),
@@ -87,8 +87,8 @@ function onlineMount(root: HTMLElement): () => void {
     if (roomH) { roomH.update(state); return; }
     clearScreen();
     roomH = renderRoom(root, {
-      code, initial: state,
-      onTakeSeat: (s) => session.send(c2s.takeSeat(s)),
+      code, initial: state, seatCount: 4, teams: true,
+      onTakeSeat: (s) => session.send(c2s.takeSeat(s as Seat)),
       onStart: () => session.send(c2s.start()),
       onLeave: () => { session.clearRoom(); navigate('/'); },
     });

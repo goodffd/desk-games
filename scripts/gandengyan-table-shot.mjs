@@ -37,9 +37,9 @@ try {
   await waitForServer();
   browser = await chromium.launch({ channel: 'chrome', headless: true });
   const a = await enter(await browser.newContext({ viewport: { width: 900, height: 900 }, deviceScaleFactor: 2 }), '阿甲');
-  await a.locator('.gy__select').selectOption('3');
+  await a.getByRole('button', { name: '3', exact: true }).click();   // 座位数分段器选 3（共享大厅）
   await a.getByRole('button', { name: '建房', exact: true }).click();
-  const code = (await a.locator('.gy__code').first().innerText()).replace(/[^A-Z0-9]/g, '').slice(0, 6);
+  const code = (await a.locator('.cr-room__code').first().innerText()).replace(/[^A-Z0-9]/g, '').slice(0, 6);
   const b = await enter(await browser.newContext(), '阿乙');
   await b.getByPlaceholder('6 位房号').fill(code);
   await b.getByRole('button', { name: '加入' }).first().click();

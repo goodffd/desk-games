@@ -83,7 +83,7 @@ export function mountTable(root: HTMLElement, api: TableApi): {
   const handEl = el('div', 'gy__hand');
   const actions = el('div', 'gy__actions');
   const playBtn = el('button', 'gy__btn gy__btn--play', '出牌') as HTMLButtonElement;
-  const passBtn = el('button', 'gy__btn', '不要') as HTMLButtonElement;
+  const passBtn = el('button', 'gy__btn gy__btn--pass', '不要') as HTMLButtonElement;
   actions.append(playBtn, passBtn);   // 「再来一局」在结算弹层里，不在这条动作栏
   wrap.append(bar, board, hintEl, chooserEl, handEl, actions);
   root.appendChild(wrap);

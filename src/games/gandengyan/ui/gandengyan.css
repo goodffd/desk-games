@@ -21,7 +21,16 @@
 }
 .gy__btn:hover:not(:disabled), .gy__back:hover { border-color: var(--gold, #c9a84c); }
 .gy__btn:disabled { opacity: .38; cursor: not-allowed; }
-.gy__btn--play { background: linear-gradient(135deg, #2f7a56, #24603f); border-color: #3d8c68; color: #f2fbf6; }
+/* 出牌 / 不要 跟掼蛋对齐：出牌金底暗字、不要深绿实底浅字（实底一眼是块按钮、不糊进绿毡），带阴影立体感 */
+.gy__btn--play { background: var(--gold, #c9a84c); border-color: transparent; color: #1a1208; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,.45); }
+.gy__btn--pass { background: #14210e; border-color: transparent; color: var(--text-light, #e8d9b0); font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,.45); }
+/* 禁用用 filter 变暗不用 opacity（跟掼蛋一致，实底按钮不透出背景） */
+.gy__btn--play:disabled, .gy__btn--pass:disabled { opacity: 1; filter: grayscale(.4) brightness(.62); box-shadow: none; }
+/* hover 只在真能悬停的设备生效，触屏点过不卡在 hover 态 */
+@media (hover: hover) {
+  .gy__btn--play:not(:disabled):hover { filter: brightness(.92); border-color: transparent; }
+  .gy__btn--pass:not(:disabled):hover { background: #1f3318; border-color: transparent; }
+}
 
 /* 牌桌台面：相对定位容器，座位环 + 中央出牌区都在里面 */
 .gy__board {

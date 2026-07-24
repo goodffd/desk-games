@@ -146,4 +146,9 @@
   .gy__actions { position: absolute; left: 0; right: 0; bottom: 8px; z-index: 11; }
   .gy__hint { position: absolute; left: 0; right: 0; bottom: 132px; z-index: 12; margin: 0; }
   .gy__chooser { position: absolute; left: 8px; right: 8px; bottom: 150px; z-index: 12; }
+  /* 结算弹层：旋转后要塞进横屏窄边（≤手机宽），别上下被盖——限尺寸 + 紧凑 + 内容多了可滚 */
+  .gy__result { max-width: 90dvh; max-height: 92dvw; overflow-y: auto; padding: 12px 20px; }
+  .gy__result-rows { gap: 5px; }
+  .gy__result-title { margin-bottom: 8px; }
+  .gy__result-again { margin-top: 10px; }
 }

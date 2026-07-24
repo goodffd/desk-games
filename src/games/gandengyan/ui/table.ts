@@ -1,6 +1,6 @@
 import type { Card, Combo, ComboType, Play, WildAssign } from '../engine/types';
 import { enumerateIdentities } from '../engine/combos';
-import { enumerateLeads } from '../engine/legal';
+import { enumerateLeads, enumerateFollows } from '../engine/legal';
 import { sortHand } from '../engine/cards';
 import { cardFace } from '../../../ui/cards/card-face';
 import type { CardRank, FaceCard } from '../../../ui/cards/types';
@@ -158,6 +158,11 @@ export function mountTable(root: HTMLElement, api: TableApi): {
 
   playBtn.addEventListener('click', attemptPlay);
   passBtn.addEventListener('click', () => { chooserEl.innerHTML = ''; api.onPass(); });
+  // 右键出牌（参考掼蛋）：牌桌上单击右键 = 出牌，仅我回合且已选牌、出牌没禁用时触发；一律屏蔽浏览器右键菜单
+  wrap.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (!playBtn.disabled && selected.size > 0) attemptPlay();
+  });
 
   function render(state: TableState, hand: Card[]): void {
     latest = state;
@@ -241,10 +246,12 @@ export function mountTable(root: HTMLElement, api: TableApi): {
     const over = state.phase === 'dealResult';
     playBtn.style.display = over || !iAmSeat ? 'none' : '';
     passBtn.style.display = over || !iAmSeat ? 'none' : '';
-    // 领出确无合法出牌（手里只剩王）时允许过——服务端会顺延出牌权；跟牌时要得起也能过。
-    const canLead = state.current !== null || enumerateLeads(myHand).length > 0;
-    playBtn.disabled = !myTurn;
-    passBtn.disabled = !myTurn || (state.current === null && canLead);
+    // 手里根本没有能出的一手（跟牌压不住 / 领出只剩王无合法领出）→ 出牌禁用、只能不要（参考掼蛋）。
+    // 领出确无合法出牌时允许过——服务端顺延出牌权；跟牌要得起也能过。
+    const cur = currentCombo();
+    const mustPass = myTurn && (cur === null ? enumerateLeads(myHand).length === 0 : enumerateFollows(myHand, cur).length === 0);
+    playBtn.disabled = !myTurn || mustPass;
+    passBtn.disabled = !myTurn || (state.current === null && !mustPass);
 
     syncTurnTimer(state);   // 座位闹钟已在上面画好，这里播种/启停读秒
   }

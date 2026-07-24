@@ -128,3 +128,22 @@
   min-width: 96px; padding: 10px; border-radius: 10px;
   background: rgba(23,36,29,.7); display: flex; flex-direction: column; gap: 6px; align-items: center;
 }
+
+/* 手机竖握时牌桌转横屏（牌大、桌宽，跟掼蛋一致）。牌桌无输入框可放心 rotate；
+   三屏(.cr-lobby)含昵称/房号输入，跟随真实方向不转（否则输入法方向对不上），由 lobby.css 自理。 */
+@media (orientation: portrait) and (max-width: 920px) {
+  html, body { overflow: hidden; }
+  .gy {
+    position: fixed; top: 50%; left: 50%;
+    width: 100dvh; height: 100dvw; min-height: 0;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center center;
+    padding: 8px 12px 12px;
+  }
+  /* 旋转后高度=手机宽(窄)：手牌/动作栏/歧义选择器改绝对定位叠在台面底部（仿掼蛋），台面才占满高度不被挤扁 */
+  .gy__board { min-height: 0; flex: 1; }
+  .gy__hand { position: absolute; left: 8px; right: 8px; bottom: 42px; min-height: 0; z-index: 10; }
+  .gy__actions { position: absolute; left: 0; right: 0; bottom: 8px; z-index: 11; }
+  .gy__hint { position: absolute; left: 0; right: 0; bottom: 132px; z-index: 12; margin: 0; }
+  .gy__chooser { position: absolute; left: 8px; right: 8px; bottom: 150px; z-index: 12; }
+}

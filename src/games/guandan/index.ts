@@ -11,6 +11,7 @@ import { OnlineDriver } from './driver/online-driver';
 import { OnlineSession } from './online/session';
 import { c2s, type LobbyRoom, type SeatInfo } from './online/protocol';
 import { mountTable, primeAudio, setTableHost, setSeatNames, setSpectator } from './ui/view';
+import { GUANDAN_RULES } from './rules';
 import {
   renderNickname, renderLobby, renderRoom,
   type NicknameHandle, type LobbyHandle, type RoomHandle, type RoomState,
@@ -65,6 +66,7 @@ function onlineMount(root: HTMLElement): () => void {
     clearScreen();
     nickH = renderNickname(root, {
       initial: session.nick,
+      rules: GUANDAN_RULES,
       onSubmit: (n) => { primeAudio(); session.setNick(n); session.send(c2s.hello(n)); },
     });
   }

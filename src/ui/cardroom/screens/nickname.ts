@@ -5,6 +5,7 @@
  */
 import './lobby.css';
 import { el, text } from './types';
+import { rulesLink, type RulesDoc } from './rules';
 
 export interface NicknameOpts {
   /** 预填昵称（localStorage 记忆）。 */
@@ -15,6 +16,8 @@ export interface NicknameOpts {
   subtitle?: string;
   /** 输入框占位符，默认「比如：阿东」。 */
   placeholder?: string;
+  /** 规则介绍：传了就在卡片下显示「📖 规则介绍」链接，点开弹层。 */
+  rules?: RulesDoc;
   /** 点「进入大厅」/回车，昵称非空时回调。 */
   onSubmit: (nick: string) => void;
 }
@@ -58,6 +61,8 @@ export function renderNickname(root: HTMLElement, opts: NicknameOpts): NicknameH
   btn.textContent = '进入大厅';
   card.appendChild(btn);
   wrap.appendChild(card);
+
+  if (opts.rules) wrap.appendChild(rulesLink(opts.brand ?? '掼蛋', opts.rules));   // 卡片下方「📖 规则介绍」
 
   const submit = (): void => {
     const nick = input.value.trim();

@@ -10,6 +10,7 @@ import { navigate } from '../../shell/nav';
 import { CardRoomSession } from '../../ui/cardroom/session';
 import { renderLobby, renderNickname, renderRoom, type LobbyRoom } from '../../ui/cardroom/screens';
 import { mountTable, type TableState } from './ui/table';
+import { GANDENGYAN_RULES } from './rules';
 import './ui/gandengyan.css';
 
 /** 房间/牌桌用到的座位信息（原在 ui/screens.ts；三屏已迁公共层，此处自留一份）。 */
@@ -54,6 +55,7 @@ function mount(root: HTMLElement): () => void {
       brand: '干瞪眼',
       subtitle: '大一法则：跟牌必须点数正好大一级',
       placeholder: '起个名字',
+      rules: GANDENGYAN_RULES,
       onSubmit: (n) => { session.setNick(n); session.send({ t: 'hello', nick: n }); },
     });
     screen = h;

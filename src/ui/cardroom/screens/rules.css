@@ -1,0 +1,43 @@
+/* 规则介绍：入口链接 + 绿毡金线弹层。掼蛋 + 干瞪眼共用。 */
+.cr-rules-link {
+  background: none; border: none; cursor: pointer;
+  color: var(--gold, #c9a84c); font: inherit; font-size: 14px;
+  padding: 10px 8px; margin-top: 6px;
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;
+}
+.cr-rules-link:hover { color: var(--text-light, #e8d9b0); }
+
+.cr-rules {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: rgba(0, 0, 0, .55);
+}
+.cr-rules__panel {
+  width: 100%; max-width: 460px; max-height: 86vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: #14211a; border: 1px solid var(--gold-dim, #8a6e2a); border-radius: 14px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, .5);
+}
+.cr-rules__head {
+  flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+  padding: 13px 18px; border-bottom: 1px solid rgba(201, 168, 76, .22);
+}
+.cr-rules__title { font-size: 17px; font-weight: 700; letter-spacing: .04em; color: var(--gold, #c9a84c); }
+.cr-rules__close {
+  margin-left: auto; background: none; border: none; cursor: pointer;
+  color: var(--text-dim, #a89070); font-size: 26px; line-height: 1; padding: 0 4px;
+}
+.cr-rules__close:hover { color: var(--text-light, #e8d9b0); }
+
+.cr-rules__body { overflow-y: auto; padding: 14px 18px 20px; color: var(--text-light, #e8d9b0); }
+.cr-rules__tagline {
+  color: var(--gold, #c9a84c); font-size: 14px; line-height: 1.5;
+  margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px dashed rgba(201, 168, 76, .2);
+}
+.cr-rules__sec { margin-bottom: 16px; }
+.cr-rules__sec:last-child { margin-bottom: 2px; }
+.cr-rules__h { margin: 0 0 8px; font-size: 15px; font-weight: 700; color: var(--gold, #c9a84c); }
+.cr-rules__rows { display: flex; flex-direction: column; gap: 7px; }
+.cr-rules__row { font-size: 13.5px; line-height: 1.62; }
+.cr-rules__k { font-weight: 700; color: #e4c774; margin-right: 6px; }
+.cr-rules__v { color: var(--text-light, #e8d9b0); }

@@ -109,10 +109,20 @@ export function cardFace(card: FaceCard, opts: CardFaceOptions = {}): HTMLElemen
   return el;
 }
 
-/** 牌底金色药丸：显示这张王被算作几点。只写数字（GDRank 子集含 0-9，不含 '='）。 */
+/**
+ * 牌底金色药丸：显示这张王被算作几点。数字用**跟牌面点数完全同款**的 .dgc-card__rank
+ * （GDRank 字体 + scaleY(1.32) 竖拉，字母/「10」再横向收窄），只把字号缩到药丸大小，
+ * 让药丸里的数字与牌面点数字形一致。
+ */
 function assignPill(rank: CardRank): HTMLElement {
   const pill = document.createElement('div');
   pill.className = 'dgc-card__assign';
-  pill.textContent = rankText(rank);
+  const num = document.createElement('span');
+  const r = rankText(rank);
+  num.className = 'dgc-card__rank';
+  if (/[JQKA]/.test(r)) num.classList.add('dgc-card__rank--alpha');
+  if (r === '10') num.classList.add('dgc-card__rank--ten');
+  num.textContent = r;
+  pill.appendChild(num);
   return pill;
 }

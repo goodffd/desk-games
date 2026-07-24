@@ -180,7 +180,10 @@
 .dgc-card__assign {
   position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%);
   background: linear-gradient(135deg, #e6c667, #c9a84c); color: #3a2a10;
-  font: 700 12px 'GDRank', serif; border-radius: 8px; padding: 1px 7px;
+  border-radius: 8px; padding: 1px 7px; line-height: 1;
   box-shadow: 0 1px 2px rgba(0,0,0,0.4); z-index: 2;
 }
-.dgc-card--small .dgc-card__assign { font-size: 10px; padding: 0 5px; bottom: 2px; }
+/* 药丸里的数字用牌面同款 .dgc-card__rank（GDRank + 竖拉变形），只缩到药丸尺寸 */
+.dgc-card__assign .dgc-card__rank { font-size: 12px; }
+.dgc-card--small .dgc-card__assign { padding: 0 5px; bottom: 2px; }
+.dgc-card--small .dgc-card__assign .dgc-card__rank { font-size: 10px; }

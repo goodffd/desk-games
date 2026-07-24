@@ -93,6 +93,14 @@ export function mountTable(root: HTMLElement, api: TableApi): {
   let latest: TableState | null = null;
   let hintTimer = 0;
 
+  // 回合倒计时（读秒）：客户端每 250ms 走一格，服务端 turnRemainMs 播种、AI 座无 timer 用本地 20s 兜底。
+  const TURN_SECONDS = 20;
+  let timedSeat: number | null = null;
+  let turnStartedAt = 0;
+  let turnTotalSec = TURN_SECONDS;
+  let turnSeeded = false;      // 本回合是否已用服务端剩余播种（首个带 turnRemainMs 的 state 回合号没变，需补播种一次）
+  let turnTick = 0;
+
   /**
    * 座位显示名：有昵称用昵称（真人，含掉线真人）；AI 补位空座——多个 AI 时按服务端座序编号
    * 「AI 1 / AI 2 …」互相区分（所有客户端看到一致），只有一个 AI 就叫「AI」；否则「座N」。
@@ -175,9 +183,13 @@ export function mountTable(root: HTMLElement, api: TableApi): {
       const meta = el('div', 'gy__seat-meta', `${s.count} 张`);
       if (s.disconnected) meta.appendChild(el('span', 'gy__seat-tag', ' 掉线'));  // AI 座名字已是「AI」，不再重复标注
       box.appendChild(meta);
-      // 轮到这一座且是真人回合（AI 无 20s 计时）：座位上显示倒计时小闹钟，等谁一目了然
-      if (s.seat === state.turn && state.phase === 'playing' && state.turnRemainMs != null) {
-        box.appendChild(el('div', 'gy__seat-clock', `⏰ ${Math.ceil(state.turnRemainMs / 1000)}s`));
+      // 轮到这一座：座位上放读秒小闹钟（含 AI 座，AI 无服务端 timer 用本地 20s 兜底）。
+      // 秒数由 paintClock 每 250ms 刷、闹钟图标 CSS 摇摆动画——等谁、还剩几秒一目了然。
+      if (s.seat === state.turn && state.phase === 'playing') {
+        const clock = el('div', 'gy__seat-clock');
+        clock.appendChild(el('span', 'gy__seat-clock-icon', '⏰'));
+        clock.appendChild(el('span', 'gy__seat-clock-sec', ''));
+        box.appendChild(clock);
       }
       // 座位最近出的一手（小牌）
       if (s.lastPlay && s.lastPlay !== 'pass') {
@@ -233,6 +245,39 @@ export function mountTable(root: HTMLElement, api: TableApi): {
     const canLead = state.current !== null || enumerateLeads(myHand).length > 0;
     playBtn.disabled = !myTurn;
     passBtn.disabled = !myTurn || (state.current === null && canLead);
+
+    syncTurnTimer(state);   // 座位闹钟已在上面画好，这里播种/启停读秒
+  }
+
+  /** 回合切换或首个服务端剩余到达时重新播种，并启停每 250ms 的读秒；仿掼蛋 view.ts。 */
+  function syncTurnTimer(state: TableState): void {
+    const active = state.phase === 'playing' ? state.turn : null;
+    const haveServer = active !== null && state.turnRemainMs != null;
+    if (active !== timedSeat || (haveServer && !turnSeeded)) {
+      timedSeat = active;
+      turnStartedAt = performance.now();
+      turnTotalSec = haveServer ? state.turnRemainMs! / 1000 : TURN_SECONDS;  // 服务端权威剩余 / AI 座本地 20s 兜底
+      turnSeeded = haveServer;
+    }
+    if (active === null) {
+      if (turnTick) { window.clearInterval(turnTick); turnTick = 0; }
+      return;
+    }
+    if (!turnTick) turnTick = window.setInterval(paintClock, 250);
+    paintClock();
+  }
+  /** 把当前回合座的闹钟秒数刷成实际剩余（≤5s 转红加急）。查 DOM 取当前那格，render 重建后也不会拿到旧引用。 */
+  function paintClock(): void {
+    if (timedSeat === null || latest?.turn !== timedSeat || latest?.phase !== 'playing') {
+      if (turnTick) { window.clearInterval(turnTick); turnTick = 0; }
+      return;
+    }
+    const remain = Math.max(0, turnTotalSec - (performance.now() - turnStartedAt) / 1000);
+    const clock = seatsEl.querySelector('.gy__seat--turn .gy__seat-clock');
+    if (!clock) return;
+    const sec = clock.querySelector('.gy__seat-clock-sec');
+    if (sec) sec.textContent = `${Math.ceil(remain)}s`;
+    clock.classList.toggle('gy__seat-clock--low', remain <= 5);
   }
 
   /**
@@ -287,6 +332,6 @@ export function mountTable(root: HTMLElement, api: TableApi): {
   return {
     render,
     hint,
-    cleanup(): void { window.clearTimeout(hintTimer); root.innerHTML = ''; },
+    cleanup(): void { window.clearTimeout(hintTimer); if (turnTick) window.clearInterval(turnTick); root.innerHTML = ''; },
   };
 }

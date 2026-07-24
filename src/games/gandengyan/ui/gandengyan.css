@@ -48,8 +48,12 @@
   display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center;
 }
 .gy__board .gy__seat--turn { border-color: var(--gold, #c9a84c); box-shadow: 0 0 0 2px rgba(201,168,76,.3); }
-/* 轮到这一座的真人回合倒计时小闹钟——等谁一目了然 */
-.gy__board .gy__seat-clock { margin-top: 3px; font-size: 13px; font-weight: 700; color: var(--gold, #c9a84c); letter-spacing: .02em; }
+/* 轮到这一座的读秒小闹钟——等谁、还剩几秒一目了然；闹钟图标摇摆动画，≤5s 转红加急（仿掼蛋） */
+.gy__board .gy__seat-clock { margin-top: 3px; display: flex; align-items: center; justify-content: center; gap: 2px; font-size: 13px; font-weight: 700; color: var(--gold, #c9a84c); }
+.gy__board .gy__seat-clock-icon { display: inline-block; font-size: 14px; transform-origin: 50% 12%; animation: gy-clock-ring .7s ease-in-out infinite; }
+@keyframes gy-clock-ring { 0%, 100% { transform: rotate(-15deg); } 50% { transform: rotate(15deg); } }
+.gy__board .gy__seat-clock--low { color: #ec5a3e; }
+.gy__board .gy__seat-clock--low .gy__seat-clock-icon { animation-duration: .28s; }
 .gy__board .gy__seat-name { font-size: 13px; color: var(--text-light, #e8d9b0); }
 .gy__board .gy__seat-meta { font-size: 12px; color: var(--text-dim, #a89070); }
 .gy__board .gy__seat-tag { color: #d9a441; }

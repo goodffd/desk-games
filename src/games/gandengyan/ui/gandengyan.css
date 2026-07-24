@@ -85,7 +85,7 @@
 
 /* 自己的手牌：共享牌面 .dgc-card，一排；选中上浮 */
 .gy__hand { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; min-height: 118px; align-items: flex-end; }
-.gy__hand .dgc-card { cursor: pointer; transition: transform .12s; }
+.gy__hand .dgc-card { cursor: pointer; transition: transform .12s; touch-action: none; }   /* touch-action:none → 手指横向划动连续选牌，不触发页面滚动/缩放 */
 .gy__hand .dgc-card.gy-card--on { transform: translateY(-12px); box-shadow: 0 0 0 2px var(--gold, #c9a84c); }
 
 .gy__actions { display: flex; gap: 12px; justify-content: center; }

@@ -92,6 +92,23 @@ export function mountTable(root: HTMLElement, api: TableApi): {
   let myHand: Card[] = [];
   let latest: TableState | null = null;
   let hintTimer = 0;
+  let dragging = false;   // 滑动选牌进行中
+  let dragMode = true;    // 本次划动目标态：true=选中 / false=取消
+
+  /** 选/弃一张牌：更新集合 + 直接切类，不整屏重渲（保证滑动顺滑；选牌不影响按钮态） */
+  function applyCardSelect(id: number, sel: boolean): void {
+    const ce = handEl.querySelector(`.dgc-card[data-card-id="${id}"]`) as HTMLElement | null;
+    if (sel) { selected.add(id); ce?.classList.add('gy-card--on'); }
+    else { selected.delete(id); ce?.classList.remove('gy-card--on'); }
+  }
+  /** 屏幕坐标下的手牌 id（滑动经过判定，鼠标/触摸通用） */
+  function cardIdAtPoint(x: number, y: number): number | null {
+    const t = document.elementFromPoint(x, y);
+    const card = t && (t as HTMLElement).closest('.dgc-card');
+    if (!card || !handEl.contains(card)) return null;
+    const id = (card as HTMLElement).dataset['cardId'];
+    return id ? Number(id) : null;
+  }
 
   // 回合倒计时（读秒）：客户端每 250ms 走一格，服务端 turnRemainMs 播种、AI 座无 timer 用本地 20s 兜底。
   const TURN_SECONDS = 20;
@@ -163,6 +180,13 @@ export function mountTable(root: HTMLElement, api: TableApi): {
     e.preventDefault();
     if (!playBtn.disabled && selected.size > 0) attemptPlay();
   });
+  // 滑动选牌：手牌区内 pointermove 经过的牌切到同一目标态；任意处松手结束（仿掼蛋，只挂一次，handEl 不随 render 重建）
+  handEl.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const id = cardIdAtPoint(e.clientX, e.clientY);
+    if (id !== null && selected.has(id) !== dragMode) applyCardSelect(id, dragMode);
+  });
+  window.addEventListener('pointerup', () => { dragging = false; });
 
   function render(state: TableState, hand: Card[]): void {
     latest = state;
@@ -236,10 +260,15 @@ export function mountTable(root: HTMLElement, api: TableApi): {
     if (iAmSeat) {
       for (const c of myHand) {
         const face = cardFace(c as FaceCard, { extraClass: selected.has(c.id) ? 'gy-card--on' : undefined });
-        face.addEventListener('click', () => {
-          if (selected.has(c.id)) selected.delete(c.id); else selected.add(c.id);
+        // 滑动选牌起手：按下决定本次划动是"选"还是"取消"，随后 pointermove 经过的牌切到同一态（鼠标/触摸通用）。
+        // 单击=只经过一张牌的退化划动，仍是切换。右键(button 2)留给"右键出牌"，不误切选中。
+        face.addEventListener('pointerdown', (e) => {
+          if ((e as PointerEvent).button !== 0) return;
+          e.preventDefault();               // 防文本选择/触摸滚动
           chooserEl.innerHTML = '';
-          render(state, hand);
+          dragging = true;
+          dragMode = !selected.has(c.id);
+          applyCardSelect(c.id, dragMode);
         });
         handEl.appendChild(face);
       }

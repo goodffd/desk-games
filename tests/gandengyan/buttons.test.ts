@@ -63,7 +63,7 @@ describe('出牌 / 不要 按钮启用（mustPass）', () => {
     const table = mountTable(root, api);
     const hand = [n('S', 3), n('H', 3)];   // 领出一对 3
     table.render(state(hand, null), hand);
-    for (const c of hand) root.querySelector<HTMLElement>(`.gy__hand .dgc-card[data-card-id="${c.id}"]`)!.click();
+    for (const c of hand) root.querySelector<HTMLElement>(`.gy__hand .dgc-card[data-card-id="${c.id}"]`)!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
     root.querySelector<HTMLElement>('.gy')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     expect(plays).toHaveLength(1);
     expect(new Set(plays[0])).toEqual(new Set([hand[0]!.id, hand[1]!.id]));

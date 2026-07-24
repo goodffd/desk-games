@@ -39,7 +39,8 @@ function tableCombo(cs: Card[]): NonNullable<TableState['current']> {
 
 const $ = (root: HTMLElement, sel: string): HTMLElement | null => root.querySelector(sel);
 const $$ = (root: HTMLElement, sel: string): HTMLElement[] => Array.from(root.querySelectorAll<HTMLElement>(sel));
-const clickCard = (root: HTMLElement, id: number): void => { $(root, `.gy__hand .dgc-card[data-card-id="${id}"]`)!.click(); };
+// 选牌现为 pointerdown 起手拖选（不再是 click），单张=退化划动仍切换选中；派发 pointerdown 模拟点选
+const clickCard = (root: HTMLElement, id: number): void => { $(root, `.gy__hand .dgc-card[data-card-id="${id}"]`)!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 })); };
 const clickBtn = (root: HTMLElement, text: string): void => { $$(root, 'button').find((b) => b.textContent === text)!.click(); };
 const chips = (root: HTMLElement): HTMLElement[] => $$(root, '.gy__chooser .gy__chip');
 const chipByName = (root: HTMLElement, name: string): HTMLElement =>

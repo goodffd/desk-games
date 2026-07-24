@@ -5,6 +5,7 @@ import { sortHand } from '../engine/cards';
 import { cardFace } from '../../../ui/cards/card-face';
 import type { CardRank, FaceCard } from '../../../ui/cards/types';
 import { seatRing } from '../../../ui/cards/layout';
+import { VOICE_CLIPS } from './voice-clips';
 import '../../../ui/cards/card-face.css';
 import '../../../ui/cards/joker-img.css';
 import '../../../ui/cards/rank-font.css';
@@ -18,6 +19,66 @@ import './gandengyan.css';
 const COMBO_CN: Record<string, string> = {
   single: '单张', pair: '对子', run: '顺子', pairRun: '连对', bomb: '炸弹', jokerBomb: '王炸',
 };
+
+// ── 报牌语音（豆包2.0 vivi clip，见 scripts/gen-gandengyan-voice.mjs；照搬掼蛋 view.ts 播放实现）──
+/** 报牌点数文字：3..10 自然点数、11/12/14 黑话「钩/圈/尖」、13 读 K、2 权重 15 读「2」。 */
+function rankSpeech(key: number): string {
+  if (key === 15) return '2';                         // 2 的权重是 15（排 A 之上），报「2」
+  const M: Record<number, string> = { 11: '钩', 12: '圈', 13: 'K', 14: '尖' };
+  return M[key] ?? String(key);
+}
+/** 一手牌 → 报牌文本（key 见 voice-clips.ts）。单张/对子按点数，其余按牌型。 */
+function comboSpeech(type: ComboType, key: number): string {
+  switch (type) {
+    case 'single': return rankSpeech(key);
+    case 'pair': return '对' + rankSpeech(key);
+    case 'run': return '顺子';
+    case 'pairRun': return '连对';
+    case 'bomb': return '炸弹';
+    case 'jokerBomb': return '王炸';
+    default: return '';
+  }
+}
+
+const SILENT_CLIP = // 50ms 静音 WAV，用户手势时播一次解锁音频（iOS/WebKit 需真实播放的静音 clip，不能靠 muted+pause）
+  'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
+let gyAudio: HTMLAudioElement | null = null;
+/** 用系统语音兜底（无 clip / clip 被拦截时）。 */
+function speakTTS(text: string): void {
+  try {
+    const synth = window.speechSynthesis; if (!synth) return;
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'zh-CN'; u.rate = 0.97; u.pitch = 1.08;
+    synth.speak(u);
+  } catch { /* 不支持则静默 */ }
+}
+/** 报牌：优先播预生成的豆包 clip；无 clip / 被浏览器拦截则退回系统语音。新报牌打断上一句（最新出牌优先）。 */
+function speak(text: string): void {
+  try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
+  const clip = VOICE_CLIPS[text];
+  if (clip) {
+    try {
+      if (!gyAudio) gyAudio = new Audio();
+      gyAudio.pause();
+      gyAudio.src = clip;
+      gyAudio.currentTime = 0;
+      const p = gyAudio.play();
+      if (p && typeof p.catch === 'function') p.catch(() => speakTTS(text));   // 被拦截 → 系统语音
+      return;
+    } catch { /* 落到系统语音 */ }
+  }
+  speakTTS(text);
+}
+/** 首个用户手势时播一次静音 clip 解锁音频，之后 AI 出牌也能出声（iOS/WebKit 自动播放限制）。 */
+function primeAudio(): void {
+  try {
+    if (!gyAudio) gyAudio = new Audio();
+    gyAudio.src = SILENT_CLIP;
+    const pr = gyAudio.play();
+    if (pr && typeof pr.catch === 'function') pr.catch(() => { /* 被拦截无妨：speak 有系统语音兜底 */ });
+  } catch { /* ignore */ }
+}
 
 export interface SeatView {
   seat: number; count: number; online: boolean; ai: boolean; disconnected?: boolean;
@@ -94,6 +155,25 @@ export function mountTable(root: HTMLElement, api: TableApi): {
   let hintTimer = 0;
   let dragging = false;   // 滑动选牌进行中
   let dragMode = true;    // 本次划动目标态：true=选中 / false=取消
+  let audioPrimed = false;            // 首个用户手势解锁音频（只一次）
+  let prevAnnounceState: TableState | null = null;   // 上一帧状态，用来 diff 出"新出牌/不要"
+  let spokenSig: string | null = null;               // 已报过的当前手牌签名，去重（同一手别重复报）
+
+  // 首个用户手势（点牌/按钮/任意点桌）解锁音频，之后 AI 出牌也能出声
+  wrap.addEventListener('pointerdown', () => { if (!audioPrimed) { audioPrimed = true; primeAudio(); } }, { capture: true });
+
+  /** diff 前后状态报牌：current 变了报牌型/点数；current 没变但轮次推进且那座是 pass 报「不要」。
+   *  首帧（进桌/重连/开局第一帧）只登记不报，避免把进桌前已发生的旧出牌又念一遍。 */
+  function announcePlays(state: TableState): void {
+    const prev = prevAnnounceState;
+    prevAnnounceState = state;
+    if (state.phase !== 'playing') { spokenSig = null; return; }
+    const cur = state.current;
+    const sig = cur ? `${cur.by}#${cur.cards.map((c) => c.id).slice().sort((a, b) => a - b).join(',')}` : null;
+    if (!prev || prev.phase !== 'playing') { spokenSig = sig; return; }   // 首帧/刚开局：只登记
+    if (sig && sig !== spokenSig) { spokenSig = sig; speak(comboSpeech(cur!.type as ComboType, cur!.key)); return; }
+    if (prev.turn !== state.turn && state.seats.find((s) => s.seat === prev.turn)?.lastPlay === 'pass') speak('不要');
+  }
 
   /** 选/弃一张牌：更新集合 + 直接切类，不整屏重渲（保证滑动顺滑；选牌不影响按钮态） */
   function applyCardSelect(id: number, sel: boolean): void {
@@ -189,6 +269,7 @@ export function mountTable(root: HTMLElement, api: TableApi): {
   window.addEventListener('pointerup', () => { dragging = false; });
 
   function render(state: TableState, hand: Card[]): void {
+    announcePlays(state);   // 报牌：diff 前后状态，新出牌/不要出声（同一状态重渲会自动去重）
     latest = state;
     myHand = sortHand(hand);
     const n = state.seats.length;

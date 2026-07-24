@@ -93,9 +93,21 @@ export function mountTable(root: HTMLElement, api: TableApi): {
   let latest: TableState | null = null;
   let hintTimer = 0;
 
-  /** 座位显示名：有昵称用昵称，AI 空座显示「AI」，否则「座N」。render 与结算屏共用。 */
-  const nameOf = (seat: number): string =>
-    api.names[seat] ?? (latest?.seats.find((x) => x.seat === seat)?.ai ? 'AI' : `座${seat}`);
+  /**
+   * 座位显示名：有昵称用昵称（真人，含掉线真人）；AI 补位空座——多个 AI 时按服务端座序编号
+   * 「AI 1 / AI 2 …」互相区分（所有客户端看到一致），只有一个 AI 就叫「AI」；否则「座N」。
+   * render 与结算屏共用。
+   */
+  const nameOf = (seat: number): string => {
+    if (api.names[seat]) return api.names[seat]!;
+    const seatList = latest?.seats ?? [];
+    const s = seatList.find((x) => x.seat === seat);
+    if (s?.ai) {
+      const aiSeats = seatList.filter((x) => x.ai).map((x) => x.seat).sort((a, b) => a - b);
+      return aiSeats.length > 1 ? `AI ${aiSeats.indexOf(seat) + 1}` : 'AI';
+    }
+    return `座${seat}`;
+  };
 
   const hint = (msg: string): void => {
     hintEl.textContent = msg;

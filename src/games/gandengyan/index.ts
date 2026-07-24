@@ -121,7 +121,7 @@ function mount(root: HTMLElement): () => void {
     mySeat = r.you; seats = r.seats;
     if (typeof r.you === 'number') session.saveRoom(r.code, r.you, r.seats[r.you]?.nick ?? session.nick);
     if (r.status === 'waiting') showRoom(r.code);
-    else if (table && lastState) table.render(lastState, myHand);
+    else if (table && lastState) { table.markResync(); table.render(lastState, myHand); }   // 重连回牌桌：抑制下一帧误报旧出牌
   });
   session.on('spectating', (m) => {
     pendingRejoin = false;
@@ -129,7 +129,7 @@ function mount(root: HTMLElement): () => void {
     seats = (m as { seats: (SeatInfo | null)[] }).seats;
     ensureTable();
   });
-  session.on('rejoined', (m) => { pendingRejoin = false; mySeat = (m as { seat: number }).seat; ensureTable(); });
+  session.on('rejoined', (m) => { pendingRejoin = false; mySeat = (m as { seat: number }).seat; ensureTable(); table?.markResync(); });   // 重连成功：下一份 state 只登记基线不报
   session.on('started', () => ensureTable());
   session.on('state', (m) => {
     lastState = m as unknown as TableState;

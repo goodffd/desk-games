@@ -43,6 +43,7 @@ function comboSpeech(type: ComboType, key: number): string {
 const SILENT_CLIP = // 50ms 静音 WAV，用户手势时播一次解锁音频（iOS/WebKit 需真实播放的静音 clip，不能靠 muted+pause）
   'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
 let gyAudio: HTMLAudioElement | null = null;
+let speakToken = 0;   // 每次报牌自增；只有"最新那次"的失败才退系统语音，防旧句倒序/重叠
 /** 用系统语音兜底（无 clip / clip 被拦截时）。 */
 function speakTTS(text: string): void {
   try {
@@ -56,28 +57,33 @@ function speakTTS(text: string): void {
 /** 报牌：优先播预生成的豆包 clip；无 clip / 被浏览器拦截则退回系统语音。新报牌打断上一句（最新出牌优先）。 */
 function speak(text: string): void {
   try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
+  const my = ++speakToken;
   const clip = VOICE_CLIPS[text];
   if (clip) {
     try {
       if (!gyAudio) gyAudio = new Audio();
-      gyAudio.pause();
+      gyAudio.pause();   // 打断上一句：会让上一句未完成的 play() 以 AbortError 拒绝——那不是真失败，别兜底
       gyAudio.src = clip;
       gyAudio.currentTime = 0;
       const p = gyAudio.play();
-      if (p && typeof p.catch === 'function') p.catch(() => speakTTS(text));   // 被拦截 → 系统语音
+      if (p && typeof p.catch === 'function') p.catch((e: unknown) => {
+        if (my !== speakToken) return;                                   // 已被后续报牌取代，闭嘴
+        if (e && (e as { name?: string }).name === 'AbortError') return; // 被 pause/换源打断，非真失败
+        speakTTS(text);                                                  // 真被自动播放策略拦截 → 系统语音
+      });
       return;
     } catch { /* 落到系统语音 */ }
   }
-  speakTTS(text);
+  if (my === speakToken) speakTTS(text);
 }
-/** 首个用户手势时播一次静音 clip 解锁音频，之后 AI 出牌也能出声（iOS/WebKit 自动播放限制）。 */
-function primeAudio(): void {
+/** 首个用户手势时播一次静音 clip 解锁音频。返回播放 promise，成功才算解锁（失败留给下次手势重试）。 */
+function primeAudio(): Promise<void> {
   try {
     if (!gyAudio) gyAudio = new Audio();
     gyAudio.src = SILENT_CLIP;
     const pr = gyAudio.play();
-    if (pr && typeof pr.catch === 'function') pr.catch(() => { /* 被拦截无妨：speak 有系统语音兜底 */ });
-  } catch { /* ignore */ }
+    return pr && typeof pr.then === 'function' ? pr : Promise.resolve();
+  } catch { return Promise.reject(new Error('prime failed')); }
 }
 
 export interface SeatView {
@@ -127,6 +133,7 @@ function playedCard(c: Card, assign: WildAssign[] | undefined, small: boolean): 
 export function mountTable(root: HTMLElement, api: TableApi): {
   render(state: TableState, hand: Card[]): void;
   hint(msg: string): void;
+  markResync(): void;
   cleanup(): void;
 } {
   root.innerHTML = '';
@@ -155,25 +162,35 @@ export function mountTable(root: HTMLElement, api: TableApi): {
   let hintTimer = 0;
   let dragging = false;   // 滑动选牌进行中
   let dragMode = true;    // 本次划动目标态：true=选中 / false=取消
-  let audioPrimed = false;            // 首个用户手势解锁音频（只一次）
+  let audioPrimed = false;            // 音频已解锁（静音 clip 播放成功后才置真，失败留给下次手势重试）
+  let voiceResync = false;            // 重连/rejoin 后置真：下一帧只登记基线不报，避免念断线期间的旧出牌
   let prevAnnounceState: TableState | null = null;   // 上一帧状态，用来 diff 出"新出牌/不要"
   let spokenSig: string | null = null;               // 已报过的当前手牌签名，去重（同一手别重复报）
 
-  // 首个用户手势（点牌/按钮/任意点桌）解锁音频，之后 AI 出牌也能出声
-  wrap.addEventListener('pointerdown', () => { if (!audioPrimed) { audioPrimed = true; primeAudio(); } }, { capture: true });
+  // 首个用户手势解锁音频。乐观标记：先置真，避免连点时多次 primeAudio 互相打断（都 reject → 永不置真 → 疯狂重播静音）。
+  // 只有静音 clip 真被自动播放策略拒绝时才撤销，留给下次手势重试。
+  wrap.addEventListener('pointerdown', () => {
+    if (audioPrimed) return;
+    audioPrimed = true;
+    primeAudio().catch(() => { audioPrimed = false; });
+  }, { capture: true });
 
-  /** diff 前后状态报牌：current 变了报牌型/点数；current 没变但轮次推进且那座是 pass 报「不要」。
-   *  首帧（进桌/重连/开局第一帧）只登记不报，避免把进桌前已发生的旧出牌又念一遍。 */
+  /** diff 前后状态报牌：current 变了报牌型/点数（含结算态里的"最后一手"，那手打包在 dealResult 帧里）；
+   *  current 没变但轮次推进且那座是 pass 报「不要」。首帧 / 重连 / 新局领出前只登记基线不报——
+   *  避免念旧局，或念断线期间已发生的出牌。 */
   function announcePlays(state: TableState): void {
     const prev = prevAnnounceState;
     prevAnnounceState = state;
-    if (state.phase !== 'playing') { spokenSig = null; return; }
     const cur = state.current;
     const sig = cur ? `${cur.by}#${cur.cards.map((c) => c.id).slice().sort((a, b) => a - b).join(',')}` : null;
-    if (!prev || prev.phase !== 'playing') { spokenSig = sig; return; }   // 首帧/刚开局：只登记
-    if (sig && sig !== spokenSig) { spokenSig = sig; speak(comboSpeech(cur!.type as ComboType, cur!.key)); return; }
-    if (prev.turn !== state.turn && state.seats.find((s) => s.seat === prev.turn)?.lastPlay === 'pass') speak('不要');
+    if (voiceResync || !prev) { voiceResync = false; spokenSig = sig; return; }   // 重连/首帧：只登记基线
+    if (!sig) { spokenSig = null; }                                               // 无当前手牌（领出待出/新局）：清签名，下一手必报
+    else if (sig !== spokenSig) { spokenSig = sig; speak(comboSpeech(cur!.type as ComboType, cur!.key)); return; }  // 新出牌（含最后一手）
+    if (state.phase === 'playing' && prev.turn !== state.turn
+        && state.seats.find((s) => s.seat === prev.turn)?.lastPlay === 'pass') speak('不要');   // 有人不要
   }
+  /** 供 index.ts 在重连/rejoin 时调：抑制紧接着那一帧的报牌，只登记基线。 */
+  function markResync(): void { voiceResync = true; }
 
   /** 选/弃一张牌：更新集合 + 直接切类，不整屏重渲（保证滑动顺滑；选牌不影响按钮态） */
   function applyCardSelect(id: number, sel: boolean): void {
@@ -471,6 +488,7 @@ export function mountTable(root: HTMLElement, api: TableApi): {
   return {
     render,
     hint,
+    markResync,
     cleanup(): void { window.clearTimeout(hintTimer); if (turnTick) window.clearInterval(turnTick); root.innerHTML = ''; },
   };
 }

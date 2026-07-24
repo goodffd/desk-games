@@ -1,6 +1,6 @@
 {
-  "count": 39,
-  "digest": "4ef9310f2e3811736a7414884989e0f1d03abe322e01900fe23fd06be7ea1f2f",
+  "count": 40,
+  "digest": "39b7c743a82d329b50cd58ddc9912f3445dccf23f5d7aecd72056426add573b1",
   "rules": [
     "|.X-card--black{ color: var(--black); }",
     "|.X-card--joker-big{ background: linear-gradient(135deg, #fff8f0, #fdeede); }",
@@ -21,6 +21,7 @@
     "|.X-card__assign .X-card__rank{ font-size: 12px; }",
     "|.X-card__assign{ position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%); background: linear-gradient(135deg, #e6c667, #c9a84c); color: #3a2a10; border-radius: 8px; padding: 1px 7px; line-height: 1; box-shadow: 0 1px 2px rgba(0,0,0,0.4); z-index: 2; }",
     "|.X-card__corner{ position: absolute; top: 2px; left: 4px; display: flex; flex-direction: row; /* 手牌：点数+花色横排紧挨（如「A♠」横着） */ align-items: center; gap: 3px; /* 数字↔花色间距 */ line-height: 0.9; z-index: 1; }",
+    "|.X-card__pip.X-suit-D{ transform-origin: 100% 100%; }",
     "|.X-card__pip{ /* 右下角大花色图（填满牌面） */ position: absolute; right: 3px; bottom: 3px; height: 42px; width: auto; }",
     "|.X-card__rank--alpha{ transform: scaleY(1.32) scaleX(0.85); }",
     "|.X-card__rank--ten{ transform: scaleY(1.32) scaleX(0.82); letter-spacing: -0.03em; }",

@@ -85,8 +85,12 @@
 
 /* 自己的手牌：共享牌面 .dgc-card，一排；选中上浮 */
 .gy__hand { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; min-height: 118px; align-items: flex-end; }
-.gy__hand .dgc-card { cursor: pointer; transition: transform .12s; touch-action: none; }   /* touch-action:none → 手指横向划动连续选牌，不触发页面滚动/缩放 */
-.gy__hand .dgc-card.gy-card--on { transform: translateY(-12px); box-shadow: 0 0 0 2px var(--gold, #c9a84c); }
+.gy__hand .dgc-card { cursor: pointer; touch-action: none; }   /* touch-action:none → 手指横向划动连续选牌，不触发页面滚动/缩放 */
+/* 选中：仿掼蛋——不上移/不跳动，整张盖一层灰罩标记，点「出牌」才打出 */
+.gy__hand .dgc-card.gy-card--on::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: rgba(0, 0, 0, .32); pointer-events: none;
+}
 
 .gy__actions { display: flex; gap: 12px; justify-content: center; }
 

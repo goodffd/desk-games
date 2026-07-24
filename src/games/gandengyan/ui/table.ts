@@ -163,6 +163,10 @@ export function mountTable(root: HTMLElement, api: TableApi): {
       const meta = el('div', 'gy__seat-meta', `${s.count} 张`);
       if (s.disconnected) meta.appendChild(el('span', 'gy__seat-tag', ' 掉线'));  // AI 座名字已是「AI」，不再重复标注
       box.appendChild(meta);
+      // 轮到这一座且是真人回合（AI 无 20s 计时）：座位上显示倒计时小闹钟，等谁一目了然
+      if (s.seat === state.turn && state.phase === 'playing' && state.turnRemainMs != null) {
+        box.appendChild(el('div', 'gy__seat-clock', `⏰ ${Math.ceil(state.turnRemainMs / 1000)}s`));
+      }
       // 座位最近出的一手（小牌）
       if (s.lastPlay && s.lastPlay !== 'pass') {
         const lp = el('div', 'gy__seat-play');
@@ -186,9 +190,7 @@ export function mountTable(root: HTMLElement, api: TableApi): {
       } else {
         centerEl.appendChild(el('div', 'gy__cur-by', myTurn ? '轮到你领出' : '等待领出'));
       }
-      if (myTurn && state.turnRemainMs != null) {
-        centerEl.appendChild(el('div', 'gy__clock', `${Math.ceil(state.turnRemainMs / 1000)}s`));
-      }
+      // 倒计时不再放中央，改到「轮到那一座」的座位上（见座位循环的 gy__seat-clock）
     }
 
     // 结算弹层

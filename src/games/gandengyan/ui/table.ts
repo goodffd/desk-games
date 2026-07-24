@@ -212,12 +212,14 @@ export function mountTable(root: HTMLElement, api: TableApi): {
     if (state.phase === 'playing') {
       if (state.current) {
         const c = state.current;
-        centerEl.appendChild(el('div', 'gy__cur-by', `${nameOf(c.by)} 出了 ${COMBO_CN[c.type] ?? c.type}`));
+        // --play：跟牌时的「X 出了 Y」+ 牌。手机端隐藏（座位牌就近显示，中央不再堆牌避免压座位框）。
+        centerEl.appendChild(el('div', 'gy__cur-by gy__cur-by--play', `${nameOf(c.by)} 出了 ${COMBO_CN[c.type] ?? c.type}`));
         const row = el('div', 'gy__cur');
         for (const card of c.cards) row.appendChild(playedCard(card, c.assign, false));
         centerEl.appendChild(row);
       } else {
-        centerEl.appendChild(el('div', 'gy__cur-by', myTurn ? '轮到你领出' : '等待领出'));
+        // --lead：领出提示。此时各座无出牌、桌面空，居中显示不会压谁；手机端保留它做领出/等待指示。
+        centerEl.appendChild(el('div', 'gy__cur-by gy__cur-by--lead', myTurn ? '轮到你领出' : '等待领出'));
       }
       // 倒计时不再放中央，改到「轮到那一座」的座位上（见座位循环的 gy__seat-clock）
     }

@@ -148,6 +148,11 @@
   .gy__actions { position: absolute; left: 0; right: 0; bottom: 8px; z-index: 11; }
   .gy__hint { position: absolute; left: 0; right: 0; bottom: 132px; z-index: 12; margin: 0; }
   .gy__chooser { position: absolute; left: 8px; right: 8px; bottom: 150px; z-index: 12; }
+  /* 窄椭圆垂直向放不下「中央牌堆 + 居中座位（顶/底"我"座）」——手机端仿掼蛋：牌只在各座位就近显示，
+     中央不堆牌、跟牌时也不显示冗余的「X 出了 Y」（座位牌已说明一切），只在领出时留「轮到你领出/等待领出」
+     提示（此刻桌面空、居中不压谁）。我自己的牌压手牌那套透明保留。桌面空间够，中央照旧。 */
+  .gy__cur, .gy__cur-by--play { display: none; }
+  .gy__cur-by--lead { font-size: 13px; background: rgba(12,24,18,.5); padding: 3px 10px; border-radius: 8px; }
   /* 结算弹层：旋转后塞进横屏窄边。flex 纵向——标题/合计/再来一局钉住永远可见，
      只中间明细行超了才滚，绝不把「再来一局」按钮截掉。 */
   .gy__result {

@@ -254,6 +254,24 @@ export function mountTable(root: HTMLElement, api: TableApi): {
     passBtn.disabled = !myTurn || (state.current === null && !mustPass);
 
     syncTurnTimer(state);   // 座位闹钟已在上面画好，这里播种/启停读秒
+    dimOverlappingPlays();  // 已打出的牌若压到手牌区就调透明，别挡着选牌（owner 要的）
+  }
+
+  /**
+   * 已打出的牌（中央桌面牌 + 各座最近出牌）若几何上压到手牌区，就把它调半透明——留着显示、又不挡选牌。
+   * 逐张矩形实质相交(两向≥12px)才算压到，边缘相切不算。需真实布局(getBoundingClientRect)，jsdom 下全 0 不触发，无害。
+   */
+  function dimOverlappingPlays(): void {
+    const hr = handEl.getBoundingClientRect();
+    if (hr.width === 0 && hr.height === 0) return;   // 未布局(jsdom)/无手牌
+    const covers = (elx: Element): boolean => {
+      const r = elx.getBoundingClientRect();
+      const ix = Math.min(r.right, hr.right) - Math.max(r.left, hr.left);
+      const iy = Math.min(r.bottom, hr.bottom) - Math.max(r.top, hr.top);
+      return ix >= 12 && iy >= 12;
+    };
+    const plays = [centerEl.querySelector('.gy__cur'), ...Array.from(seatsEl.querySelectorAll('.gy__seat-play'))];
+    for (const p of plays) if (p) p.classList.toggle('gy__play--covered', covers(p));
   }
 
   /** 回合切换或首个服务端剩余到达时重新播种，并启停每 250ms 的读秒；仿掼蛋 view.ts。 */

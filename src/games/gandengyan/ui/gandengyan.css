@@ -67,6 +67,8 @@
 }
 .gy__cur-by { color: var(--text-dim, #a89070); font-size: 13px; }
 .gy__cur { display: flex; gap: 5px; }
+/* 已打出的牌压到手牌区 → 调透明（留着显示又不挡选牌，owner 要的效果） */
+.gy__play--covered { opacity: .4; transition: opacity .18s; }
 .gy__clock { color: var(--gold, #c9a84c); font-size: 15px; font-weight: 700; }
 
 /* 提示 + 歧义选择器 */
@@ -146,9 +148,14 @@
   .gy__actions { position: absolute; left: 0; right: 0; bottom: 8px; z-index: 11; }
   .gy__hint { position: absolute; left: 0; right: 0; bottom: 132px; z-index: 12; margin: 0; }
   .gy__chooser { position: absolute; left: 8px; right: 8px; bottom: 150px; z-index: 12; }
-  /* 结算弹层：旋转后要塞进横屏窄边（≤手机宽），别上下被盖——限尺寸 + 紧凑 + 内容多了可滚 */
-  .gy__result { max-width: 90dvh; max-height: 92dvw; overflow-y: auto; padding: 12px 20px; }
-  .gy__result-rows { gap: 5px; }
-  .gy__result-title { margin-bottom: 8px; }
-  .gy__result-again { margin-top: 10px; }
+  /* 结算弹层：旋转后塞进横屏窄边。flex 纵向——标题/合计/再来一局钉住永远可见，
+     只中间明细行超了才滚，绝不把「再来一局」按钮截掉。 */
+  .gy__result {
+    display: flex; flex-direction: column; overflow: hidden;
+    max-width: 90dvh; max-height: 90dvw; padding: 12px 20px;
+  }
+  .gy__result-title { flex-shrink: 0; margin-bottom: 6px; }
+  .gy__result-rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; gap: 5px; }
+  .gy__result-sum { flex-shrink: 0; }
+  .gy__result-again { flex-shrink: 0; margin-top: 8px; }
 }

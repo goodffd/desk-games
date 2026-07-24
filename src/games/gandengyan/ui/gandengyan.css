@@ -143,8 +143,8 @@
     padding: 8px 12px 12px;
   }
   /* 旋转后高度=手机宽(窄)：手牌/动作栏/歧义选择器改绝对定位叠在台面底部（仿掼蛋），台面才占满高度不被挤扁 */
-  .gy__board { min-height: 0; flex: 1; margin-bottom: 96px; }   /* 底部给手牌留空间，台面上移，你那座不被手牌挡 */
-  .gy__hand { position: absolute; left: 8px; right: 8px; bottom: 42px; min-height: 0; z-index: 10; }
+  .gy__board { min-height: 0; flex: 1; margin-bottom: 110px; }   /* 底部让出「按钮+手牌+间隙」的空间，台面上移，你那座不被手牌挡 */
+  .gy__hand { position: absolute; left: 8px; right: 8px; bottom: 52px; min-height: 0; z-index: 10; }  /* 上移到按钮之上留 8px 间隙，不再压按钮 */
   .gy__actions { position: absolute; left: 0; right: 0; bottom: 8px; z-index: 11; }
   .gy__hint { position: absolute; left: 0; right: 0; bottom: 132px; z-index: 12; margin: 0; }
   .gy__chooser { position: absolute; left: 8px; right: 8px; bottom: 150px; z-index: 12; }

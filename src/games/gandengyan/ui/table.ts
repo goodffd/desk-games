@@ -180,7 +180,7 @@ export function mountTable(root: HTMLElement, api: TableApi): {
     for (const s of state.seats) {
       const v = ((s.seat - mine) % n + n) % n;
       const anchor = ring[v]!;
-      const box = el('div', `gy__seat gy__seat--${anchor.edge}${s.seat === state.turn && state.phase === 'playing' ? ' gy__seat--turn' : ''}`);
+      const box = el('div', `gy__seat gy__seat--${anchor.edge}${s.seat === state.turn && state.phase === 'playing' ? ' gy__seat--turn' : ''}${s.seat === mine && iAmSeat ? ' gy__seat--me' : ''}`);
       box.style.left = `${anchor.leftPct}%`;
       box.style.top = `${anchor.topPct}%`;
       const who = nameOf(s.seat);
@@ -258,8 +258,10 @@ export function mountTable(root: HTMLElement, api: TableApi): {
   }
 
   /**
-   * 已打出的牌（中央桌面牌 + 各座最近出牌）若几何上压到手牌区，就把它调半透明——留着显示、又不挡选牌。
-   * 逐张矩形实质相交(两向≥12px)才算压到，边缘相切不算。需真实布局(getBoundingClientRect)，jsdom 下全 0 不触发，无害。
+   * **只**把我自己座位打出的牌，在它几何压到手牌区时调半透明——留着显示、又不挡选牌。
+   * 只有我自己的出牌框才紧挨我的手牌；别家（含对面 AI）的出牌离我手牌远，绝不能因为蹭到手牌那条竖长
+   * bbox 就跟着透明（owner 反馈：对面 AI「出了单张」也变透明了）。故只查 .gy__seat--me .gy__seat-play，
+   * 不碰中央桌面牌与别家座位。逐张矩形实质相交(两向≥12px)才算压到。需真实布局，jsdom 下全 0 不触发，无害。
    */
   function dimOverlappingPlays(): void {
     const hr = handEl.getBoundingClientRect();
@@ -270,8 +272,8 @@ export function mountTable(root: HTMLElement, api: TableApi): {
       const iy = Math.min(r.bottom, hr.bottom) - Math.max(r.top, hr.top);
       return ix >= 12 && iy >= 12;
     };
-    const plays = [centerEl.querySelector('.gy__cur'), ...Array.from(seatsEl.querySelectorAll('.gy__seat-play'))];
-    for (const p of plays) if (p) p.classList.toggle('gy__play--covered', covers(p));
+    for (const p of Array.from(seatsEl.querySelectorAll('.gy__seat--me .gy__seat-play')))
+      p.classList.toggle('gy__play--covered', covers(p));
   }
 
   /** 回合切换或首个服务端剩余到达时重新播种，并启停每 250ms 的读秒；仿掼蛋 view.ts。 */

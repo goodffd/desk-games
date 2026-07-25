@@ -93,14 +93,21 @@ function speakTTS(text: string): void {
  *  gdSpeakEndAt = 本句预计结束时间戳，AI 出牌据此等本句报牌播完再出，避免被打断截断。 */
 let gdAudio: HTMLAudioElement | null = null;
 let gdSpeakEndAt = 0;
+// 每次报牌自增。`gdAudio.pause()` 打断上一句时，上一句**尚未开始播放**的 play() 会以 AbortError 拒绝；
+// 老写法在 catch 里不分因由一律兜底，于是把「旧句」用系统语音重念一遍压在新 clip 上（真 Chrome 实测已复现）。
+// 窗口窄：play() 一开始播就 resolve，只有"还没起播就被顶掉"那几毫秒才中招。掼蛋一个 state 只报一句、
+// 服务端 AI 还有思考延时，真实对局里逼不出来（实测 53 次 clip 播放 / 0 次 AbortError）——
+// 所以这是**加固**，不是已发生的用户可见故障。干瞪眼 table.ts 是同款守卫。
+let gdSpeakToken = 0;
 function speak(text: string): void {
   try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
+  const my = ++gdSpeakToken;
   const now = performance.now();
   const clip = VOICE_CLIPS[text];
   if (clip) {
     try {
       if (!gdAudio) gdAudio = new Audio();
-      gdAudio.pause();
+      gdAudio.pause();   // 打断上一句：会让上一句未完成的 play() 以 AbortError 拒绝——那不是真失败，别兜底
       gdSpeakEndAt = now + 1300; // 保守估计，metadata 就绪后按真实时长校准
       gdAudio.onloadedmetadata = (): void => {
         const d = gdAudio?.duration ?? 0;
@@ -110,7 +117,11 @@ function speak(text: string): void {
       gdAudio.src = clip;
       gdAudio.currentTime = 0;
       const p = gdAudio.play();
-      if (p && typeof p.catch === 'function') p.catch(() => { gdSpeakEndAt = 0; speakTTS(text); }); // 被拦截 → 系统语音
+      if (p && typeof p.catch === 'function') p.catch((e: unknown) => {
+        if (my !== gdSpeakToken) return;                                 // 已被后续报牌取代：别退系统语音，更别清掉新句的 gdSpeakEndAt
+        if (e && (e as { name?: string }).name === 'AbortError') return; // 被 pause/换源打断，非真失败
+        gdSpeakEndAt = 0; speakTTS(text);                                // 真被自动播放策略拦截 → 系统语音
+      });
       return;
     } catch { gdSpeakEndAt = 0; /* 落到系统语音 */ }
   }

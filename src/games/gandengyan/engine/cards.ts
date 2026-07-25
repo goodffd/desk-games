@@ -79,7 +79,25 @@ export function sortValue(c: Card): number {
   return power(c.rank);
 }
 
+/** 同点数时的花色次序（左→右）：黑桃 → 红心 → 梅花 → 方块。王无花色，排在同点数末尾。纯显示。 */
+const SUIT_ORDER: Record<Suit, number> = { S: 0, H: 1, C: 2, D: 3 };
+function suitOrder(c: Card): number { return c.kind === 'joker' ? 4 : SUIT_ORDER[c.suit]; }
+
+/**
+ * 显示排序：先点数小→大（2 在 A 之上、王更上），同点数按黑桃→红心→梅花→方块。返回新数组。
+ *
+ * `assignOf` 只给出牌区用：当 6 使的王要站进 5 与 7 中间，不能按"王最大"甩到末尾。
+ * 手牌没有指派，不传即可。**只管显示**——牌型的关键点数走 `combos.ts`，别拿这个比大小。
+ */
+export function sortForDisplay(cards: readonly Card[], assignOf?: (c: Card) => Rank | null): Card[] {
+  const key = (c: Card): number => {
+    const as = c.kind === 'joker' ? assignOf?.(c) ?? null : null;
+    return as != null ? power(as) : sortValue(c);
+  };
+  return [...cards].sort((a, b) => key(a) - key(b) || suitOrder(a) - suitOrder(b));
+}
+
 /** 手牌升序排列，返回新数组，不动原来的。 */
 export function sortHand(cards: readonly Card[]): Card[] {
-  return [...cards].sort((a, b) => sortValue(a) - sortValue(b));
+  return sortForDisplay(cards);
 }

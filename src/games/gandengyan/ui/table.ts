@@ -1,7 +1,7 @@
 import type { Card, Combo, ComboType, Play, WildAssign } from '../engine/types';
 import { enumerateIdentities } from '../engine/combos';
 import { enumerateLeads, enumerateFollows } from '../engine/legal';
-import { sortHand } from '../engine/cards';
+import { sortHand, sortForDisplay } from '../engine/cards';
 import { cardFace } from '../../../ui/cards/card-face';
 import type { CardRank, FaceCard } from '../../../ui/cards/types';
 import { seatRing } from '../../../ui/cards/layout';
@@ -124,10 +124,14 @@ function el(tag: string, cls: string, text?: string): HTMLElement {
   if (text !== undefined) e.textContent = text;
   return e;
 }
-/** 一张出过的牌的元素：王带上被指派的点数（药丸），别人才看得懂桌面 */
+/** 一张出过的牌的元素：王带上被指派的点数，别人才看得懂桌面 */
 function playedCard(c: Card, assign: WildAssign[] | undefined, small: boolean): HTMLElement {
   const a = assign?.find((x) => x.jokerId === c.id);
   return cardFace(c as FaceCard, { small, assignedRank: (a?.rank ?? null) as CardRank | null });
+}
+/** 出牌区显示序：与手牌同一套（点数小→大、同点数黑桃→红心→梅花→方块），王按被指派的点数入序。 */
+function shownOrder(cards: readonly Card[], assign: WildAssign[] | undefined): Card[] {
+  return sortForDisplay(cards, (c) => assign?.find((a) => a.jokerId === c.id)?.rank ?? null);
 }
 
 export function mountTable(root: HTMLElement, api: TableApi): {
@@ -321,7 +325,8 @@ export function mountTable(root: HTMLElement, api: TableApi): {
       // 座位最近出的一手（小牌）
       if (s.lastPlay && s.lastPlay !== 'pass') {
         const lp = el('div', 'gy__seat-play');
-        for (const c of s.lastPlay.cards) lp.appendChild(playedCard(c, s.lastPlay.assign, true));
+        const assign = s.lastPlay.assign;
+        for (const c of shownOrder(s.lastPlay.cards, assign)) lp.appendChild(playedCard(c, assign, true));
         box.appendChild(lp);
       } else if (s.lastPlay === 'pass') {
         box.appendChild(el('div', 'gy__seat-pass', '不要'));
@@ -337,7 +342,7 @@ export function mountTable(root: HTMLElement, api: TableApi): {
         // --play：跟牌时的「X 出了 Y」+ 牌。手机端隐藏（座位牌就近显示，中央不再堆牌避免压座位框）。
         centerEl.appendChild(el('div', 'gy__cur-by gy__cur-by--play', `${nameOf(c.by)} 出了 ${COMBO_CN[c.type] ?? c.type}`));
         const row = el('div', 'gy__cur');
-        for (const card of c.cards) row.appendChild(playedCard(card, c.assign, false));
+        for (const card of shownOrder(c.cards, c.assign)) row.appendChild(playedCard(card, c.assign, false));
         centerEl.appendChild(row);
       } else {
         // --lead：领出提示。此时各座无出牌、桌面空，居中显示不会压谁；手机端保留它做领出/等待指示。

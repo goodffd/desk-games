@@ -45,8 +45,19 @@ function sortValue(c) {
   if (c.kind === "joker") return c.big ? 17 : 16;
   return power(c.rank);
 }
+var SUIT_ORDER = { S: 0, H: 1, C: 2, D: 3 };
+function suitOrder(c) {
+  return c.kind === "joker" ? 4 : SUIT_ORDER[c.suit];
+}
+function sortForDisplay(cards, assignOf) {
+  const key = (c) => {
+    const as = c.kind === "joker" ? assignOf?.(c) ?? null : null;
+    return as != null ? power(as) : sortValue(c);
+  };
+  return [...cards].sort((a, b) => key(a) - key(b) || suitOrder(a) - suitOrder(b));
+}
 function sortHand(cards) {
-  return [...cards].sort((a, b) => sortValue(a) - sortValue(b));
+  return sortForDisplay(cards);
 }
 
 // src/games/gandengyan/engine/combos.ts

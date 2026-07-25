@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeDeck, dealHands, firstDealer, nextDealer, sortHand } from '../../src/games/gandengyan/engine/cards';
+import { makeDeck, dealHands, firstDealer, nextDealer, sortHand, sortForDisplay } from '../../src/games/gandengyan/engine/cards';
 import { seededShuffle } from '../helpers/rng';
 import { cards } from './mk';
 
@@ -105,5 +105,33 @@ describe('sortHand — 手牌排序：2 排在 A 之上，王排最后', () => {
     const before = hand.map((c) => c.id);
     sortHand(hand);
     expect(hand.map((c) => c.id)).toEqual(before);
+  });
+
+  it('同点数按 黑桃 → 红心 → 梅花 → 方块（左→右）', () => {
+    // 故意打乱着传进去，出来必须是 S H C D
+    const sorted = sortHand(cards('D7 C7 H7 S7'));
+    expect(sorted.map((c) => (c.kind === 'joker' ? 'j' : c.suit))).toEqual(['S', 'H', 'C', 'D']);
+  });
+
+  it('点数优先于花色：方块 5 仍排在黑桃 7 前面', () => {
+    const sorted = sortHand(cards('S7 D5'));
+    expect(sorted.map((c) => (c.kind === 'joker' ? 'j' : `${c.suit}${c.rank}`))).toEqual(['D5', 'S7']);
+  });
+});
+
+describe('sortForDisplay — 出牌区：王按被指派的点数入序', () => {
+  it('当 6 使的王站进 5 与 7 中间，不被甩到末尾', () => {
+    const hand = cards('S5 S7');
+    const joker = cards('jB')[0]!;
+    const play = [hand[1]!, joker, hand[0]!];   // 乱序传入：7、王、5
+    const shown = sortForDisplay(play, (c) => (c.kind === 'joker' ? 6 : null));
+    expect(shown.map((c) => (c.kind === 'joker' ? '王(=6)' : `${c.suit}${c.rank}`)))
+      .toEqual(['S5', '王(=6)', 'S7']);
+  });
+
+  it('不传 assignOf 时王仍按"最大"排最后（手牌用法不变）', () => {
+    const shown = sortForDisplay(cards('jB S5 S7'));
+    expect(shown.map((c) => (c.kind === 'joker' ? '王' : `${c.suit}${c.rank}`)))
+      .toEqual(['S5', 'S7', '王']);
   });
 });

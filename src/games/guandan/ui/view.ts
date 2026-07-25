@@ -365,7 +365,9 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     const elx = playEls[seat]!;
     elx.innerHTML = '';
     // 最近出牌的人浮到手牌区之上(z 7>手牌6)，其余各家沉到手牌区之下(z 3<手牌6) → 只挡当前这手，不挡选牌
-    elx.style.zIndex = seat === lastActor ? '7' : '3';
+    // 别家最新那手浮到手牌之上(z7>手牌6)，看得见人家出了什么；**我自己出的牌不浮**——
+    // 我知道自己出了什么，让手牌盖住它就行（owner 拍板：手牌盖住出的牌，不是把出的牌调透明）。
+    elx.style.zIndex = (seat === lastActor && seat !== HUMAN_SEAT) ? '7' : '3';
     const lp = lastPlays[seat];
     if (lp === null) { elx.classList.remove('has-play'); return; }
     elx.classList.add('has-play');
@@ -515,16 +517,14 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     // 手牌与出牌区的层叠/透明。**淡谁，看牌是谁出的**（仿干瞪眼：淡的是出的牌，不是手牌）：
     // · 轮到我出牌：手牌浮到 z7 之上(gd-hand--ontop)，把压住我手牌的别家牌盖回去 → 手牌完整不透明、好选牌；
     // · 别家的牌压住我手牌：淡手牌到 45%，让别家出的牌/「不要」凸显——这是这条逻辑的本意；
-    // · **我自己**的牌压住我手牌：淡我自己出的那手牌，手牌保持实的。淡手牌是反的——我知道自己出了什么，
-    //   却把整手牌洗白；而且我出的牌在别家跟牌后会沉到手牌之下(z3<z6)，手牌一淡它就从底下透出来，
-    //   看着像「出的牌也透明了」。这条同时收掉那个artifact。
+    // · **我自己**的牌压住我手牌：什么都不淡。我知道自己出了什么，手牌盖住它即可（我的出牌区恒 z3，
+    //   在手牌之下）。淡手牌是反的——会把整手牌洗白，且我的牌从半透明手牌底下透出来。
     // 90° 旋转下各元素包围盒仍是正交矩形，元素间矩形相交判断准确。
     const live = started && !isDealOver(state);
     const myTurn = live && state.turn === HUMAN_SEAT;
     const othersCover = lastActor !== null && lastActor !== HUMAN_SEAT && playCoversHand(lastActor);
     handEl.classList.toggle('gd-hand--ontop', myTurn);
     handEl.classList.toggle('gd-hand--dim', !myTurn && live && othersCover);
-    playEls[HUMAN_SEAT]!.classList.toggle('gd-play--covered', live && playCoversHand(HUMAN_SEAT));
   }
 
   // ── 出牌（牌局推进在服务端，经 driver；view 只取选中牌、转 driver） ──

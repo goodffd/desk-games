@@ -176,7 +176,10 @@
   .dgc-joker-word { font-size: 0.40rem; top: 3px; left: 2px; }
   .dgc-card--small .dgc-joker-word { font-size: 0.36rem; }
   .dgc-card--small .dgc-card__suit--wild { font-size: 0.46rem; }
+  /* 手机上 JOKER 字更窄，指派点数跟着左移贴回去 */
+  .dgc-card__assign { left: 10px; }
   .dgc-card__assign .dgc-card__rank { font-size: 0.68rem; }
+  .dgc-card--small .dgc-card__assign { left: 8px; }
   .dgc-card--small .dgc-card__assign .dgc-card__rank { font-size: 0.56rem; }
 }
 
@@ -184,10 +187,10 @@
    直接把点数写成金色，摆在 JOKER 字旁、小丑图上方。白描边保证压到帽檐时仍读得出。
    数字用牌面同款 .dgc-card__rank（GDRank + 竖拉变形），只缩字号。 */
 .dgc-card__assign {
-  position: absolute; top: 1px; right: 5px;
+  position: absolute; top: 1px; left: 19px;   /* 紧挨竖排 JOKER 右侧，留一点缝不贴字 */
   color: var(--gold); line-height: 1; z-index: 2;
   text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 1px #fff;
 }
 .dgc-card__assign .dgc-card__rank { font-size: 0.95rem; }
-.dgc-card--small .dgc-card__assign { right: 3px; }
+.dgc-card--small .dgc-card__assign { left: 12px; }
 .dgc-card--small .dgc-card__assign .dgc-card__rank { font-size: 0.8rem; }

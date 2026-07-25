@@ -55,7 +55,7 @@ export interface CardFaceOptions {
    */
   cornerBadge?: { text: string; className?: string } | null;
   /**
-   * 「这张牌当前被算作某点数」——干瞪眼的王。渲染成牌底金色药丸。掼蛋恒 null。
+   * 「这张牌当前被算作某点数」——干瞪眼的王。渲染成金色点数，摆在 JOKER 字旁、小丑图上方。掼蛋恒 null。
    */
   assignedRank?: CardRank | null;
   /** 游戏侧钩子，如 gy-card--dead */
@@ -72,7 +72,7 @@ export function cardFace(card: FaceCard, opts: CardFaceOptions = {}): HTMLElemen
   if (card.kind === 'joker') {
     el.classList.add('dgc-card--joker', card.big ? 'dgc-card--joker-big' : 'dgc-card--joker-small');
     el.innerHTML = jokerInner(card.big);
-    if (opts.assignedRank != null) el.appendChild(assignPill(opts.assignedRank));
+    if (opts.assignedRank != null) el.appendChild(assignMark(opts.assignedRank));
     el.dataset['cardId'] = String(card.id);
     return el;
   }
@@ -103,26 +103,26 @@ export function cardFace(card: FaceCard, opts: CardFaceOptions = {}): HTMLElemen
   // 右下角大花色（途游式：左上角标 + 右下大花色填满整张牌）
   el.appendChild(suitImg(card.suit, 'dgc-card__pip'));
 
-  if (opts.assignedRank != null) el.appendChild(assignPill(opts.assignedRank));
+  if (opts.assignedRank != null) el.appendChild(assignMark(opts.assignedRank));
 
   el.dataset['cardId'] = String(card.id);
   return el;
 }
 
 /**
- * 牌底金色药丸：显示这张王被算作几点。数字用**跟牌面点数完全同款**的 .dgc-card__rank
- * （GDRank 字体 + scaleY(1.32) 竖拉，字母/「10」再横向收窄），只把字号缩到药丸大小，
- * 让药丸里的数字与牌面点数字形一致。
+ * 金色点数：显示这张王被算作几点，摆在 JOKER 字旁、小丑图上方（样式见 card-face.css，
+ * 仿掼蛋逢人配的金「配」，无底色）。数字用**跟牌面点数完全同款**的 .dgc-card__rank
+ * （GDRank 字体 + scaleY(1.32) 竖拉，字母/「10」再横向收窄），只缩字号，字形与牌面一致。
  */
-function assignPill(rank: CardRank): HTMLElement {
-  const pill = document.createElement('div');
-  pill.className = 'dgc-card__assign';
+function assignMark(rank: CardRank): HTMLElement {
+  const mark = document.createElement('div');
+  mark.className = 'dgc-card__assign';
   const num = document.createElement('span');
   const r = rankText(rank);
   num.className = 'dgc-card__rank';
   if (/[JQKA]/.test(r)) num.classList.add('dgc-card__rank--alpha');
   if (r === '10') num.classList.add('dgc-card__rank--ten');
   num.textContent = r;
-  pill.appendChild(num);
-  return pill;
+  mark.appendChild(num);
+  return mark;
 }

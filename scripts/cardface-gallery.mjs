@@ -34,7 +34,8 @@ row('方块', [4,6,10,13].map(r=>N('D',r)));
 row('梅花', [2,8,11,14].map(r=>N('C',r)));
 row('大小王', [cardFace({kind:'joker',big:true,id:1}), cardFace({kind:'joker',big:false,id:2})]);
 row('逢人配', [cardFace({kind:'normal',suit:'H',rank:2,id:3},{cornerBadge:{text:'配',className:'dgc-card__suit--wild'}})]);
-row('王带指派', [cardFace({kind:'joker',big:true,id:4},{assignedRank:6}), cardFace({kind:'joker',big:false,id:5},{assignedRank:13})]);
+row('王带指派', [cardFace({kind:'joker',big:true,id:4},{assignedRank:6}), cardFace({kind:'joker',big:false,id:5},{assignedRank:13}), cardFace({kind:'joker',big:true,id:6},{assignedRank:10}), cardFace({kind:'joker',big:false,id:7},{assignedRank:14})]);
+row('指派·小牌', [cardFace({kind:'joker',big:true,id:14},{assignedRank:6,small:true}), cardFace({kind:'joker',big:false,id:15},{assignedRank:13,small:true}), cardFace({kind:'joker',big:true,id:16},{assignedRank:10,small:true})]);
 const sm = (suit,rank) => cardFace({kind:'normal',suit,rank,id:Math.random()},{small:true});
 row('出牌区小牌', [sm('S',14), sm('H',13), sm('C',10), cardFace({kind:'joker',big:true,id:9},{small:true})]);
 document.body.appendChild(wrap);
@@ -49,9 +50,8 @@ const out = await build({
 const css = [
   'src/ui/theme.css', 'src/ui/cards/card-face.css', 'src/ui/cards/joker-img.css', 'src/ui/cards/rank-font.css',
 ].map((f) => readFileSync(join(ROOT, f), 'utf8')).join('\n');
-// #20 的药丸样式还没进 card-face.css，这里临时给个样式好看指派效果
-const pill = `.dgc-card__assign{position:absolute;left:50%;bottom:4px;transform:translateX(-50%);background:linear-gradient(135deg,#e6c667,#c9a84c);color:#3a2a10;font:700 12px 'GDRank',serif;border-radius:8px;padding:1px 7px;box-shadow:0 1px 2px rgba(0,0,0,.4);}`;
-const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0}body{margin:0}${css}${pill}</style></head><body></body></html>`;
+// 指派样式已在 card-face.css 里，这里绝不能再覆盖一份——否则画廊显示的是假象，改了 CSS 也看不出来
+const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0}body{margin:0}${css}</style></head><body></body></html>`;
 
 mkdirSync(join(ROOT, 'tmp'), { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });

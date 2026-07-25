@@ -162,11 +162,10 @@
   color: var(--gold); line-height: 1; z-index: 2;
   text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 1px #fff;
 }
-/* 字号跟旁边竖排 JOKER 对齐：.dgc-card__rank 带 scaleY(1.32) 竖拉，所以字号取 JOKER 字号 ÷ 1.32，
-   两者视觉高度才真的一样（0.8/1.32=0.606、0.5/1.32=0.379；手机档同法）。 */
-.dgc-card__assign .dgc-card__rank { font-size: 0.606rem; }
+/* 字号：曾试过缩到与 JOKER 字等高（÷1.32），owner 判定太小 —— 这里保持点数自身的可读尺寸。 */
+.dgc-card__assign .dgc-card__rank { font-size: 0.95rem; }
 .dgc-card--small .dgc-card__assign { left: 12px; }
-.dgc-card--small .dgc-card__assign .dgc-card__rank { font-size: 0.379rem; }
+.dgc-card--small .dgc-card__assign .dgc-card__rank { font-size: 0.8rem; }
 
 @media (max-width: 520px), (max-height: 520px) {
   .dgc-card { width: 42px; height: 60px; border-radius: 6px; padding: 3px 4px; }
@@ -193,7 +192,7 @@
   .dgc-card--small .dgc-card__suit--wild { font-size: 0.46rem; }
   /* 手机上 JOKER 字更窄，指派点数跟着左移贴回去 */
   .dgc-card__assign { left: 10px; }
-  .dgc-card__assign .dgc-card__rank { font-size: 0.303rem; }
+  .dgc-card__assign .dgc-card__rank { font-size: 0.68rem; }
   .dgc-card--small .dgc-card__assign { left: 10px; }
-  .dgc-card--small .dgc-card__assign .dgc-card__rank { font-size: 0.273rem; }
+  .dgc-card--small .dgc-card__assign .dgc-card__rank { font-size: 0.56rem; }
 }

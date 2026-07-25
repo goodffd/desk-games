@@ -53,7 +53,7 @@
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 240, 210, 0.07);
 }
 
-/* ===== 返回大厅（内置大厅后的顶部返回入口；mount 包装层注入，原独立版无此键） ===== */
+/* ===== 返回游戏厅（内置大厅后的顶部返回入口；mount 包装层注入，原独立版无此键） ===== */
 .xq-root .xq-back {
   display: inline-flex;
   align-items: center;
@@ -64,7 +64,7 @@
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--paper-dim);
-  font-family: var(--font-ui);   /* 「返回大厅」不在嵌入字体子集，须走系统无衬线，勿用 --font-display */
+  font-family: var(--font-ui);   /* 「返回游戏厅」不在嵌入字体子集，须走系统无衬线，勿用 --font-display */
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 1px;

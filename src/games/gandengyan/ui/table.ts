@@ -144,7 +144,7 @@ export function mountTable(root: HTMLElement, api: TableApi): {
   const wrap = el('div', 'gy');
   const bar = el('div', 'gy__bar');
   bar.append(el('div', 'gy__title', '干瞪眼'), el('div', 'gy__deck', ''), (() => {
-    const b = el('button', 'gy__back', '返回大厅'); b.addEventListener('click', () => api.onLeave()); return b;
+    const b = el('button', 'gy__back', '返回游戏厅'); b.addEventListener('click', () => api.onLeave()); return b;
   })());
   const board = el('div', 'gy__board');       // 座位环 + 中央出牌区
   const seatsEl = el('div', 'gy__seats');

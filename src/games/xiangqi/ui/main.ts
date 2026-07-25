@@ -33,12 +33,13 @@ export function mountXiangqi(root: HTMLElement): () => void {
   const on = (t: EventTarget, type: string, fn: EventListenerOrEventListenerObject) => { t.addEventListener(type, fn); listeners.push({ t, type, fn }); };
   let disposed = false;
 
-  // 返回大厅：内置后无刷新 mount，没有浏览器返回入口，故在 stage 顶部注入返回链接（与掼蛋一致，走壳的 navigate('/')）。
+  // 返回游戏厅：内置后无刷新 mount，没有浏览器返回入口，故在 stage 顶部注入返回链接（与掼蛋一致，走壳的 navigate('/')）。
   // 原独立 SPA 无此键（外链版靠浏览器后退）。属壳集成层，不入 template.ts；点击监听走 on() → cleanup 统一解绑、host.remove() 零残留。
+  // 写「游戏厅」不写「大厅」：同屏的等待房里有「取消，返回大厅」（回象棋自己的联机大厅），两个「大厅」会打架。
   const backBtn = document.createElement('button');
   backBtn.type = 'button';
   backBtn.className = 'xq-back';
-  backBtn.innerHTML = '<span class="xq-back__arrow">←</span><span>返回大厅</span>';
+  backBtn.innerHTML = '<span class="xq-back__arrow">←</span><span>返回游戏厅</span>';
   $('.stage').prepend(backBtn);
   on(backBtn, 'click', () => navigate('/'));
 

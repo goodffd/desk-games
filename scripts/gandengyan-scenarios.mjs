@@ -137,7 +137,7 @@ async function scenarioLeave(browser) {
   await c.getByRole('button', { name: '建房', exact: true }).click();
   await c.getByRole('button', { name: '开打' }).click();
   await c.locator('.gy__hand').waitFor({ timeout: 20000 });
-  await c.getByRole('button', { name: '返回大厅' }).click();
+  await c.getByRole('button', { name: '返回游戏厅' }).click();
   await c.locator('.home').waitFor({ timeout: 10000 });
   if (await c.locator('.gy').count()) throw new Error('离开后牌桌 DOM 残留');
   await c.waitForTimeout(2000);

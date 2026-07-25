@@ -261,7 +261,7 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
   levelsEl.className = 'gd-topbar__levels';
   const backBtn = document.createElement('button');
   backBtn.className = 'gd-topbar__back';
-  backBtn.textContent = '← 返回大厅';
+  backBtn.textContent = '← 返回游戏厅';
   backBtn.addEventListener('click', () => { navigate('/'); });
   topbar.appendChild(topbarTitle);
   topbar.appendChild(levelsEl);

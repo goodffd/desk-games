@@ -140,7 +140,7 @@ async function acCleanLeave(browser) {
   await c.getByRole('button', { name: '开打' }).click();          // 1 真人 + 1 AI，直接开打进牌桌
   await c.locator('.gy__hand').waitFor({ timeout: 20000 });
   log('进了牌桌（定时器在跑）');
-  await c.getByRole('button', { name: '返回大厅' }).click();
+  await c.getByRole('button', { name: '返回游戏厅' }).click();
   await c.locator('.home').waitFor({ timeout: 10000 });            // 回到游戏列表首页
   const gyLeft = await c.locator('.gy').count();
   if (gyLeft) throw new Error(`离开后牌桌 DOM 仍残留 ${gyLeft} 个 .gy`);

@@ -22,9 +22,22 @@
 - 安装：`npm install`
 - 开发：`npm run dev`（Vite dev server）
 - 构建：`npm run build`（`tsc --noEmit && vite build` → `dist/index.html` 单文件）
-- **真机冒烟（掼蛋联机）**：`npm run smoke:guandan` —— 一条命令跑完 建房 / 加入 / 入座 / 开打 / 观战 / 断线重连 的真路径（自己起服务、自己收摊，失败退非零码）。跑之前要有构建产物：`npm run build && npm run build:server`，缺了会提示。`SMOKE_HEADED=1` 开有头浏览器肉眼看，`SMOKE_PORT` 换端口。
-  **动了房间层 / 联机协议 / 会话重连，必须跑它**——单测替代不了：房间层三层各自绿、合起来仍可能坏，只有真浏览器 + 真 WebSocket 能证明「两个人真的能坐到一张桌上打，断了还能回来」。
-- 其它真机冒烟：Playwright + 系统 Chrome（`channel:'chrome'`），掼蛋打完一整局验名次、象棋打完整局验胜负。
+
+### 真机脚本（Playwright + 系统 Chrome `channel:'chrome'`，各自起服务、自己收摊，失败退非零码）
+
+跑之前要有构建产物：`npm run build && npm run build:server`，缺了会提示。`SMOKE_HEADED=1` 开有头浏览器肉眼看，`SMOKE_PORT` 换端口。
+
+| 命令 | 覆盖 | 什么时候跑 |
+|---|---|---|
+| `npm run smoke:guandan` | 掼蛋：建房 / 加入 / 入座 / 开打 / 观战 / 断线重连 | 动了房间层 / 联机协议 / 会话重连 |
+| `npm run smoke:gandengyan` | 干瞪眼：建房选人数 / 加入 / 入座 / 昵称全服唯一 / 开打 / 出牌·不要链路 | 同上 |
+| `npm run smoke:gandengyan:scenarios` | 干瞪眼四场景：歧义指派 / 5 人环形 / 掉线→重连 / 离开清理 | 动了干瞪眼 UI 或房间层 |
+| `npm run accept:gandengyan` | 干瞪眼打完整局：赢家判定 + 赔付明细 + 离开清理 | 动了干瞪眼引擎 / 结算 |
+| `npm run ui-proof` | 联机三屏像素哈希（基线 `scripts/ui-proof.baseline.json`） | 动了三屏 / 牌面 / 主题；改基线用 `-- --save` |
+
+**动了房间层 / 联机协议 / 会话重连，必须跑对应 smoke**——单测替代不了：房间层三层各自绿、合起来仍可能坏，只有真浏览器 + 真 WebSocket 能证明「两个人真的能坐到一张桌上打，断了还能回来」。
+
+**发版前这几条全过一遍，不挑"最近改了哪块"。** 理由：`accept:gandengyan` 与 `smoke:gandengyan` 曾同时红着没人发现——脚本把「轮到我但必须过」（出牌键因 `mustPass` 禁用）误判成「不是我的回合」，永不点「不要」，整局冻死。按需触发的规矩挡不住脚本自身腐坏，只有定期全跑才会暴露。写真机脚本时记住：**判「不是我的回合」要两个动作键同时禁用**，单看出牌键会误伤 `mustPass`。
 
 ### 测试分快慢两轨
 

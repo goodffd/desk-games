@@ -18,6 +18,11 @@ export interface NicknameOpts {
   placeholder?: string;
   /** 规则介绍：传了就在卡片下显示「📖 规则介绍」链接，点开弹层。 */
   rules?: RulesDoc;
+  /**
+   * 传了就在左上角渲染「← 返回游戏厅」，点了回调（控制器走 navigate('/')）。
+   * 昵称页是壳内 mount 的第一屏，没有浏览器后退入口，不给出口人就退不出去。
+   */
+  onBack?: () => void;
   /** 点「进入大厅」/回车，昵称非空时回调。 */
   onSubmit: (nick: string) => void;
 }
@@ -33,6 +38,18 @@ const MAX_NICK = 12;
 export function renderNickname(root: HTMLElement, opts: NicknameOpts): NicknameHandle {
   root.innerHTML = '';
   const wrap = el('div', 'cr-lobby');
+
+  // 出口：本页主按钮「进入大厅」进的是本游戏的联机大厅，故返回键写「游戏厅」（首页 h1 自称），
+  // 同屏两个「大厅」必须消歧。位置在左上角，与象棋/牌桌的返回键同一处心智。
+  if (opts.onBack) {
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'cr-lobby__back';
+    back.appendChild(text('span', 'cr-lobby__back-arrow', '←'));
+    back.appendChild(text('span', 'cr-lobby__back-label', '返回游戏厅'));
+    back.addEventListener('click', opts.onBack);
+    wrap.appendChild(back);
+  }
 
   const brand = el('div', 'cr-lobby__brand');
   brand.appendChild(text('div', 'cr-lobby__title', opts.brand ?? '掼蛋'));

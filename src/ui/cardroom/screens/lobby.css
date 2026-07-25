@@ -119,6 +119,38 @@
 }
 .cr-lobby__btn--ghost:hover { background: rgba(201, 168, 76, 0.12); border-color: var(--gold, #c9a84c); filter: none; }
 
+/* 昵称页左上角「← 返回游戏厅」药丸键：绿毡金线版，与象棋 .xq-back 同族（hover 箭头左移）。
+   绝对定位贴在金线晕边内侧，不插进「取名 → 进入大厅」的主流程视线。 */
+.cr-lobby__back {
+  position: absolute;
+  top: 26px;
+  left: 30px;   /* 金线晕边 inset:14px，再让出一档，别贴着框线 */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 6px 11px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-dim, #a89070);
+  background: rgba(201, 168, 76, 0.06);
+  border: 1px solid rgba(201, 168, 76, 0.28);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.18s, border-color 0.18s, background 0.18s;
+}
+.cr-lobby__back:hover {
+  color: var(--text-light, #e8d9b0);
+  border-color: var(--gold, #c9a84c);
+  background: rgba(201, 168, 76, 0.14);
+}
+/* 触控热区外扩到 ~44px 高（Apple HIG 下限），视觉尺寸不变——手机上药丸本身只有 30px 高，
+   按钮已是 absolute，伪元素直接相对它定位。 */
+.cr-lobby__back::after { content: ''; position: absolute; inset: -7px -6px; }
+.cr-lobby__back-arrow { font-size: 15px; line-height: 1; transition: transform 0.18s; }
+.cr-lobby__back:hover .cr-lobby__back-arrow { transform: translateX(-2px); }
+
 /* 错误/提示行 */
 .cr-lobby__err {
   min-height: 14px;

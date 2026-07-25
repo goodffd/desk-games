@@ -67,6 +67,7 @@ function onlineMount(root: HTMLElement): () => void {
     nickH = renderNickname(root, {
       initial: session.nick,
       rules: GUANDAN_RULES,
+      onBack: () => navigate('/'),
       onSubmit: (n) => { primeAudio(); session.setNick(n); session.send(c2s.hello(n)); },
     });
   }

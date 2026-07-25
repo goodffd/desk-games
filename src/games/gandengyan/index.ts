@@ -56,6 +56,7 @@ function mount(root: HTMLElement): () => void {
       subtitle: '大一法则：跟牌必须点数正好大一级',
       placeholder: '起个名字',
       rules: GANDENGYAN_RULES,
+      onBack: () => navigate('/'),
       onSubmit: (n) => { session.setNick(n); session.send({ t: 'hello', nick: n }); },
     });
     screen = h;

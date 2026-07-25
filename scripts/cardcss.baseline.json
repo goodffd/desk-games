@@ -1,6 +1,6 @@
 {
   "count": 40,
-  "digest": "03e8353cb1aae64a71126f2b609b48205ed4817979c9c1a05cb0ab6882903705",
+  "digest": "0d3dc0df22042c1d0f2f5bb5bff59f720cf764e240b8f02e001f3071efbc3bd5",
   "rules": [
     "|.X-card--black{ color: var(--black); }",
     "|.X-card--joker-big{ background: linear-gradient(135deg, #fff8f0, #fdeede); }",
@@ -8,7 +8,7 @@
     "|.X-card--joker-small{ background: linear-gradient(135deg, #f6f6f8, #eaeaee); }",
     "|.X-card--joker{ position: relative; }",
     "|.X-card--red{ color: var(--red); }",
-    "|.X-card--small .X-card__assign .X-card__rank{ font-size: 0.8rem; }",
+    "|.X-card--small .X-card__assign .X-card__rank{ font-size: 0.379rem; }",
     "|.X-card--small .X-card__assign{ left: 12px; }",
     "|.X-card--small .X-card__corner{ /* 出牌：点数+花色竖排，间距更大 */ flex-direction: column; gap: 9px; /* 桌面：点数↔花色再拉开 */ align-items: center; left: 4px; }",
     "|.X-card--small .X-card__pip{ height: 26px; right: 2px; bottom: 2px; }",
@@ -18,7 +18,7 @@
     "|.X-card--small .X-joker-fig{ width: 42px; height: 66px; }",
     "|.X-card--small .X-joker-word{ font-size: 0.5rem; top: 3px; left: 2px; }",
     "|.X-card--small{ width: 58px; height: 81px; font-size: 0.85rem; }",
-    "|.X-card__assign .X-card__rank{ font-size: 0.95rem; }",
+    "|.X-card__assign .X-card__rank{ font-size: 0.606rem; }",
     "|.X-card__assign{ position: absolute; top: 1px; left: 19px; /* 紧挨竖排 JOKER 右侧，留一点缝不贴字 */ color: var(--gold); line-height: 1; z-index: 2; text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 1px #fff; }",
     "|.X-card__corner{ position: absolute; top: 2px; left: 4px; display: flex; flex-direction: row; /* 手牌：点数+花色横排紧挨（如「A♠」横着） */ align-items: center; gap: 3px; /* 数字↔花色间距 */ line-height: 0.9; z-index: 1; }",
     "|.X-card__pip.X-suit-D{ transform-origin: 100% 100%; }",

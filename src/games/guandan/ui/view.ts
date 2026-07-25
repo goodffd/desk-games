@@ -489,13 +489,12 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     passBtn.disabled = !isHumanTurn || state.current === null; // 自己领出时不能"不要"
   }
 
-  /** 最新那手牌(z7=lastActor 的出牌区)是否几何上压到「具体某张手牌」 → 决定手牌要不要淡。
-   *  所有人(含我自己)统一判定。不能用手牌容器整体包围盒：手牌是「同点数列底部对齐、各列高低不一」
-   *  的阶梯形，容器矩形把短列上方的空角也算进去，出牌区落在空角会误判成压到。改为逐张牌矩形相交，
-   *  且实质相交(两向都≥12px)才算压到——边缘相切不算，避免别家一出牌手牌就闪透明。 */
-  function latestPlayCoversHand(): boolean {
-    if (lastActor === null) return false;
-    const pe = playEls[lastActor]!;
+  /** 某家的出牌区是否几何上压到我「具体某张手牌」。不能用手牌容器整体包围盒：手牌是「同点数列底部
+   *  对齐、各列高低不一」的阶梯形，容器矩形把短列上方的空角也算进去，出牌区落在空角会误判成压到。
+   *  改为逐张牌矩形相交，且实质相交(两向都≥12px)才算压到——边缘相切不算，避免别家一出牌手牌就闪透明。 */
+  function playCoversHand(seat: Seat | null): boolean {
+    if (seat === null) return false;
+    const pe = playEls[seat]!;
     if (!pe.classList.contains('has-play')) return false;
     const pr = pe.getBoundingClientRect();
     for (const card of Array.from(handEl.querySelectorAll('.dgc-card'))) {
@@ -513,14 +512,19 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     renderStatus();
     renderButtons();
     syncTurnTimer();
-    // 手牌与最新那手牌(z7=lastActor)的层叠/透明，按是否轮到我分两套：
+    // 手牌与出牌区的层叠/透明。**淡谁，看牌是谁出的**（仿干瞪眼：淡的是出的牌，不是手牌）：
     // · 轮到我出牌：手牌浮到 z7 之上(gd-hand--ontop)，把压住我手牌的别家牌盖回去 → 手牌完整不透明、好选牌；
-    // · 没轮到我：手牌在 z7 之下，最新那手牌(无论谁出的、含我自己)只要几何上压到我「具体某张牌」，
-    //   手牌就淡到 45%(gd-hand--dim)，让被盖住的牌/「不要」凸显；没压到不淡。
+    // · 别家的牌压住我手牌：淡手牌到 45%，让别家出的牌/「不要」凸显——这是这条逻辑的本意；
+    // · **我自己**的牌压住我手牌：淡我自己出的那手牌，手牌保持实的。淡手牌是反的——我知道自己出了什么，
+    //   却把整手牌洗白；而且我出的牌在别家跟牌后会沉到手牌之下(z3<z6)，手牌一淡它就从底下透出来，
+    //   看着像「出的牌也透明了」。这条同时收掉那个artifact。
     // 90° 旋转下各元素包围盒仍是正交矩形，元素间矩形相交判断准确。
-    const myTurn = started && !isDealOver(state) && state.turn === HUMAN_SEAT;
+    const live = started && !isDealOver(state);
+    const myTurn = live && state.turn === HUMAN_SEAT;
+    const othersCover = lastActor !== null && lastActor !== HUMAN_SEAT && playCoversHand(lastActor);
     handEl.classList.toggle('gd-hand--ontop', myTurn);
-    handEl.classList.toggle('gd-hand--dim', !myTurn && started && !isDealOver(state) && latestPlayCoversHand());
+    handEl.classList.toggle('gd-hand--dim', !myTurn && live && othersCover);
+    playEls[HUMAN_SEAT]!.classList.toggle('gd-play--covered', live && playCoversHand(HUMAN_SEAT));
   }
 
   // ── 出牌（牌局推进在服务端，经 driver；view 只取选中牌、转 driver） ──

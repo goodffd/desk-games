@@ -68,7 +68,16 @@ async function enterLobby(ctx, nick) {
  */
 async function takeTurn(page) {
   const play = page.getByRole('button', { name: '出牌' });
-  if (await play.isDisabled().catch(() => true)) return false;   // 不是我的回合
+  const pass = page.getByRole('button', { name: '不要' });
+  // UI 语义（table.ts）：play.disabled = !myTurn || mustPass；pass.disabled = !myTurn || (领出 && !mustPass)。
+  // 「不是我的回合」只有两键同时禁用这一种。只看 play 会把「轮到我但必须过」也当成别人的回合而空转——
+  // 大一法则下跟不上极常见，一撞上就永远不点「不要」，整局冻死在这一手（曾致本冒烟真人 0 次出手）。
+  const playOff = await play.isDisabled().catch(() => true);
+  const passOff = await pass.isDisabled().catch(() => true);
+  if (playOff && passOff) return false;
+  if (playOff) {                                                 // 轮到我但必须过
+    try { await pass.click({ timeout: 1500 }); return true; } catch { return false; }
+  }
 
   // 我的回合：优先出一张（领出任意单张合法；跟牌试前几张能压的），出不掉才「不要」。
   // 所有动作短超时 + catch —— AI 每手都会触发 render 重刷，长超时会在竞态里干等。
@@ -85,7 +94,6 @@ async function takeTurn(page) {
     } catch { return false; }   // 元素被重渲染冲掉：这轮算了
   }
   // 一张都出不掉（比如领出只剩王）→ 不要
-  const pass = page.getByRole('button', { name: '不要' });
   try { await pass.click({ timeout: 1500 }); return true; } catch { return false; }
 }
 

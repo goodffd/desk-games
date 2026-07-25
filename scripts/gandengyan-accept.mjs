@@ -62,8 +62,13 @@ async function enterLobby(ctx, nick) {
 async function takeTurn(page) {
   const play = page.getByRole('button', { name: '出牌' });
   const pass = page.getByRole('button', { name: '不要' });
-  if (await play.isDisabled().catch(() => true)) return false;        // 出牌禁用=不是我的回合
-  if (!(await pass.isDisabled().catch(() => true))) {                 // 不要可点=跟牌/无牌可领：快过
+  // UI 语义（table.ts）：play.disabled = !myTurn || mustPass；pass.disabled = !myTurn || (领出 && !mustPass)。
+  // 「不是我的回合」只有两键同时禁用这一种。只看 play 会把「轮到我但必须过」也当成别人的回合而空转——
+  // 大一法则下跟不上极常见，一撞上就永远不点「不要」，整局冻死在这一手（曾致本脚本长期 150s 超时）。
+  const playOff = await play.isDisabled().catch(() => true);
+  const passOff = await pass.isDisabled().catch(() => true);
+  if (playOff && passOff) return false;
+  if (!passOff) {                                                     // 不要可点=跟牌/必须过：快过
     try { await pass.click({ timeout: 1200 }); return true; } catch { return false; }
   }
   // 领出：读手牌点数，选最大的同点数一组

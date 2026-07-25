@@ -156,9 +156,12 @@
 /* 王被指派成某点数（干瞪眼用；掼蛋不产生此 DOM）：仿掼蛋逢人配的金「配」——不加底色，
    直接把点数写成金色，摆在 JOKER 字旁、小丑图上方。白描边保证压到帽檐时仍读得出。
    数字用牌面同款 .dgc-card__rank（GDRank + 竖拉变形），只缩字号。
+   top 是**两个引擎实测扫出来的**，不是算的：Chrome 与 WebKit 对变换层的栅格取整不同，
+   同一个 top 在两边能差 1px（真机是 iOS Safari=WebKit，只照 Chrome 调必然翻车）。
+   工具见 scripts/ink-align-check.mjs --sweep。
    **必须写在手机媒体查询之前**：同特异性后写的赢，放到查询后面会把手机档的 left 覆盖掉。 */
 .dgc-card__assign {
-  position: absolute; top: 2px; left: 19px;  /* top 按**墨迹**对齐 JOKER 首字母（对盒顶不够：点数带 1.32 竖拉，墨迹会下沉），left 紧挨竖排 JOKER */
+  position: absolute; top: 3px; left: 19px;  /* top 按**墨迹**对齐 JOKER 首字母（对盒顶不够：点数带 1.32 竖拉，墨迹会下沉），left 紧挨竖排 JOKER */
   display: flex;              /* 必须：普通 div 会按继承的 16px 字号撑出行盒 strut，点数跟 strut 基线对齐，
                                  字号越小被压得越低——手机档点数比 JOKER 低 3px 就是这么来的。flex 无 strut。 */
   color: var(--gold); line-height: 1; z-index: 2;
@@ -193,8 +196,8 @@
   .dgc-card--small .dgc-joker-word { font-size: 0.36rem; }
   .dgc-card--small .dgc-card__suit--wild { font-size: 0.46rem; }
   /* 手机上 JOKER 字更窄，指派点数跟着左移贴回去 */
-  .dgc-card__assign { top: 2px; left: 10px; }
+  .dgc-card__assign { top: 1.5px; left: 10px; }
   .dgc-card__assign .dgc-card__rank { font-size: 0.68rem; }
-  .dgc-card--small .dgc-card__assign { top: 3px; left: 10px; }
+  .dgc-card--small .dgc-card__assign { top: 2.5px; left: 10px; }
   .dgc-card--small .dgc-card__assign .dgc-card__rank { font-size: 0.56rem; }
 }

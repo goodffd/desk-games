@@ -256,6 +256,9 @@
 }
 /* 没轮到我、别家/我刚出的牌压到我手牌时：手牌整体半透明，凸显那手牌/「不要」 */
 .gd-player-hand.gd-hand--dim { opacity: 0.45; transition: opacity 0.25s; }
+/* 我出的牌被手牌盖不住、露出一截时：把它淡下去，别让那一截实牌像插在手牌里的野牌。
+   完整盖住 / 完全不相交都不加这个类（判定见 view.ts myPlayPokesOutOfHand）。 */
+.gd-play.gd-play--peek { opacity: 0.4; transition: opacity 0.25s; }
 /* 轮到我出牌时：手牌浮到最新出牌(z7)之上，盖住压住我手牌的别家牌，看清自己的牌好选牌 */
 .gd-player-hand.gd-hand--ontop { z-index: 8; }
 

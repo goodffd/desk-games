@@ -26,6 +26,34 @@ function levelLabel(r: Rank): string {
 /** 队名：队 0 = 我方(你&对家)，队 1 = 对方(上家&下家)。 */
 const teamName = (t: 0 | 1): string => (t === 0 ? '我方' : '对方');
 
+/** 只读矩形，够几何判定用（DOMRect 天然满足）。 */
+export interface RectLike { left: number; right: number; top: number; bottom: number; width: number; height: number }
+
+/** `target` 被 `covers` 里的矩形盖住多少：在 target 上取 n×n 个采样点，返回被盖住的点数。 */
+export function sampledCoverage(target: RectLike, covers: readonly RectLike[], n = 9): number {
+  if (target.width < 1 || target.height < 1 || !covers.length) return 0;
+  let covered = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const x = target.left + (target.width * (i + 0.5)) / n;
+      const y = target.top + (target.height * (j + 0.5)) / n;
+      if (covers.some((r) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)) covered++;
+    }
+  }
+  return covered;
+}
+
+/**
+ * 「盖不住」判定——我出的牌该不该淡：
+ * · 完整盖住 → false：本来就看不见，淡了反而从半透明底下透出来；
+ * · 完全不相交 → false：那是正常展示（桌面端空间够时就是这样）；
+ * · 露出一截 → true：那一截是唯一可见的部分，实的看着像手牌里插了张野牌。
+ */
+export function pokesOut(target: RectLike, covers: readonly RectLike[], n = 9): boolean {
+  const c = sampledCoverage(target, covers, n);
+  return c > 0 && c < n * n;
+}
+
 /** 简短牌名（进贡提示用）。 */
 function cardBrief(c: Card, level: Rank): string {
   if (c.kind === 'joker') return c.big ? '大王' : '小王';
@@ -508,6 +536,16 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     return false;
   }
 
+  /** 我出的那手牌是不是「手牌盖不住」：与手牌有交集、但没被手牌完整遮住（有一截露在外面）。
+   *  三种情形见 pokesOut() 的注释。手牌是阶梯形（同点数成列、各列高低不一），
+   *  不能拿容器包围盒判，按逐张牌矩形采样——判定本体是纯函数，单测在 tests/guandan/play-coverage.test.ts。 */
+  function myPlayPokesOutOfHand(): boolean {
+    const pe = playEls[HUMAN_SEAT]!;
+    if (!pe.classList.contains('has-play')) return false;
+    return pokesOut(pe.getBoundingClientRect(),
+      Array.from(handEl.querySelectorAll('.dgc-card')).map((c) => c.getBoundingClientRect()));
+  }
+
   function renderAll(): void {
     for (const s of [0, 1, 2, 3] as Seat[]) { renderSeatInfo(s); renderPlay(s); }
     renderHand();
@@ -517,14 +555,16 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     // 手牌与出牌区的层叠/透明。**淡谁，看牌是谁出的**（仿干瞪眼：淡的是出的牌，不是手牌）：
     // · 轮到我出牌：手牌浮到 z7 之上(gd-hand--ontop)，把压住我手牌的别家牌盖回去 → 手牌完整不透明、好选牌；
     // · 别家的牌压住我手牌：淡手牌到 45%，让别家出的牌/「不要」凸显——这是这条逻辑的本意；
-    // · **我自己**的牌压住我手牌：什么都不淡。我知道自己出了什么，手牌盖住它即可（我的出牌区恒 z3，
-    //   在手牌之下）。淡手牌是反的——会把整手牌洗白，且我的牌从半透明手牌底下透出来。
+    // · **我自己**的牌：不淡手牌。我的出牌区恒 z3 在手牌之下，手牌盖得住就藏着；
+    //   盖不住、露出一截时才淡那手牌本身（gd-play--peek）。淡手牌是反的——会把整手牌洗白。
     // 90° 旋转下各元素包围盒仍是正交矩形，元素间矩形相交判断准确。
     const live = started && !isDealOver(state);
     const myTurn = live && state.turn === HUMAN_SEAT;
     const othersCover = lastActor !== null && lastActor !== HUMAN_SEAT && playCoversHand(lastActor);
     handEl.classList.toggle('gd-hand--ontop', myTurn);
     handEl.classList.toggle('gd-hand--dim', !myTurn && live && othersCover);
+    // 我自己出的牌恒 z3 在手牌之下：盖得住就让它藏着，盖不住（露出一截）才把它淡下去
+    playEls[HUMAN_SEAT]!.classList.toggle('gd-play--peek', live && myPlayPokesOutOfHand());
   }
 
   // ── 出牌（牌局推进在服务端，经 driver；view 只取选中牌、转 driver） ──

@@ -119,35 +119,30 @@
 }
 .cr-lobby__btn--ghost:hover { background: rgba(201, 168, 76, 0.12); border-color: var(--gold, #c9a84c); filter: none; }
 
-/* 昵称页左上角「← 返回游戏厅」药丸键：绿毡金线版，与象棋 .xq-back 同族（hover 箭头左移）。
-   绝对定位贴在金线晕边内侧，不插进「取名 → 进入大厅」的主流程视线。 */
+/* 昵称页卡片下方的次要动作行：「📖 规则介绍 · ← 返回游戏厅」。
+   两枚同款金色下划线链接，视觉同级；规则自带的 margin-top 在行内清掉，免得两枚错半档。 */
+.cr-lobby__actions { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.cr-lobby__actions .cr-rules-link { margin-top: 0; }
+.cr-lobby__actions-sep { color: rgba(201, 168, 76, 0.45); font-size: 14px; user-select: none; }
+
+/* 「← 返回游戏厅」：与 .cr-rules-link 同款（14px 金色下划线 + 10px 纵向 padding 给足触控热区），
+   只靠箭头区分导航属性；hover 箭头左移，与象棋 .xq-back 一脉。 */
 .cr-lobby__back {
-  position: absolute;
-  top: 26px;
-  left: 30px;   /* 金线晕边 inset:14px，再让出一档，别贴着框线 */
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px 6px 11px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: var(--text-dim, #a89070);
-  background: rgba(201, 168, 76, 0.06);
-  border: 1px solid rgba(201, 168, 76, 0.28);
-  border-radius: 999px;
+  gap: 5px;
+  padding: 10px 8px;
+  background: none;
+  border: none;
   cursor: pointer;
-  transition: color 0.18s, border-color 0.18s, background 0.18s;
+  color: var(--gold, #c9a84c);
+  font: inherit;
+  font-size: 14px;
+  transition: color 0.18s;
 }
-.cr-lobby__back:hover {
-  color: var(--text-light, #e8d9b0);
-  border-color: var(--gold, #c9a84c);
-  background: rgba(201, 168, 76, 0.14);
-}
-/* 触控热区外扩到 ~44px 高（Apple HIG 下限），视觉尺寸不变——手机上药丸本身只有 30px 高，
-   按钮已是 absolute，伪元素直接相对它定位。 */
-.cr-lobby__back::after { content: ''; position: absolute; inset: -7px -6px; }
+/* 下划线画在文字上、不画在按钮上——画在按钮上箭头下方会拖出一截断线（后代无法取消祖先的 text-decoration）。 */
+.cr-lobby__back-label { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.cr-lobby__back:hover { color: var(--text-light, #e8d9b0); }
 .cr-lobby__back-arrow { font-size: 15px; line-height: 1; transition: transform 0.18s; }
 .cr-lobby__back:hover .cr-lobby__back-arrow { transform: translateX(-2px); }
 

@@ -1,10 +1,12 @@
 /* 规则介绍：入口链接 + 绿毡金线弹层。掼蛋 + 干瞪眼共用。 */
 .cr-rules-link {
+  display: inline-flex; align-items: center; gap: 5px;
   background: none; border: none; cursor: pointer;
   color: var(--gold, #c9a84c); font: inherit; font-size: 14px;
   padding: 10px 8px; margin-top: 6px;
-  text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;
 }
+/* 下划线画在文字上、不画在按钮上——画在按钮上会从 📖 底下穿过去（后代无法取消祖先的 text-decoration）。 */
+.cr-rules-link__label { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
 .cr-rules-link:hover { color: var(--text-light, #e8d9b0); }
 
 .cr-rules {

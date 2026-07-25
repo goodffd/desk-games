@@ -61,7 +61,9 @@ export function rulesLink(brand: string, doc: RulesDoc): HTMLButtonElement {
   const b = document.createElement('button');
   b.className = 'cr-rules-link';
   b.type = 'button';
-  b.textContent = '📖 规则介绍';
+  // 图标与文字分开：下划线只画在文字上，不从 📖 底下穿过（与并排的「← 返回游戏厅」同一套处理）。
+  b.appendChild(text('span', 'cr-rules-link__icon', '📖'));
+  b.appendChild(text('span', 'cr-rules-link__label', '规则介绍'));
   b.addEventListener('click', () => showRules(brand, doc));
   return b;
 }

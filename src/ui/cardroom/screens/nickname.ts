@@ -39,18 +39,6 @@ export function renderNickname(root: HTMLElement, opts: NicknameOpts): NicknameH
   root.innerHTML = '';
   const wrap = el('div', 'cr-lobby');
 
-  // 出口：本页主按钮「进入大厅」进的是本游戏的联机大厅，故返回键写「游戏厅」（首页 h1 自称），
-  // 同屏两个「大厅」必须消歧。位置在左上角，与象棋/牌桌的返回键同一处心智。
-  if (opts.onBack) {
-    const back = document.createElement('button');
-    back.type = 'button';
-    back.className = 'cr-lobby__back';
-    back.appendChild(text('span', 'cr-lobby__back-arrow', '←'));
-    back.appendChild(text('span', 'cr-lobby__back-label', '返回游戏厅'));
-    back.addEventListener('click', opts.onBack);
-    wrap.appendChild(back);
-  }
-
   const brand = el('div', 'cr-lobby__brand');
   brand.appendChild(text('div', 'cr-lobby__title', opts.brand ?? '掼蛋'));
   brand.appendChild(text('div', 'cr-lobby__subtitle', opts.subtitle ?? '网络对战 · 4 人整盘'));
@@ -79,7 +67,23 @@ export function renderNickname(root: HTMLElement, opts: NicknameOpts): NicknameH
   card.appendChild(btn);
   wrap.appendChild(card);
 
-  if (opts.rules) wrap.appendChild(rulesLink(opts.brand ?? '掼蛋', opts.rules));   // 卡片下方「📖 规则介绍」
+  // 卡片下方一行次要动作：「📖 规则介绍 · ← 返回游戏厅」。
+  // 由左到右是承诺递减（了解 → 离开）；放这儿而不是左上角，是因为手机上左上角单手够不着，
+  // 而这一屏是表单页，返回不是打到一半要跑的高频退出，落在拇指自然区更合适。
+  // 返回键写「游戏厅」不写「大厅」：同屏主按钮「进入大厅」进的是本游戏的联机大厅，两个「大厅」会打架。
+  const actions = el('div', 'cr-lobby__actions');
+  if (opts.rules) actions.appendChild(rulesLink(opts.brand ?? '掼蛋', opts.rules));
+  if (opts.rules && opts.onBack) actions.appendChild(text('span', 'cr-lobby__actions-sep', '·'));
+  if (opts.onBack) {
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'cr-lobby__back';
+    back.appendChild(text('span', 'cr-lobby__back-arrow', '←'));
+    back.appendChild(text('span', 'cr-lobby__back-label', '返回游戏厅'));
+    back.addEventListener('click', opts.onBack);
+    actions.appendChild(back);
+  }
+  if (actions.childElementCount) wrap.appendChild(actions);
 
   const submit = (): void => {
     const nick = input.value.trim();

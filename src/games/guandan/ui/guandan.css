@@ -115,6 +115,11 @@
   position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
   margin-top: 3px;
   flex-wrap: wrap; justify-content: center; max-width: 92px;
+  /* 换行成两排时，上下留白要再往上补 1px（比单行的 3.5/4.5 多一档）：
+     两排的墨迹盒＝上排名字的墨迹顶 → 下排徽章/闹钟的盒底，上边多吃了一层 CJK 行盒空隙、
+     下边没有，所以整体偏下。逐档实测 d2=0/0.5/1/1.5，d2=1 这档四种组合 × 双引擎 × 双视口
+     最坏偏差降到 1.44px（其余 ≤0.98），取它。 */
+  padding-top: 2.5px; padding-bottom: 5.5px;
 }
 /* 昵称独占第一行，张数+闹钟(包成 gd-seat__meta 小组)并排到第二行(共两行，不是三行)；超长昵称省略号兜底 */
 .gd-seat--left .gd-seat__name,
@@ -132,9 +137,16 @@
   font-size: 0.72rem; font-weight: 700; color: var(--gold);
   pointer-events: none;
 }
+/* 闹钟 ⏰ 关在**自己的无边框方框**里，不让它的行盒去决定药丸布局。
+   原来它是普通 inline 文本，高度跟着系统 emoji 字体的行盒走——那个行盒各引擎/各系统
+   自己说了算，实测 Chrome 与 WebKit 在药丸里的垂直偏差方向**相反**，没有常数能补平。
+   现在：固定 1.15em 见方 + grid 居中 + line-height 0，框的几何由我们定；
+   框再和文字框一起被药丸的 align-items:center 居中——框对框，emoji 的字体度量不再外溢。 */
 .gd-seat__clock {
-  display: inline-block; font-size: 0.82rem;
-  transform-origin: 50% 12%;
+  display: grid; place-items: center;
+  width: 1.15em; height: 1.15em;
+  line-height: 0; font-size: 0.82rem;
+  transform-origin: 50% 50%;   /* 原 50% 12%（贴顶）：摆动时把盘面往下甩，重心跟着跑 */
   animation: gd-clock-ring 0.7s ease-in-out infinite;
 }
 @keyframes gd-clock-ring  { 0%,100% { transform: rotate(-15deg); } 50% { transform: rotate(15deg); }}
@@ -512,6 +524,8 @@
   .gd-avatar { width: 34px; height: 34px; }
   .gd-avatar svg { width: 21px; height: 21px; }
   .gd-seat__info { font-size: 0.6rem; padding: 2.5px 6px 3.5px; }  /* 上下 1px→3px 补留白 + 同桌面的 ±0.5px 墨迹校准 */
+  /* 左右家换行两排时同桌面再补一档（见上面 d2=1 的注释） */
+  .gd-seat--left .gd-seat__info, .gd-seat--right .gd-seat__info { padding-top: 1.5px; padding-bottom: 4.5px; }
   /* 张数徽标在手机端缩小：0.98rem(桌面值)在小屏过大、加光晕会压到出牌区。关脉冲、用小静态光晕，光晕不外溢 */
   .gd-seat__count--alert { font-size: 0.64rem; padding: 0 4px; box-shadow: 0 0 3px 1px rgba(255,210,80,0.75); animation: none; }
   .gd-topbar { padding: 0.25rem 0.6rem; }

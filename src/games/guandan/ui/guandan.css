@@ -177,7 +177,10 @@
 .gd-seat__info {
   display: flex; align-items: center; justify-content: center; align-content: center; gap: 5px;
   background: rgba(0,0,0,0.4);
-  padding: 4px 9px; border-radius: 11px;
+  /* 上下不是对称的 4/4，是 3.5/4.5：CJK 行盒(strut)天生把墨迹压低，对称 padding 下
+     四家 × Chrome/WebKit × 手机/桌面 八个测点**全是正数**(偏下 0.17~1.25px)——系统性偏差不是噪声。
+     逐档扫上下劈分(0/±0.5/±1/±1.5/±2)，±0.5 这档最坏偏移降到 0.5px 且不再同号，取它。 */
+  padding: 3.5px 9px 4.5px; border-radius: 11px;
   font-size: 0.72rem; color: var(--text-light); white-space: nowrap;
 }
 .gd-seat__name { font-weight: 600; }
@@ -508,7 +511,7 @@
   .gd-player-hand { min-height: 60px; padding: 4px 0.3rem 4px; }
   .gd-avatar { width: 34px; height: 34px; }
   .gd-avatar svg { width: 21px; height: 21px; }
-  .gd-seat__info { font-size: 0.6rem; padding: 3px 6px; }  /* 上下 1px→3px：同桌面，别让字顶到药丸上下沿 */
+  .gd-seat__info { font-size: 0.6rem; padding: 2.5px 6px 3.5px; }  /* 上下 1px→3px 补留白 + 同桌面的 ±0.5px 墨迹校准 */
   /* 张数徽标在手机端缩小：0.98rem(桌面值)在小屏过大、加光晕会压到出牌区。关脉冲、用小静态光晕，光晕不外溢 */
   .gd-seat__count--alert { font-size: 0.64rem; padding: 0 4px; box-shadow: 0 0 3px 1px rgba(255,210,80,0.75); animation: none; }
   .gd-topbar { padding: 0.25rem 0.6rem; }

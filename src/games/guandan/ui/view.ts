@@ -26,34 +26,6 @@ function levelLabel(r: Rank): string {
 /** 队名：队 0 = 我方(你&对家)，队 1 = 对方(上家&下家)。 */
 const teamName = (t: 0 | 1): string => (t === 0 ? '我方' : '对方');
 
-/** 只读矩形，够几何判定用（DOMRect 天然满足）。 */
-export interface RectLike { left: number; right: number; top: number; bottom: number; width: number; height: number }
-
-/** `target` 被 `covers` 里的矩形盖住多少：在 target 上取 n×n 个采样点，返回被盖住的点数。 */
-export function sampledCoverage(target: RectLike, covers: readonly RectLike[], n = 9): number {
-  if (target.width < 1 || target.height < 1 || !covers.length) return 0;
-  let covered = 0;
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      const x = target.left + (target.width * (i + 0.5)) / n;
-      const y = target.top + (target.height * (j + 0.5)) / n;
-      if (covers.some((r) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)) covered++;
-    }
-  }
-  return covered;
-}
-
-/**
- * 「盖不住」判定——我出的牌该不该淡：
- * · 完整盖住 → false：本来就看不见，淡了反而从半透明底下透出来；
- * · 完全不相交 → false：那是正常展示（桌面端空间够时就是这样）；
- * · 露出一截 → true：那一截是唯一可见的部分，实的看着像手牌里插了张野牌。
- */
-export function pokesOut(target: RectLike, covers: readonly RectLike[], n = 9): boolean {
-  const c = sampledCoverage(target, covers, n);
-  return c > 0 && c < n * n;
-}
-
 /** 简短牌名（进贡提示用）。 */
 function cardBrief(c: Card, level: Rank): string {
   if (c.kind === 'joker') return c.big ? '大王' : '小王';
@@ -71,6 +43,33 @@ const SEAT_LABELS: Record<Seat, string> = { 0: '你', 1: '下家', 2: '对家', 
 const SEAT_POS: Record<Seat, string> = { 0: 'bottom', 1: 'right', 2: 'top', 3: 'left' };
 
 type LastPlay = Combo | 'pass' | null;
+
+/** 手牌区 / 我的出牌区的明暗——**焦点按回合整段切换**，两块永远一实一淡：
+ *
+ *  | 时刻                              | 我的手牌            | 我的出牌区            |
+ *  |-----------------------------------|---------------------|-----------------------|
+ *  | 不是我的回合（我出完 → 别家一圈） | 淡 .45              | z7 压住手牌、实体     |
+ *  | 轮到我                            | 实体、z8 浮到最上   | z3 沉到手牌下、淡 .4  |
+ *
+ *  只认 `myTurn` 一个量，**不掺「谁最新出牌」**：绑最新出牌者的话，「我刚出完」这段
+ *  只活到下家动手为止——真机实测 1.7s（还含 0.25s 淡入），一晃就没，肉眼根本看不见。
+ *  按回合切换，每段都是好几秒，是个看得住的状态而不是一闪。
+ *
+ *  手牌只在「我的出牌区真压住手牌」时才淡：本副我还没出过牌、或桌面宽屏两块不相交时，
+ *  淡它是白洗一层。纯函数好单测——真机逼不出全部时序，靠 tests/guandan-emphasis.test.ts 锁死。 */
+export interface EmphasisInput {
+  live: boolean;              // 牌局进行中（已开打、本副没结束）
+  myTurn: boolean;            // 轮到我出牌
+  coversHand: boolean;        // 我的出牌区（或最新那手）几何上压住了我的某张手牌
+}
+export function emphasis(i: EmphasisInput): { handDim: boolean; myPlayDim: boolean; myPlayOnTop: boolean } {
+  if (!i.live) return { handDim: false, myPlayDim: false, myPlayOnTop: false };
+  return {
+    handDim: !i.myTurn && i.coversHand,
+    myPlayDim: i.myTurn,
+    myPlayOnTop: !i.myTurn,
+  };
+}
 
 /** 选系统里最自然的中文语音：增强/高级/Siri/网络语音优先，其次知名本地语音 */
 let gdVoice: SpeechSynthesisVoice | null = null;
@@ -392,10 +391,12 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
   function renderPlay(seat: Seat): void {
     const elx = playEls[seat]!;
     elx.innerHTML = '';
-    // 最近出牌的人浮到手牌区之上(z 7>手牌6)，其余各家沉到手牌区之下(z 3<手牌6) → 只挡当前这手，不挡选牌
-    // 别家最新那手浮到手牌之上(z7>手牌6)，看得见人家出了什么；**我自己出的牌不浮**——
-    // 我知道自己出了什么，让手牌盖住它就行（owner 拍板：手牌盖住出的牌，不是把出的牌调透明）。
-    elx.style.zIndex = (seat === lastActor && seat !== HUMAN_SEAT) ? '7' : '3';
+    // 别家：最新那手浮到手牌之上(z7>手牌6)，其余沉到手牌之下(z3<手牌6) → 只挡当前这手，不挡选牌。
+    // 我自己：**整个「不是我的回合」都浮在 z7**、压住我那半透明的手牌。不能跟着 lastActor 走——
+    // 下家一接手我就沉到 z3，会从 .45 的手牌底下透出来（老 bug），而且那段淡只活 1.7s 看不见。
+    // 轮到我时沉回 z3，由 z8 的手牌完整盖住（见 emphasis()）。
+    const myTurnNow = started && !isDealOver(state) && state.turn === HUMAN_SEAT;
+    elx.style.zIndex = seat === HUMAN_SEAT ? (myTurnNow ? '3' : '7') : (seat === lastActor ? '7' : '3');
     const lp = lastPlays[seat];
     if (lp === null) { elx.classList.remove('has-play'); return; }
     elx.classList.add('has-play');
@@ -536,35 +537,21 @@ export function mountTable(root: HTMLElement, driver: GameDriver): () => void {
     return false;
   }
 
-  /** 我出的那手牌是不是「手牌盖不住」：与手牌有交集、但没被手牌完整遮住（有一截露在外面）。
-   *  三种情形见 pokesOut() 的注释。手牌是阶梯形（同点数成列、各列高低不一），
-   *  不能拿容器包围盒判，按逐张牌矩形采样——判定本体是纯函数，单测在 tests/guandan/play-coverage.test.ts。 */
-  function myPlayPokesOutOfHand(): boolean {
-    const pe = playEls[HUMAN_SEAT]!;
-    if (!pe.classList.contains('has-play')) return false;
-    return pokesOut(pe.getBoundingClientRect(),
-      Array.from(handEl.querySelectorAll('.dgc-card')).map((c) => c.getBoundingClientRect()));
-  }
-
   function renderAll(): void {
     for (const s of [0, 1, 2, 3] as Seat[]) { renderSeatInfo(s); renderPlay(s); }
     renderHand();
     renderStatus();
     renderButtons();
     syncTurnTimer();
-    // 手牌与出牌区的层叠/透明。**淡谁，看牌是谁出的**（仿干瞪眼：淡的是出的牌，不是手牌）：
-    // · 轮到我出牌：手牌浮到 z7 之上(gd-hand--ontop)，把压住我手牌的别家牌盖回去 → 手牌完整不透明、好选牌；
-    // · 别家的牌压住我手牌：淡手牌到 45%，让别家出的牌/「不要」凸显——这是这条逻辑的本意；
-    // · **我自己**的牌：不淡手牌。我的出牌区恒 z3 在手牌之下，手牌盖得住就藏着；
-    //   盖不住、露出一截时才淡那手牌本身（gd-play--peek）。淡手牌是反的——会把整手牌洗白。
+    // 手牌与出牌区的层叠/透明：**焦点按回合整段切换**，两块一实一淡（状态表见 emphasis()）。
+    // 轮到我 → 手牌浮到最上(gd-hand--ontop z8)且实体，把各家出的牌连同我自己那手一起盖回去，好选牌。
     // 90° 旋转下各元素包围盒仍是正交矩形，元素间矩形相交判断准确。
     const live = started && !isDealOver(state);
     const myTurn = live && state.turn === HUMAN_SEAT;
-    const othersCover = lastActor !== null && lastActor !== HUMAN_SEAT && playCoversHand(lastActor);
+    const e = emphasis({ live, myTurn, coversHand: playCoversHand(HUMAN_SEAT) || playCoversHand(lastActor) });
     handEl.classList.toggle('gd-hand--ontop', myTurn);
-    handEl.classList.toggle('gd-hand--dim', !myTurn && live && othersCover);
-    // 我自己出的牌恒 z3 在手牌之下：盖得住就让它藏着，盖不住（露出一截）才把它淡下去
-    playEls[HUMAN_SEAT]!.classList.toggle('gd-play--peek', live && myPlayPokesOutOfHand());
+    handEl.classList.toggle('gd-hand--dim', e.handDim);
+    playEls[HUMAN_SEAT]!.classList.toggle('gd-play--recede', e.myPlayDim);
   }
 
   // ── 出牌（牌局推进在服务端，经 driver；view 只取选中牌、转 driver） ──

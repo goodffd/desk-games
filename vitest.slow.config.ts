@@ -12,6 +12,6 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   test: {
     include: ['tests/**/*.slow.test.ts'],
-    exclude: ['**/.claude/**', '**/node_modules/**', '**/dist/**'],
+    exclude: ['**/.codex/**', '**/node_modules/**', '**/dist/**'],
   },
 });

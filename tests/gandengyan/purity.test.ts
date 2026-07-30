@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 /**
  * 引擎纯度闸门。
  *
- * 项目 CLAUDE.md 的硬约定：`engine/` 绝不 import DOM，规则判定只有这一个真相来源。
+ * 项目 AGENTS.md 的硬约定：`engine/` 绝不 import DOM，规则判定只有这一个真相来源。
  * 干瞪眼还多一条：**引擎自己不摇骰子**——洗牌函数由调用方注入，
  * 否则同一个种子复现不出同一局，模糊测试的失败就没法复盘。
  *

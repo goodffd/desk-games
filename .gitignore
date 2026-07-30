@@ -1,7 +1,7 @@
 node_modules/
 dist/
 src/shell/links.ts
-.claude/
+.codex/
 .DS_Store
 **/.DS_Store
 
